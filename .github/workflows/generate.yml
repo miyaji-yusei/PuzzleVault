@@ -1,0 +1,37 @@
+name: Puzzle Generation
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 毎日03:00 JST
+  workflow_dispatch:
+    inputs:
+      game:
+        description: '対象ゲーム (sudoku/nonogram/queens/libra/panda/hashi/all)'
+        default: 'all'
+      count:
+        description: '生成問題数'
+        default: '100'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - name: Generate puzzles
+        run: npx ts-node scripts/generate-puzzles.ts
+        env:
+          GAME: ${{ github.event.inputs.game || 'all' }}
+          PUZZLE_COUNT: ${{ github.event.inputs.count || '100' }}
+          DIFFICULTY_LEVELS: easy,normal,hard,expert
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: '[Auto] 問題データ更新 ${{ github.run_id }}'
+          branch: 'auto/puzzles-${{ github.run_number }}'
+          commit-message: 'chore: auto-generate puzzle data'
+          body: '自動生成された問題データの更新です。'
