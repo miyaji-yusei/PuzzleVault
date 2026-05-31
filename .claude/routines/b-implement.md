@@ -1,106 +1,104 @@
-# Routine B: 自動実装
+# Routine B: ゲームエンジン実装 (Worker Phase 2)
 
-## 目的
-claudeラベル付きIssueを1件取得し、ゲームエンジンを実装してPRを作成する。
+## ブランチルール
+- ベース: `develop`（必ず `git checkout develop && git pull origin develop` から開始）
+- 作業ブランチ: `claude/{issue番号}`（developから切る）
+- PRターゲット: `develop`（`--base develop` 必須）
+- `main` には絶対に触らない
 
 ## 手順
 
-1. `.claude/paused` ファイルが存在する場合は「一時停止中のためスキップします」と出力して終了する
+1. `.claude/paused` ファイルが存在する場合は「一時停止中」と出力して終了する
 
-2. `gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number) | .[0]'` でIssueを1件取得する
+2. claudeラベルIssueを全件取得する:
+   `gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number)'`
 
-3. Issueが取得できない場合は「実装待ちIssueがありません」と出力して終了する
+3. Issueが0件なら「実装待ちIssueなし」と出力して終了する
 
-4. 取得したIssueの番号・タイトル・本文を確認し、対象ゲーム名（例: sudoku）を特定する
+4. **実装ループ**（最大3件。トークン残量が少ない場合は途中で終了してよい）:
 
-5. `git checkout develop && git pull origin develop` で最新を取得する
+   各Issueについて以下を実行:
 
-6. `git checkout -b claude/{issue番号}` でブランチを作成する
+   a. `git checkout develop && git pull origin develop`
+   b. `git checkout -b claude/{Issue番号}`
+   c. `.github/CLAUDE.md` を読んでコーディング規約を確認する
+   d. Issue本文に記載された仕様書パス（`docs/md/games/{name}.md`）を読む
+   e. 以下のファイルを実装する:
+      - `src/engines/{name}/types.ts` - 型定義（`src/types/engine.ts` の Difficulty等を参照）
+      - `src/engines/{name}/generator.ts` - seed引数必須、同一seedで同一問題を再現
+      - `src/engines/{name}/solver.ts` - solve() と countSolutions()
+      - `src/engines/{name}/validator.ts` - ValidationResult を返す
+      - `src/engines/{name}/index.ts` - 全関数をエクスポート
+      - `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
+   f. テストは以下をカバーする:
+      - 各Difficultyで10問生成して全問解けることを確認
+      - 同一seedで同一問題が生成されることを確認
+      - countSolutions()の一意解チェックが正しいことを確認
+      - 生成時間が500ms以内（Normal）
+      - validateが正誤を正しく判定することを確認
+   g. `npm run typecheck` を実行してエラーがないことを確認する
+   h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
+   i. エラーがある場合は修正する（最大3回）
+   j. `git add -A && git commit -m "[ClaudeCode] #{番号} {ゲーム名}エンジン実装"`
+   k. `git push origin claude/{Issue番号}`
+   l. 以下のPR本文でPRを作成する:
+      `gh pr create --base develop --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" --body "{本文}"`
 
-7. `.github/CLAUDE.md` を読んでコーディング規約を確認する
+      PR本文:
+      ```
+      ## 🎮 このPRで遊べるようになるゲーム
 
-8. Issue本文に記載された仕様書パス（`docs/md/games/{name}.md`）を読んで仕様を理解する
+      **{ゲーム名}** のエンジンが追加されます。
 
-9. 以下のファイルを実装する:
-   - `src/engines/{name}/types.ts` - 型定義（Difficulty等の共通型は `src/types/engine.ts` を参照）
-   - `src/engines/{name}/generator.ts` - 問題生成（seed引数必須、同一seedで同一問題を再現）
-   - `src/engines/{name}/solver.ts` - 解法・countSolutions()（一意解チェック用）
-   - `src/engines/{name}/validator.ts` - ユーザー入力の合否判定
-   - `src/engines/{name}/index.ts` - 全関数のエクスポート
-   - `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
+      ### ゲーム概要
+      {仕様書の概要から1〜2文}
 
-10. テストは以下をカバーすること:
-    - 各Difficultyで10問生成して全問解けることを確認
-    - 同一seedで同一問題が生成されることを確認
-    - countSolutions()が一意解を正しく判定することを確認
-    - 生成時間が500ms以内であることを確認（Normal難易度）
-    - validateが正誤を正しく判定することを確認
+      ### 難易度
+      easy / normal / hard / expert の4段階
 
-11. `npm run typecheck` を実行しエラーがないことを確認する
+      ---
 
-12. `npm test -- --testPathPattern={name}` を実行し全件パスすることを確認する
+      ## ✅ 実装内容
 
-13. エラーがあれば修正してから次に進む（最大3回まで修正を試みる）
+      - [x] `src/engines/{name}/generator.ts` - 問題生成（seed対応）
+      - [x] `src/engines/{name}/solver.ts` - 解法・一意解チェック
+      - [x] `src/engines/{name}/validator.ts` - ユーザー入力検証
+      - [x] `src/engines/{name}/types.ts` - 型定義
+      - [x] `src/engines/{name}/index.ts` - エクスポート
+      - [x] `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
 
-14. `git add -A && git commit -m "[ClaudeCode] #{番号} {ゲーム名}エンジン実装"` でコミットする
+      ---
 
-15. `git push origin claude/{issue番号}` でpushする
+      ## 🖥️ ローカルで動作確認する手順
 
-16. 以下のテンプレートでPRを作成する:
-    `gh pr create --base develop --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" --body "{本文}"`
+      ```bash
+      # 1. このブランチをチェックアウト
+      git fetch origin
+      git checkout claude/{Issue番号}
 
-    PR本文テンプレート:
-    ```
-    ## 🎮 このPRで遊べるようになるゲーム
+      # 2. 依存パッケージをインストール
+      npm install --legacy-peer-deps
 
-    **{ゲーム名}** のエンジンが追加されます。
+      # 3. エンジン単体テストを実行
+      npm test -- --testPathPattern={name}
 
-    ### ゲーム概要
-    {仕様書の概要セクションから1〜2文}
+      # 4. 型チェックを実行
+      npm run typecheck
 
-    ### 難易度
-    easy / normal / hard / expert の4段階
+      # 5. 問題を1問生成して内容を確認（オプション）
+      npx ts-node -e "
+      const engine = require('./src/engines/{name}');
+      const puzzle = engine.generate('normal', 12345);
+      console.log(JSON.stringify(puzzle, null, 2));
+      "
+      ```
 
-    ---
+      ---
 
-    ## ✅ 実装内容
+      Closes #{番号}
+      ```
 
-    - [x] `src/engines/{name}/generator.ts` - 問題生成（seed対応）
-    - [x] `src/engines/{name}/solver.ts` - 解法・一意解チェック
-    - [x] `src/engines/{name}/validator.ts` - ユーザー入力検証
-    - [x] `src/engines/{name}/types.ts` - 型定義
-    - [x] `src/engines/{name}/index.ts` - エクスポート
-    - [x] `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
+   m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
 
-    ---
-
-    ## 🖥️ ローカルで動作確認する手順
-
-    ```bash
-    # 1. このブランチをチェックアウト
-    git fetch origin
-    git checkout claude/{issue番号}
-
-    # 2. 依存パッケージをインストール
-    npm install --legacy-peer-deps
-
-    # 3. エンジン単体テストを実行
-    npm test -- --testPathPattern={name}
-
-    # 4. 型チェックを実行
-    npm run typecheck
-
-    # 5. 問題を1問生成して内容を確認（オプション）
-    npx ts-node -e "
-    const engine = require('./src/engines/{name}');
-    const puzzle = engine.generate('normal', 12345);
-    console.log(JSON.stringify(puzzle, null, 2));
-    "
-    ```
-
-    ---
-
-    Closes #{番号}
-    ```
-
-17. `gh issue edit {番号} --add-label in-progress --remove-label claude` でIssueのラベルを更新する
+5. 実装した件数を記録する:
+   `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました"`
