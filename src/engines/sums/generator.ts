@@ -14,6 +14,7 @@ function createRng(seed: number): () => number {
 
 const SIZE: Record<Difficulty, number> = { easy: 8, normal: 10, hard: 13, expert: 16 }
 const DENSITY: Record<Difficulty, number> = { easy: 0.22, normal: 0.28, hard: 0.32, expert: 0.35 }
+const FILL_BUDGET: Record<Difficulty, number> = { easy: 50000, normal: 100000, hard: 200000, expert: 500000 }
 
 function makeIsBlack(size: number, rng: () => number, density: number): boolean[][] {
   return Array.from({ length: size }, (_, r) =>
@@ -73,8 +74,10 @@ function fillValues(
   vOf: Map<string, [number, number][]>,
   sol: (number | null)[][],
   idx: number,
-  rng: () => number
+  rng: () => number,
+  budget: { n: number }
 ): boolean {
+  if (budget.n-- <= 0) return false
   if (idx === wCells.length) return true
   const [r, c] = wCells[idx]!
   const key = `${r},${c}`
@@ -94,7 +97,7 @@ function fillValues(
   for (const val of vals) {
     if (used.has(val)) continue
     sol[r]![c] = val
-    if (fillValues(wCells, hOf, vOf, sol, idx + 1, rng)) return true
+    if (fillValues(wCells, hOf, vOf, sol, idx + 1, rng, budget)) return true
     sol[r]![c] = null
   }
   return false
@@ -142,7 +145,7 @@ function tryGenerate(difficulty: Difficulty, seed: number): SumsPuzzle | null {
   if (!wCells.every(([r, c]) => hOf.has(`${r},${c}`) && vOf.has(`${r},${c}`))) return null
 
   const sol: (number | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
-  if (!fillValues(wCells, hOf, vOf, sol, 0, rng)) return null
+  if (!fillValues(wCells, hOf, vOf, sol, 0, rng, { n: FILL_BUDGET[difficulty] })) return null
 
   const grid = buildGrid(b, size, sol, hOf, vOf)
   const solution = sol as (CellValue | null)[][]
