@@ -29,85 +29,68 @@ const DIFFICULTY_SIZE: Record<Difficulty, number> = {
   expert: 12,
 }
 
-function isAdjacentToAny(
-  queens: [number, number][],
-  row: number,
-  col: number
-): boolean {
-  for (const [qr, qc] of queens) {
-    if (Math.abs(qr - row) <= 1 && Math.abs(qc - col) <= 1) return true
-  }
-  return false
-}
+const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]] as const
 
+// queens[r] = row r のクイーンの列。
+// 最適化: 直前行のクイーンのみ隣接チェックすればよい（2行以上離れたクイーンは絶対に隣接しない）
 function placeQueens(
   n: number,
   row: number,
-  queens: [number, number][],
-  usedCols: Set<number>,
+  queens: number[],
+  colMask: number,
+  prevCol: number,
   colOrder: number[],
   rng: () => number
-): [number, number][] | null {
+): number[] | null {
   if (row === n) return queens
-
-  const shuffledCols = shuffle(colOrder, rng)
-  for (const col of shuffledCols) {
-    if (usedCols.has(col)) continue
-    if (isAdjacentToAny(queens, row, col)) continue
-
-    usedCols.add(col)
-    queens.push([row, col])
-    const result = placeQueens(n, row + 1, queens, usedCols, colOrder, rng)
+  const shuffled = shuffle(colOrder, rng)
+  for (const col of shuffled) {
+    if (colMask & (1 << col)) continue
+    if (Math.abs(prevCol - col) <= 1) continue
+    queens.push(col)
+    const result = placeQueens(n, row + 1, queens, colMask | (1 << col), col, colOrder, rng)
     if (result !== null) return result
     queens.pop()
-    usedCols.delete(col)
   }
   return null
 }
 
-const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]] as const
-
-/**
- * ランダムフロンティア拡張で領域を生成する。
- * Voronoi（純粋BFS）と異なり、各ステップでランダムなフロンティアセルを選ぶため
- * 不規則な形状の領域が生成され、一意解を持ちやすくなる。
- */
-function buildRegions(n: number, queens: [number, number][], rng: () => number): ColorId[][] {
-  const regions: ColorId[][] = Array.from({ length: n }, () =>
-    Array(n).fill(-1) as ColorId[]
-  )
-
-  for (let i = 0; i < queens.length; i++) {
-    const [r, c] = queens[i]
-    regions[r][c] = i as ColorId
+// ランダムフロンティア拡張で領域を生成（Voronoiより非対称で一意解になりやすい）
+function buildRegions(n: number, queenCols: number[], rng: () => number): number[] {
+  const regions = new Array<number>(n * n).fill(-1)
+  for (let r = 0; r < n; r++) {
+    regions[r * n + queenCols[r]] = r
   }
 
-  const frontier: [number, number, ColorId][] = []
-  for (let i = 0; i < queens.length; i++) {
-    const [qr, qc] = queens[i]
+  const frontier: number[] = []
+  const fColor: number[] = []
+  for (let r = 0; r < n; r++) {
+    const qc = queenCols[r]
     for (const [dr, dc] of DIRS) {
-      const nr = qr + dr
-      const nc = qc + dc
-      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) {
-        frontier.push([nr, nc, i as ColorId])
+      const nr = r + dr, nc = qc + dc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr * n + nc] === -1) {
+        frontier.push(nr * n + nc)
+        fColor.push(r)
       }
     }
   }
 
   while (frontier.length > 0) {
     const idx = Math.floor(rng() * frontier.length)
-    const [r, c, color] = frontier[idx]
-    frontier[idx] = frontier[frontier.length - 1]
-    frontier.pop()
-
-    if (regions[r][c] !== -1) continue
-
-    regions[r][c] = color
+    const pos = frontier[idx]
+    const color = fColor[idx]
+    const last = frontier.length - 1
+    frontier[idx] = frontier[last]; frontier.pop()
+    fColor[idx] = fColor[last]; fColor.pop()
+    if (regions[pos] !== -1) continue
+    regions[pos] = color
+    const r = (pos / n) | 0, c = pos % n
     for (const [dr, dc] of DIRS) {
-      const nr = r + dr
-      const nc = c + dc
-      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) {
-        frontier.push([nr, nc, color])
+      const nr = r + dr, nc = c + dc
+      const npos = nr * n + nc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[npos] === -1) {
+        frontier.push(npos)
+        fColor.push(color)
       }
     }
   }
@@ -115,126 +98,180 @@ function buildRegions(n: number, queens: [number, number][], rng: () => number):
   return regions
 }
 
-function countSolutionsInternal(
+// ビットマスク + O(1)隣接チェック高速解カウント
+function countSolutionsFast(
   n: number,
-  regions: ColorId[][],
+  regions: number[],
   row: number,
-  usedCols: Set<number>,
-  usedColors: Set<number>,
-  queens: [number, number][],
-  count: { value: number }
+  colMask: number,
+  colorMask: number,
+  prevCol: number,
+  count: { value: number },
+  maxCount: number
 ): void {
-  if (count.value > 1) return
-  if (row === n) {
-    count.value++
-    return
-  }
-
+  if (count.value >= maxCount) return
+  if (row === n) { count.value++; return }
   for (let col = 0; col < n; col++) {
-    if (usedCols.has(col)) continue
-    const color = regions[row][col]
-    if (usedColors.has(color)) continue
-    if (isAdjacentToAny(queens, row, col)) continue
-
-    usedCols.add(col)
-    usedColors.add(color)
-    queens.push([row, col])
-    countSolutionsInternal(n, regions, row + 1, usedCols, usedColors, queens, count)
-    queens.pop()
-    usedCols.delete(col)
-    usedColors.delete(color)
+    if (colMask & (1 << col)) continue
+    if (Math.abs(prevCol - col) <= 1) continue
+    const color = regions[row * n + col]
+    if (colorMask & (1 << color)) continue
+    countSolutionsFast(n, regions, row + 1, colMask | (1 << col), colorMask | (1 << color), col, count, maxCount)
   }
 }
 
-function hasUniqueSolution(n: number, regions: ColorId[][]): boolean {
+function hasUniqueSolution(n: number, regions: number[]): boolean {
   const count = { value: 0 }
-  countSolutionsInternal(n, regions, 0, new Set(), new Set(), [], count)
+  countSolutionsFast(n, regions, 0, 0, 0, -100, count, 2)
   return count.value === 1
 }
 
-function isRegionConnected(n: number, regions: ColorId[][], color: ColorId): boolean {
-  let start: [number, number] | null = null
-  let total = 0
+// 代替解（primary 以外の解）を1つ探す。なければ null を返す。
+function findAltSolution(n: number, regions: number[], primary: number[]): number[] | null {
+  const found: number[][] = []
 
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      if (regions[r][c] === color) {
-        total++
-        if (start === null) start = [r, c]
+  function bt(row: number, colMask: number, colorMask: number, prevCol: number, queens: number[]) {
+    if (found.length >= 1) return
+    if (row === n) {
+      for (let r = 0; r < n; r++) {
+        if (queens[r] !== primary[r]) { found.push([...queens]); return }
       }
+      return  // this is the primary solution, skip
+    }
+    for (let col = 0; col < n; col++) {
+      if (colMask & (1 << col)) continue
+      if (Math.abs(prevCol - col) <= 1) continue
+      const color = regions[row * n + col]
+      if (colorMask & (1 << color)) continue
+      queens.push(col)
+      bt(row + 1, colMask | (1 << col), colorMask | (1 << color), col, queens)
+      queens.pop()
     }
   }
 
-  if (start === null) return false
+  bt(0, 0, 0, -100, [])
+  return found.length >= 1 ? found[0] : null
+}
+
+function isRegionConnected(n: number, regions: number[], color: number): boolean {
+  let start = -1, total = 0
+  for (let i = 0; i < n * n; i++) {
+    if (regions[i] === color) { total++; if (start === -1) start = i }
+  }
+  if (start === -1) return false
 
   const visited = new Uint8Array(n * n)
-  const queue: [number, number][] = [start]
-  visited[start[0] * n + start[1]] = 1
-  let head = 0
-  let count = 1
+  const queue: number[] = [start]
+  visited[start] = 1
+  let head = 0, count = 1
 
   while (head < queue.length) {
-    const [r, c] = queue[head++]
+    const pos = queue[head++]
+    const r = (pos / n) | 0, c = pos % n
     for (const [dr, dc] of DIRS) {
-      const nr = r + dr
-      const nc = c + dc
-      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === color && !visited[nr * n + nc]) {
-        visited[nr * n + nc] = 1
-        count++
-        queue.push([nr, nc])
+      const nr = r + dr, nc = c + dc
+      const npos = nr * n + nc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[npos] === color && !visited[npos]) {
+        visited[npos] = 1; count++; queue.push(npos)
       }
     }
   }
-
   return count === total
 }
 
-function adjustForUniqueness(
+// 代替クイーン位置への調整を1回行う（altを引数に受け取り、findAltSolutionを呼ばない）
+function applyTargetedAdjustment(
   n: number,
-  regions: ColorId[][],
-  queens: [number, number][],
-  rng: () => number,
-  maxAttempts = 200
-): ColorId[][] {
-  const queenSet = new Set(queens.map(([r, c]) => r * n + c))
+  regions: number[],
+  queenCols: number[],
+  queenSet: Set<number>,
+  alt: number[],
+  rng: () => number
+): number[] {
+  const rows = shuffle(Array.from({ length: n }, (_, i) => i), rng)
+  let working = [...regions]
+  let anyChanged = false
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (hasUniqueSolution(n, regions)) return regions
+  for (const r of rows) {
+    const ac = alt[r]
+    const pos = r * n + ac
+    if (queenSet.has(pos)) continue
 
-    const borderCells: [number, number, ColorId, ColorId][] = []
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (queenSet.has(r * n + c)) continue
+    const altColor = working[pos]
+    const intendedColor = working[r * n + queenCols[r]]
 
-        const currentColor = regions[r][c]
-        for (const [dr, dc] of DIRS) {
-          const nr = r + dr
-          const nc = c + dc
-          if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
-            const neighborColor = regions[nr][nc]
-            if (neighborColor !== currentColor) {
-              borderCells.push([r, c, currentColor, neighborColor])
-              break
-            }
-          }
-        }
+    const targets: number[] = []
+    if (intendedColor !== altColor) targets.push(intendedColor)
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr, nc = ac + dc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
+        const neighborColor = working[nr * n + nc]
+        if (neighborColor !== altColor && !targets.includes(neighborColor)) targets.push(neighborColor)
       }
     }
 
-    if (borderCells.length === 0) break
-
-    const idx = Math.floor(rng() * borderCells.length)
-    const [br, bc, oldColor, newColor] = borderCells[idx]
-
-    const testRegions = regions.map(row => [...row] as ColorId[])
-    testRegions[br][bc] = newColor
-
-    if (isRegionConnected(n, testRegions, oldColor)) {
-      regions = testRegions
+    for (const newColor of targets) {
+      const candidate = [...working]
+      candidate[pos] = newColor
+      if (isRegionConnected(n, candidate, altColor)) {
+        working = candidate
+        anyChanged = true
+        break
+      }
     }
   }
 
+  if (anyChanged) return working
+
+  // フォールバック: ランダム境界セル調整
+  const borderCells: [number, number, number][] = []
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const pos = r * n + c
+      if (queenSet.has(pos)) continue
+      const color = regions[pos]
+      for (const [dr, dc] of DIRS) {
+        const nr = r + dr, nc = c + dc
+        if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr * n + nc] !== color) {
+          borderCells.push([pos, color, regions[nr * n + nc]])
+          break
+        }
+      }
+    }
+  }
+  if (borderCells.length === 0) return regions
+  const [bpos, oldColor, newColor] = borderCells[Math.floor(rng() * borderCells.length)]
+  const test = [...regions]
+  test[bpos] = newColor
+  if (isRegionConnected(n, test, oldColor)) return test
   return regions
+}
+
+// findAltSolution をラウンドごとに1回だけ呼び出し、その間はN回のターゲット調整をまとめて実行する。
+// これにより大グリッドでの findAltSolution 呼び出し回数を大幅削減し高速化する。
+function adjustForUniqueness(
+  n: number,
+  regions: number[],
+  queenCols: number[],
+  rng: () => number
+): { regions: number[]; unique: boolean } {
+  const queenSet = new Set<number>(queenCols.map((c, r) => r * n + c))
+  // ラウンドごとの調整回数: グリッドが大きいほど多くの調整が必要
+  const adjustsPerRound = n * 3
+  // ラウンド数: これだけ findAltSolution を呼び出す
+  const maxRounds = 8
+
+  for (let round = 0; round < maxRounds; round++) {
+    const alt = findAltSolution(n, regions, queenCols)
+    if (alt === null) return { regions, unique: true }
+
+    // 同じ代替解を狙って複数回調整（findAltSolution は再呼び出しせず）
+    for (let adj = 0; adj < adjustsPerRound; adj++) {
+      regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt, rng)
+    }
+  }
+
+  return { regions, unique: false }
 }
 
 export function generate(difficulty: Difficulty, seed: number): QueensPuzzle {
@@ -242,26 +279,24 @@ export function generate(difficulty: Difficulty, seed: number): QueensPuzzle {
   const actualSeed = seed >>> 0
   const colOrder = Array.from({ length: n }, (_, i) => i)
 
-  for (let attempt = 0; attempt < 50; attempt++) {
-    // 各試行に独立した決定論的サブシードを使うことで、シードが同じなら常に同じ結果を返しつつ、
-    // 試行ごとに異なる探索空間をカバーできる。
+  for (let attempt = 0; attempt < 300; attempt++) {
+    // 試行ごとに独立したサブシードで、同一seedなら常に同じ結果を保証する
     const subSeed = (actualSeed + attempt * 0x9e3779b9) >>> 0
     const rng = createRng(subSeed)
 
-    const placedQueens = placeQueens(n, 0, [], new Set<number>(), colOrder, rng)
-    if (placedQueens === null) continue
+    const queenCols = placeQueens(n, 0, [], 0, -100, colOrder, rng)
+    if (queenCols === null) continue
 
-    let regions = buildRegions(n, placedQueens, rng)
-    regions = adjustForUniqueness(n, regions, placedQueens, rng, 200)
+    const flatRegions = buildRegions(n, queenCols, rng)
+    const { regions: adjustedRegions, unique } = adjustForUniqueness(n, flatRegions, queenCols, rng)
 
-    if (!hasUniqueSolution(n, regions)) continue
+    if (!unique) continue
 
-    const solution: boolean[][] = Array.from({ length: n }, () =>
-      Array(n).fill(false) as boolean[]
+    const regions: ColorId[][] = Array.from({ length: n }, (_, r) =>
+      Array.from({ length: n }, (_, c) => adjustedRegions[r * n + c] as ColorId)
     )
-    for (const [r, c] of placedQueens) {
-      solution[r][c] = true
-    }
+    const solution: boolean[][] = Array.from({ length: n }, () => Array(n).fill(false) as boolean[])
+    for (let r = 0; r < n; r++) solution[r][queenCols[r]] = true
 
     return {
       id: `queens-${difficulty}-${actualSeed}`,
