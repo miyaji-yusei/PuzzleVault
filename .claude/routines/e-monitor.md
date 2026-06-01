@@ -13,24 +13,35 @@
    `gh issue list --label claude --state open --json number` が0件の場合:
    `gh issue create --title "[監視] キュー枯渇: claudeラベルIssueが0件" --label monitoring-alert --body "Issue補充が必要です。Managerの次回Phase2で補充されます。"`
 
-2. **スタック検知**
+2. **PR未作成のin-progress検知**（トークン切れ対策）
+   ```bash
+   IN_PROGRESS=$(gh issue list --label in-progress --state open --json number,title)
+   OPEN_PRS=$(gh pr list --base develop --state open --json headRefName)
+   ```
+   - `in-progress` IssueのうちPR（`claude/{番号}` ブランチ）が存在しないものを検知する
+   - 対象Issueが見つかった場合:
+     - `gh issue edit {番号} --remove-label in-progress --add-label claude`
+     - `gh issue comment {番号} --body "[Monitor] PR未作成のまま実装が中断されています（トークン切れの可能性）。Workerキューに再投入しました。次のWorkerで再実装されます。"`
+
+3. **スタック検知**
    `gh issue list --label in-progress --state open --json number,title,updatedAt` で確認:
-   - `updatedAt` から24時間以上経過したIssueを検知する
+   - `updatedAt` から24時間以上経過したIssueを検知する（Draft PRがある場合も含む）
    - `gh issue edit {番号} --add-label claude --remove-label in-progress`
    - `gh issue comment {番号} --body "[Routine E] 24時間以上進捗なし。claudeキューに再投入しました。"`
+   - 対応するDraft PRが存在する場合はクローズする: `gh pr close {PR番号} --comment "スタックしたためクローズ。Issueを再実装キューに投入しました。"`
 
-3. **PR放置チェック**
+4. **PR放置チェック**
    `gh pr list --base develop --state open --json number,title,createdAt` で確認:
    - `createdAt` から72時間以上経過したPRを検知する
    - `gh pr comment {番号} --body "[Routine E] 72時間以上マージされていません。Workerが次回レビューします。"`
 
-4. **CI連続失敗チェック**
+5. **CI連続失敗チェック**
    `gh pr list --base develop --state open --json number,title` で各PRのコメント履歴を確認:
    - "fix: レビュー修正" コミットが3回以上あるPRを検知する
    - `gh pr edit {番号} --add-label do-not-merge`
    - `gh issue create --title "[監視] CI連続失敗: PR #{番号}" --label monitoring-alert --body "手動確認が必要です。do-not-mergeラベルを付与しました。"`
 
-5. **PR本文品質チェック**
+6. **PR本文品質チェック**
    `gh pr list --base develop --state open` で各PRの本文を確認:
    - 「🎮 このPRで遊べるようになるゲーム」がなければ追記する
    - `gh pr edit {番号} --body "{更新した本文}"`
