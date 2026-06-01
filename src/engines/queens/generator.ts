@@ -254,9 +254,8 @@ function applyTargetedAdjustment(
   return regions
 }
 
-// ラウンドごとに findAltSolution を1回呼び、1回の調整を行う。
-// これにより古い alt で複数回調整して変更を打ち消し合うバグを防ぐ。
-// limit 内で代替解が見つからない場合は1回だけフル探索を行い、それでも見つからなければ一意解確定。
+// フェーズ1: bounded探索で高速に代替解を見つけ1回調整を繰り返す。
+// フェーズ2: 近一意状態になったら無制限探索で残りの代替解を潰す。
 function adjustForUniqueness(
   n: number,
   regions: number[],
@@ -265,24 +264,22 @@ function adjustForUniqueness(
 ): { regions: number[]; unique: boolean } {
   const queenSet = new Set<number>(queenCols.map((c, r) => r * n + c))
   const FAST_NODES = 5000
-  const MAX_ROUNDS = 100
+  const MAX_FAST_ROUNDS = 150
+  const MAX_FULL_ROUNDS = 8
 
-  for (let round = 0; round < MAX_ROUNDS; round++) {
+  // フェーズ1: 高速bounded探索
+  for (let round = 0; round < MAX_FAST_ROUNDS; round++) {
     const { alt, exhausted } = findAltSolution(n, regions, queenCols, FAST_NODES)
-
     if (!exhausted && alt === null) return { regions, unique: true }
-
-    if (exhausted && alt === null) {
-      // 近一意: 第2解がFAST_NODESより深い → フル探索で確認
-      const { alt: fullAlt } = findAltSolution(n, regions, queenCols)
-      if (fullAlt === null) return { regions, unique: true }
-      // 深い第2解が存在: 1回調整してこの試行を終了
-      regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, fullAlt, rng)
-      return { regions, unique: false }
-    }
-
-    // alt が見つかった: 1回だけターゲット調整
+    if (exhausted && alt === null) break  // 近一意 → フェーズ2へ
     regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt!, rng)
+  }
+
+  // フェーズ2: 無制限探索で残りの代替解を潰す
+  for (let round = 0; round < MAX_FULL_ROUNDS; round++) {
+    const { alt } = findAltSolution(n, regions, queenCols)
+    if (alt === null) return { regions, unique: true }
+    regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt, rng)
   }
 
   return { regions, unique: false }
