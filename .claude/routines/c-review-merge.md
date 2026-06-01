@@ -61,5 +61,10 @@
    gh pr merge {番号} --squash --delete-branch
    ```
    - PR本文の `Closes #{Issue番号}` からIssue番号を取得する
-   - `gh issue edit {Issue番号} --add-label completed --remove-label in-progress`
-   - 「PR #{番号} をdevelopにマージしました」と出力する
+   - Issue番号が特定できた場合:
+     ```bash
+     gh issue edit {Issue番号} --add-label completed --remove-label in-progress --remove-label claude
+     gh issue close {Issue番号} --comment "PR #{番号} のマージにより実装完了。"
+     ```
+   - Issue番号が特定できない場合: PRタイトルの `#{番号}` からIssue番号を推測して同様に処理する
+   - 「PR #{番号} をdevelopにマージし、Issue #{Issue番号} をcompletedでクローズしました」と出力する
