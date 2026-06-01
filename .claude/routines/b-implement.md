@@ -39,10 +39,24 @@
    g. `npm run typecheck` を実行してエラーがないことを確認する
    h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
    i. エラーがある場合は修正する（最大3回）
-   j. `git add -A && git commit -m "[ClaudeCode] #{番号} {ゲーム名}エンジン実装"`
+   j. `git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"`
    k. `git push origin claude/{Issue番号}`
-   l. 以下のPR本文でPRを作成する:
-      `gh pr create --base develop --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" --body "{本文}"`
+   k2. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
+       ```bash
+       DRAFT_PR=$(gh pr create --base develop --draft \
+         --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
+         --body "作業中のDraft PRです。実装完了後にReadyに変換します。\n\nCloses #{番号}")
+       # $DRAFT_PR にPR番号が返る
+       ```
+       → Draft PR作成後、実装を継続する。以降のpushは自動的にこのPRに反映される。
+   l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
+      ```bash
+      gh pr ready {PR番号}
+      gh pr edit {PR番号} \
+        --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" \
+        --body "{完成したPR本文（下記テンプレート）}"
+      ```
+      PR本文（Readyに変換時に設定）:
 
       PR本文:
       ```
