@@ -49,7 +49,22 @@
 
    **リリース不適**:
    - 完了ゲームが2件以下
-   → `gh issue create --title "[リリース判断] 基準未達" --label monitoring-alert --body "完了ゲーム: {N}件。基準（3件以上）に未達のためリリース見送り。"` を作成して終了する
+   → 重複作成を防ぐため、同じ件数での "基準未達" Issueが既に存在しないか確認してから作成する:
+     ```bash
+     EXISTING=$(gh issue list --label monitoring-alert --state open --json title \
+       --jq "[.[] | select(.title | contains(\"基準未達\"))] | length")
+     if [ "$EXISTING" -eq 0 ]; then
+       gh issue create --title "[リリース判断] 基準未達" --label monitoring-alert \
+         --body "完了ゲーム: {N}件。基準（3件以上）に未達のためリリース見送り。"
+     fi
+     ```
+   → `.claude/last-release-check` に現在のcompleted数を書き込んで終了する（重複実行防止）:
+     ```bash
+     echo "{N}" > .claude/last-release-check
+     git add .claude/last-release-check
+     git commit -m "chore: リリースチェック記録更新（基準未達）"
+     git push origin develop
+     ```
 
 7. リリース適と判断した場合:
    - `npm test` を実行して全件パスを確認する
