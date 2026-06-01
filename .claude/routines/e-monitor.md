@@ -9,53 +9,81 @@
 
 ### フェーズ1: 異常検知・復旧
 
-1. **キュー枯渇チェック**
-   `gh issue list --label claude --state open --json number` が0件の場合:
-   `gh issue create --title "[監視] キュー枯渇: claudeラベルIssueが0件" --label monitoring-alert --body "Issue補充が必要です。Managerの次回Phase2で補充されます。"`
-
-2. **PR未作成のin-progress検知**（トークン切れ対策）
+1. **マージ済みPRのIssue状態修復**（最優先チェック）
    ```bash
-   IN_PROGRESS=$(gh issue list --label in-progress --state open --json number,title)
-   OPEN_PRS=$(gh pr list --base develop --state open --json headRefName)
+   # in-progress または claude ラベルのIssueを全件取得
+   gh issue list --label in-progress,claude --state open --json number,title,labels
    ```
-   - `in-progress` IssueのうちPR（`claude/{番号}` ブランチ）が存在しないものを検知する
-   - 対象Issueが見つかった場合:
-     - `gh issue edit {番号} --remove-label in-progress --add-label claude`
-     - `gh issue comment {番号} --body "[Monitor] PR未作成のまま実装が中断されています（トークン切れの可能性）。Workerキューに再投入しました。次のWorkerで再実装されます。"`
+   各Issueについて `gh pr list --head claude/{番号} --state all --json number,state,mergedAt` を確認する:
+   - PRが `merged` → Issueをcompleted + close:
+     ```bash
+     gh issue edit {番号} --add-label completed --remove-label in-progress --remove-label claude
+     gh issue close {番号} --comment "[Monitor] PR #{PR番号}がマージ済みのため完了としてクローズしました。"
+     ```
+   - PRが `closed`（未マージ）でIssueが `in-progress` → claudeに再キュー:
+     ```bash
+     gh issue edit {番号} --remove-label in-progress --add-label claude
+     gh issue comment {番号} --body "[Monitor] PRがクローズされています。Workerキューに再投入しました。"
+     ```
+   - PRが存在しない + Issueが `in-progress` → claudeに再キュー:
+     ```bash
+     gh issue edit {番号} --remove-label in-progress --add-label claude
+     gh issue comment {番号} --body "[Monitor] PR未作成のまま中断されています（トークン切れの可能性）。Workerキューに再投入しました。"
+     ```
+   - PRが存在しない + Issueが `claude` → 正常（Workerが未処理）→ そのまま
 
-3. **スタック検知**
-   `gh issue list --label in-progress --state open --json number,title,updatedAt` で確認:
-   - `updatedAt` から24時間以上経過したIssueを検知する（Draft PRがある場合も含む）
-   - `gh issue edit {番号} --add-label claude --remove-label in-progress`
-   - `gh issue comment {番号} --body "[Routine E] 24時間以上進捗なし。claudeキューに再投入しました。"`
-   - 対応するDraft PRが存在する場合はクローズする: `gh pr close {PR番号} --comment "スタックしたためクローズ。Issueを再実装キューに投入しました。"`
+2. **キュー枯渇チェック**
+   ```bash
+   gh issue list --label claude --state open --json number
+   ```
+   が0件の場合:
+   - `gh issue create --title "[監視] キュー枯渇: claudeラベルIssueが0件" --label monitoring-alert --body "Issue補充が必要です。このManagerセッションのPhase2で補充されます。"`
+   - **注意**: このフラグは後続のPhase2（a-issue-refill）で必ず処理すること。キュー枯渇の場合Phase2はスキップせずに実行する。
 
-4. **PR放置チェック**
-   `gh pr list --base develop --state open --json number,title,createdAt` で確認:
-   - `createdAt` から72時間以上経過したPRを検知する
-   - `gh pr comment {番号} --body "[Routine E] 72時間以上マージされていません。Workerが次回レビューします。"`
+3. **スタック検知**（24時間以上更新なし）
+   ```bash
+   gh issue list --label in-progress --state open --json number,title,updatedAt
+   ```
+   - `updatedAt` から24時間以上経過: ステップ1の修復処理と重複するためスキップ（ステップ1で対処済み）
+
+4. **PR放置チェック**（72時間以上open）
+   ```bash
+   gh pr list --base develop --state open --json number,title,createdAt,isDraft
+   ```
+   - `createdAt` から72時間以上経過したdraft PRを検知:
+     `gh pr comment {番号} --body "[Monitor] 72時間以上Draftのままです。Workerが次回対応します。"`
+   - 72時間以上経過したready PRを検知:
+     `gh pr comment {番号} --body "[Monitor] 72時間以上マージされていません。Workerが次回レビューします。"`
 
 5. **CI連続失敗チェック**
-   `gh pr list --base develop --state open --json number,title` で各PRのコメント履歴を確認:
-   - "fix: レビュー修正" コミットが3回以上あるPRを検知する
-   - `gh pr edit {番号} --add-label do-not-merge`
-   - `gh issue create --title "[監視] CI連続失敗: PR #{番号}" --label monitoring-alert --body "手動確認が必要です。do-not-mergeラベルを付与しました。"`
+   ```bash
+   gh pr list --base develop --state open --json number,title
+   ```
+   各PRについてコミット履歴を確認:
+   - `"fix: レビュー修正"` コミットが3回以上あるPRを検知:
+     `gh pr edit {番号} --add-label do-not-merge`
+     `gh issue create --title "[監視] CI連続失敗: PR #{番号}" --label monitoring-alert --body "手動確認が必要です。do-not-mergeラベルを付与しました。"`
 
 6. **PR本文品質チェック**
-   `gh pr list --base develop --state open` で各PRの本文を確認:
-   - 「🎮 このPRで遊べるようになるゲーム」がなければ追記する
-   - `gh pr edit {番号} --body "{更新した本文}"`
+   ```bash
+   gh pr list --base develop --state open --json number,body,isDraft
+   ```
+   - isDraft=falseのPRで「🎮 このPRで遊べるようになるゲーム」がなければ追記:
+     `gh pr edit {番号} --body "{更新した本文}"`
 
 ---
 
 ### フェーズ2: プロンプト改善
 
-6. 直近の活動を確認する:
-   `gh issue list --state all --json number,title,comments,updatedAt --limit 30`
+7. 直近の活動を確認する:
+   ```bash
+   gh issue list --state all --json number,title,comments,updatedAt --limit 30
+   gh pr list --state all --json number,title,comments,state --limit 20
+   ```
 
-7. 繰り返し発生しているエラーパターンを特定する（例: 同じエラーで修正が3回以上発生）
+8. 繰り返し発生しているエラーパターンを特定する（例: 同じエラーで修正が3回以上発生）
 
-8. 改善が必要な場合:
+9. 改善が必要な場合:
    ```bash
    git checkout develop && git pull origin develop
    ```
@@ -71,15 +99,15 @@
 
 ### フェーズ3: 正常確認ログ
 
-9. 異常が見つからなかった場合:
-   ```bash
-   git checkout develop && git pull origin develop
-   ```
-   `.claude/monitor-log.md` を読む（存在しない場合は作成）
-   末尾に `{ISO8601日時}: 全チェック正常` を追記する
-   ```bash
-   git add .claude/monitor-log.md
-   git commit -m "chore: 監視ログ更新"
-   git push origin develop
-   ```
-   「パイプライン正常稼働中」と出力して終了する
+10. 異常が見つからなかった場合:
+    ```bash
+    git checkout develop && git pull origin develop
+    ```
+    `.claude/monitor-log.md` を読む（存在しない場合は作成）
+    末尾に `{ISO8601日時}: 全チェック正常` を追記する
+    ```bash
+    git add .claude/monitor-log.md
+    git commit -m "chore: 監視ログ更新"
+    git push origin develop
+    ```
+    「パイプライン正常稼働中」と出力して終了する

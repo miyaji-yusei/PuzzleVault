@@ -8,12 +8,29 @@
 
 1. `gh issue list --label claude --state open --json number` でキューを確認する
 2. claudeラベルIssueが3件以上あれば「補充不要: {N}件キューあり」と出力して終了する
-3. `gh issue list --state all --json number,title,labels` で全Issueを確認し、実装済みゲームを特定する
-   - `completed` または `in-progress` ラベルのIssueタイトルからゲーム名を抽出する
+
+3. **実装済みゲームを特定する**（以下を全て確認する）:
+   ```bash
+   # completed/in-progressラベルのIssue（open/closed両方）
+   gh issue list --state all --json number,title,labels,state
+   ```
+   以下のいずれかに該当するゲームは「実装済み」とみなす:
+   - `completed` ラベルが付いているIssue
+   - `closed` 状態のIssue（ユーザー手動クローズ含む）
+   - `in-progress` ラベルのIssue（実装進行中）
+   - `claude` ラベルのIssue（実装待ちキュー）
+   - `src/engines/{name}/` ディレクトリが develop に存在するゲーム:
+     ```bash
+     git checkout develop && git pull origin develop
+     ls src/engines/ 2>/dev/null || echo "（エンジンなし）"
+     ```
+
 4. 全10ゲームのリストから未着手のゲームを以下の優先順位で選ぶ（claudeラベルが3件になるまで追加）:
    - Phase1（優先）: sudoku → nonogram → queens → solitaire
    - Phase2: libra → panda → hashi → seven → spider → sums
+
 5. 未着手ゲームについて `docs/md/games/{name}.md` を読んでIssue本文を作成する
+
 6. `gh issue create --title "[ClaudeCode] {ゲーム名} ゲームエンジン実装" --label claude --body {本文}` でIssueを作成する
 
    Issue本文テンプレート:
