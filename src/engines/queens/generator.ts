@@ -1,7 +1,6 @@
 import { QueensPuzzle, ColorId } from './types'
 import { Difficulty } from '../../types/engine'
 
-// mulberry32 シードベース疑似乱数生成器
 function createRng(seed: number): () => number {
   let s = seed >>> 0
   return (): number => {
@@ -30,9 +29,6 @@ const DIFFICULTY_SIZE: Record<Difficulty, number> = {
   expert: 12,
 }
 
-/**
- * 8方向に隣接するセルのチェック
- */
 function isAdjacentToAny(
   queens: [number, number][],
   row: number,
@@ -44,10 +40,6 @@ function isAdjacentToAny(
   return false
 }
 
-/**
- * バックトラックでN個のクイーンを配置
- * 各行・各列にクイーンが1つ、8方向に非隣接
- */
 function placeQueens(
   n: number,
   row: number,
@@ -73,40 +65,49 @@ function placeQueens(
   return null
 }
 
+const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]] as const
+
 /**
- * クイーン位置を基にVoronoiベースで領域を生成（BFS拡張）
+ * ランダムフロンティア拡張で領域を生成する。
+ * Voronoi（純粋BFS）と異なり、各ステップでランダムなフロンティアセルを選ぶため
+ * 不規則な形状の領域が生成され、一意解を持ちやすくなる。
  */
-function buildRegions(n: number, queens: [number, number][]): ColorId[][] {
+function buildRegions(n: number, queens: [number, number][], rng: () => number): ColorId[][] {
   const regions: ColorId[][] = Array.from({ length: n }, () =>
     Array(n).fill(-1) as ColorId[]
   )
 
-  // 各クイーンを対応する色のシードとして配置
-  const queue: [number, number, number][] = []
   for (let i = 0; i < queens.length; i++) {
     const [r, c] = queens[i]
-    regions[r][c] = i
-    queue.push([r, c, i])
+    regions[r][c] = i as ColorId
   }
 
-  // BFSで4方向に拡張
-  const dirs = [
-    [0, 1],
-    [0, -1],
-    [1, 0],
-    [-1, 0],
-  ] as const
+  const frontier: [number, number, ColorId][] = []
+  for (let i = 0; i < queens.length; i++) {
+    const [qr, qc] = queens[i]
+    for (const [dr, dc] of DIRS) {
+      const nr = qr + dr
+      const nc = qc + dc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) {
+        frontier.push([nr, nc, i as ColorId])
+      }
+    }
+  }
 
-  let head = 0
-  while (head < queue.length) {
-    const item = queue[head++]
-    const [r, c, color] = item
-    for (const [dr, dc] of dirs) {
+  while (frontier.length > 0) {
+    const idx = Math.floor(rng() * frontier.length)
+    const [r, c, color] = frontier[idx]
+    frontier[idx] = frontier[frontier.length - 1]
+    frontier.pop()
+
+    if (regions[r][c] !== -1) continue
+
+    regions[r][c] = color
+    for (const [dr, dc] of DIRS) {
       const nr = r + dr
       const nc = c + dc
       if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) {
-        regions[nr][nc] = color
-        queue.push([nr, nc, color])
+        frontier.push([nr, nc, color])
       }
     }
   }
@@ -114,10 +115,6 @@ function buildRegions(n: number, queens: [number, number][]): ColorId[][] {
   return regions
 }
 
-/**
- * 解の一意性チェック用バックトラックソルバー
- * countを最大2で打ち切る
- */
 function countSolutionsInternal(
   n: number,
   regions: ColorId[][],
@@ -151,49 +148,66 @@ function countSolutionsInternal(
 
 function hasUniqueSolution(n: number, regions: ColorId[][]): boolean {
   const count = { value: 0 }
-  countSolutionsInternal(
-    n,
-    regions,
-    0,
-    new Set<number>(),
-    new Set<number>(),
-    [],
-    count
-  )
+  countSolutionsInternal(n, regions, 0, new Set(), new Set(), [], count)
   return count.value === 1
 }
 
-/**
- * 一意解になるよう領域を調整する
- * ランダムに境界セルの領域割り当てを変更して再チェック（最大100回）
- */
+function isRegionConnected(n: number, regions: ColorId[][], color: ColorId): boolean {
+  let start: [number, number] | null = null
+  let total = 0
+
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (regions[r][c] === color) {
+        total++
+        if (start === null) start = [r, c]
+      }
+    }
+  }
+
+  if (start === null) return false
+
+  const visited = new Uint8Array(n * n)
+  const queue: [number, number][] = [start]
+  visited[start[0] * n + start[1]] = 1
+  let head = 0
+  let count = 1
+
+  while (head < queue.length) {
+    const [r, c] = queue[head++]
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr
+      const nc = c + dc
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === color && !visited[nr * n + nc]) {
+        visited[nr * n + nc] = 1
+        count++
+        queue.push([nr, nc])
+      }
+    }
+  }
+
+  return count === total
+}
+
 function adjustForUniqueness(
   n: number,
   regions: ColorId[][],
   queens: [number, number][],
   rng: () => number,
-  maxAttempts = 100
+  maxAttempts = 200
 ): ColorId[][] {
-  const dirs = [
-    [0, 1],
-    [0, -1],
-    [1, 0],
-    [-1, 0],
-  ] as const
+  const queenSet = new Set(queens.map(([r, c]) => r * n + c))
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (hasUniqueSolution(n, regions)) return regions
 
-    // 境界セル（隣接する異なる色のセルを持つセル）を収集
-    const borderCells: [number, number, number, number][] = []
+    const borderCells: [number, number, ColorId, ColorId][] = []
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
-        // クイーンセルは変更しない
-        const isQueenCell = queens.some(([qr, qc]) => qr === r && qc === c)
-        if (isQueenCell) continue
+        if (queenSet.has(r * n + c)) continue
 
         const currentColor = regions[r][c]
-        for (const [dr, dc] of dirs) {
+        for (const [dr, dc] of DIRS) {
           const nr = r + dr
           const nc = c + dc
           if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
@@ -209,55 +223,13 @@ function adjustForUniqueness(
 
     if (borderCells.length === 0) break
 
-    // ランダムに境界セルを選んで隣接色に変更
     const idx = Math.floor(rng() * borderCells.length)
-    const [br, bc, , newColor] = borderCells[idx]
+    const [br, bc, oldColor, newColor] = borderCells[idx]
 
-    // 変更後も元の色領域が連結であることを確認
     const testRegions = regions.map(row => [...row] as ColorId[])
     testRegions[br][bc] = newColor
 
-    // 元の色の連結性チェック
-    const oldColor = regions[br][bc]
-    const oldColorCells: [number, number][] = []
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (testRegions[r][c] === oldColor) {
-          oldColorCells.push([r, c])
-        }
-      }
-    }
-
-    if (oldColorCells.length === 0) continue
-
-    // BFSで連結チェック
-    const visited = new Set<string>()
-    const startCell = oldColorCells[0]
-    const bfsQueue: [number, number][] = [startCell]
-    visited.add(`${startCell[0]},${startCell[1]}`)
-
-    let bfsHead = 0
-    while (bfsHead < bfsQueue.length) {
-      const [r, c] = bfsQueue[bfsHead++]
-      for (const [dr, dc] of dirs) {
-        const nr = r + dr
-        const nc = c + dc
-        if (
-          nr >= 0 &&
-          nr < n &&
-          nc >= 0 &&
-          nc < n &&
-          testRegions[nr][nc] === oldColor &&
-          !visited.has(`${nr},${nc}`)
-        ) {
-          visited.add(`${nr},${nc}`)
-          bfsQueue.push([nr, nc])
-        }
-      }
-    }
-
-    if (visited.size === oldColorCells.length) {
-      // 連結性が保たれているので変更を適用
+    if (isRegionConnected(n, testRegions, oldColor)) {
       regions = testRegions
     }
   }
@@ -268,26 +240,22 @@ function adjustForUniqueness(
 export function generate(difficulty: Difficulty, seed: number): QueensPuzzle {
   const n = DIFFICULTY_SIZE[difficulty]
   const actualSeed = seed >>> 0
-  const rng = createRng(actualSeed)
-
   const colOrder = Array.from({ length: n }, (_, i) => i)
 
-  // 一意解が得られるまで最大20回リトライ
-  for (let attempt = 0; attempt < 20; attempt++) {
-    // Step 1: N個のクイーン位置を配置（バックトラック）
+  for (let attempt = 0; attempt < 50; attempt++) {
+    // 各試行に独立した決定論的サブシードを使うことで、シードが同じなら常に同じ結果を返しつつ、
+    // 試行ごとに異なる探索空間をカバーできる。
+    const subSeed = (actualSeed + attempt * 0x9e3779b9) >>> 0
+    const rng = createRng(subSeed)
+
     const placedQueens = placeQueens(n, 0, [], new Set<number>(), colOrder, rng)
     if (placedQueens === null) continue
 
-    // Step 2: Voronoiベースで領域を生成
-    let regions = buildRegions(n, placedQueens)
-
-    // Step 3: 一意解になるよう調整（最大200回）
+    let regions = buildRegions(n, placedQueens, rng)
     regions = adjustForUniqueness(n, regions, placedQueens, rng, 200)
 
-    // 一意解が得られなかった場合は次のattemptへ
     if (!hasUniqueSolution(n, regions)) continue
 
-    // Step 4: 解ボードを構築
     const solution: boolean[][] = Array.from({ length: n }, () =>
       Array(n).fill(false) as boolean[]
     )
