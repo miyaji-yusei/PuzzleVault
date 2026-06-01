@@ -186,7 +186,9 @@ function isRegionConnected(n: number, regions: number[], color: number): boolean
   return count === total
 }
 
-// 代替クイーン位置への調整を1回行う（altを引数に受け取り、findAltSolutionを呼ばない）
+// 代替解を破るターゲット調整。
+// alt配列の各行rで、(r, alt[r])の色を「altがその行より前で既に使った色」に変えると
+// alt配列内で同色が2行に現れて矛盾が生じる。この優先順位で変更を試みる。
 function applyTargetedAdjustment(
   n: number,
   regions: number[],
@@ -195,6 +197,9 @@ function applyTargetedAdjustment(
   alt: number[],
   rng: () => number
 ): number[] {
+  // altの色列を事前計算（初期regionsから）
+  const altSeqColors = alt.map((c, r) => regions[r * n + c])
+
   const rows = shuffle(Array.from({ length: n }, (_, i) => i), rng)
   let working = [...regions]
   let anyChanged = false
@@ -207,8 +212,14 @@ function applyTargetedAdjustment(
     const altColor = working[pos]
     const intendedColor = working[r * n + queenCols[r]]
 
+    // 優先ターゲット: altがrows 0..r-1で既に使用した色（これに変えるとalt内で矛盾が確定）
     const targets: number[] = []
-    if (intendedColor !== altColor) targets.push(intendedColor)
+    for (let r2 = 0; r2 < r; r2++) {
+      const c = altSeqColors[r2]
+      if (c !== altColor && !targets.includes(c)) targets.push(c)
+    }
+    // 次候補: 一次解の色、隣接セルの色
+    if (intendedColor !== altColor && !targets.includes(intendedColor)) targets.push(intendedColor)
     for (const [dr, dc] of DIRS) {
       const nr = r + dr, nc = ac + dc
       if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
@@ -254,8 +265,8 @@ function applyTargetedAdjustment(
   return regions
 }
 
-// フェーズ1: bounded探索で高速に代替解を見つけ1回調整を繰り返す。
-// フェーズ2: 近一意状態になったら無制限探索で残りの代替解を潰す。
+// ラウンドごとに bounded findAltSolution を1回呼び、1回の調整を行う。
+// exhausted（近一意）になったらフル探索を最大MAX_FULL回行い残りの代替解を潰す。
 function adjustForUniqueness(
   n: number,
   regions: number[],
@@ -265,17 +276,15 @@ function adjustForUniqueness(
   const queenSet = new Set<number>(queenCols.map((c, r) => r * n + c))
   const FAST_NODES = 5000
   const MAX_FAST_ROUNDS = 150
-  const MAX_FULL_ROUNDS = 8
+  const MAX_FULL_ROUNDS = 3
 
-  // フェーズ1: 高速bounded探索
   for (let round = 0; round < MAX_FAST_ROUNDS; round++) {
     const { alt, exhausted } = findAltSolution(n, regions, queenCols, FAST_NODES)
     if (!exhausted && alt === null) return { regions, unique: true }
-    if (exhausted && alt === null) break  // 近一意 → フェーズ2へ
+    if (exhausted && alt === null) break
     regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt!, rng)
   }
 
-  // フェーズ2: 無制限探索で残りの代替解を潰す
   for (let round = 0; round < MAX_FULL_ROUNDS; round++) {
     const { alt } = findAltSolution(n, regions, queenCols)
     if (alt === null) return { regions, unique: true }
