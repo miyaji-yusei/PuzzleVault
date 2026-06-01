@@ -21,6 +21,16 @@
 
    a. `git checkout develop && git pull origin develop`
    b. `git checkout -b claude/{Issue番号}`
+   b2. **実装を始める前にDraft PRを作成する**（セッション切れ時のコード消失防止）:
+       ```bash
+       git commit --allow-empty -m "wip: #{番号} {ゲーム名} 作業開始"
+       git push origin claude/{Issue番号}
+       gh pr create --base develop --draft \
+         --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
+         --body "作業中のDraft PRです。実装完了後にReadyに変換します。\n\nCloses #{番号}"
+       ```
+       → **Draft PRが存在することを確認してから実装を開始すること。**
+         セッション切れが起きてもブランチとDraft PRが残るため、次のWorkerが継続できる。
    c. `.github/CLAUDE.md` を読んでコーディング規約を確認する
    d. Issue本文に記載された仕様書パス（`docs/md/games/{name}.md`）を読む
    e. 以下のファイルを実装する:
@@ -41,14 +51,6 @@
    i. エラーがある場合は修正する（最大3回）
    j. `git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"`
    k. `git push origin claude/{Issue番号}`
-   k2. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
-       ```bash
-       DRAFT_PR=$(gh pr create --base develop --draft \
-         --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
-         --body "作業中のDraft PRです。実装完了後にReadyに変換します。\n\nCloses #{番号}")
-       # $DRAFT_PR にPR番号が返る
-       ```
-       → Draft PR作成後、実装を継続する。以降のpushは自動的にこのPRに反映される。
    l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
       ```bash
       gh pr ready {PR番号}
