@@ -40,6 +40,16 @@
    - `gh issue create --title "[監視] キュー枯渇: claudeラベルIssueが0件" --label monitoring-alert --body "Issue補充が必要です。このManagerセッションのPhase2で補充されます。"`
    - **注意**: このフラグは後続のPhase2（a-issue-refill）で必ず処理すること。キュー枯渇の場合Phase2はスキップせずに実行する。
 
+   1件以上の場合（キュー正常）:
+   - open の「キュー枯渇」アラートが残っていれば解決済みとしてクローズする:
+     ```bash
+     gh issue list --label monitoring-alert --state open --json number,title
+     ```
+     タイトルが `[監視] キュー枯渇` で始まるIssueを検出した場合:
+     ```bash
+     gh issue close {番号} --comment "[Monitor] キューが補充されたため解決済みとしてクローズしました。"
+     ```
+
 3. **スタック検知**（24時間以上更新なし）
    ```bash
    gh issue list --label in-progress --state open --json number,title,updatedAt
