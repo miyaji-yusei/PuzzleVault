@@ -4,37 +4,34 @@
 - GitHub操作のみ（ブランチ操作不要）
 - ファイル確認は develop ブランチの状態を参照
 
-## 実装フェーズの優先順位
+## 補充ルール（エンジンとUIを並行）
 
-現在は **UIフェーズ** を優先する。以下の順でIssueを補充する:
+キューに空きがある場合、以下の優先順位でIssueを補充する:
 
-### UIフェーズ（現在優先）
-1. `app-foundation` — アプリ基盤（_layout.tsx, タブ, ホーム画面, 設定画面）
-2. `sudoku-ui` — ナンプレ画面UI
-3. `nonogram-ui` — イラストロジック画面UI
-4. `queens-ui` — クイーンズマスター画面UI
-5. `libra-ui` — Libra画面UI
-6. `panda-ui` — Panda画面UI
+### 優先順位
+1. **app-foundation**（未作成かつ `app/(tabs)/` が存在しない場合）
+2. **完成エンジンのUI**（`src/engines/{name}/` が存在するがUI Issueが未作成のゲーム）
+   - 順序: sudoku → nonogram → queens → libra → panda → solitaire → hashi → seven → spider → sums
+3. **未実装エンジン**（`src/engines/{name}/` が存在しないゲーム）
+   - 順序: solitaire → hashi → seven → spider → sums
 
-### エンジンフェーズ（UIが揃い次第再開）
-- solitaire → hashi → seven → spider → sums
+※ UI IssueとエンジンIssueを混在させてよい（例: UI 2件 + エンジン 1件）
 
 ## 手順
 
 1. `gh issue list --label claude --state open --json number` でキューを確認する
 2. claudeラベルIssueが3件以上あれば「補充不要: {N}件キューあり」と出力して終了する
 
-3. **実装済みタスクを特定する**（以下を全て確認する）:
+3. **現状を把握する**:
    ```bash
    gh issue list --state all --json number,title,labels,state
    git checkout develop && git pull origin develop
-   ls src/engines/ 2>/dev/null
-   ls app/ src/components/ 2>/dev/null
+   ls src/engines/
+   ls app/
    ```
-   以下のいずれかに該当するタスクは「実装済み」とみなす:
-   - `completed` ラベルまたは `closed` 状態のIssue
-   - `in-progress` / `claude` ラベルのIssue（進行中・待機中）
-   - 対応ディレクトリが develop に存在する（`app/(tabs)/`等）
+   - 既存Issue（claude/in-progress/completed/closed）のタイトルから「着手済みタスク」を抽出する
+   - `src/engines/{name}/` の存在で「エンジン完成ゲーム」を特定する
+   - `app/(tabs)/` の存在で「app-foundation完了」を確認する
 
 4. 未着手タスクを上記の優先順位で選んでIssueを作成する（3件になるまで）
 
