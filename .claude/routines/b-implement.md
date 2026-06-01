@@ -52,10 +52,16 @@
    l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
       ```bash
       gh pr ready {PR番号}
+      # Draft解除の確認（必須）
+      gh pr view {PR番号} --json isDraft --jq '.isDraft' | grep -q 'false' \
+        || { echo "[エラー] Draft解除に失敗しました。gh pr ready {PR番号} を再実行してください"; exit 1; }
       gh pr edit {PR番号} \
         --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" \
         --body "{完成したPR本文（下記テンプレート）}"
       ```
+      **注意**: `gh pr ready` が成功したことを確認してから次のステップへ進むこと。
+      PRがDraftのままの場合は `in-progress` ラベルを付けてはいけない。
+
       PR本文（Readyに変換時に設定）:
 
       PR本文:
