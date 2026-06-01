@@ -93,7 +93,7 @@ function scoreMove(s: SpiderState, move: Move): number {
       score += seq.length * 2
     }
   } else {
-    // Empty column: good for Kings, neutral for others
+    // Empty column: good for Kings, slight cost for others
     score += bottomCard.rank === 13 ? 30 + seq.length * 5 : -5
   }
 
@@ -127,20 +127,26 @@ export function autoSolve(
   const s = cloneState(initial)
   removeCompleteSets(s)
 
-  // Track iterations without revealing a face-down card
-  let noRevealSteps = 0
+  // noProgressSteps counts moves with no reveal AND no foundation increase
+  let noProgressSteps = 0
+  let lastFoundation = s.foundation
 
   for (let iter = 0; iter < maxIter; iter++) {
     if (isComplete(s)) return s
 
+    if (s.foundation > lastFoundation) {
+      noProgressSteps = 0
+      lastFoundation = s.foundation
+    }
+
     const moves = findValidMoves(s, suitCount)
 
-    if (moves.length === 0 || noRevealSteps > 30) {
-      // Stuck: deal if possible
+    if (moves.length === 0 || noProgressSteps > 50) {
       const hasEmpty = s.tableau.some(col => col.length === 0)
       if (s.stock.length > 0 && !hasEmpty) {
         dealFromStock(s)
-        noRevealSteps = 0
+        noProgressSteps = 0
+        lastFoundation = s.foundation
         continue
       }
       return null
@@ -153,18 +159,16 @@ export function autoSolve(
       if (sc > bestScore) { bestScore = sc; bestMove = m }
     }
 
-    const srcColBefore = s.tableau[bestMove.fromCol]!
+    const srcCol = s.tableau[bestMove.fromCol]!
     const revealsCard =
-      bestMove.fromIdx > 0 &&
-      srcColBefore.length > bestMove.fromIdx &&
-      !srcColBefore[bestMove.fromIdx - 1]!.faceUp
+      bestMove.fromIdx > 0 && !srcCol[bestMove.fromIdx - 1]!.faceUp
 
     applyMove(s, bestMove)
 
     if (revealsCard) {
-      noRevealSteps = 0
+      noProgressSteps = 0
     } else {
-      noRevealSteps++
+      noProgressSteps++
     }
   }
 
