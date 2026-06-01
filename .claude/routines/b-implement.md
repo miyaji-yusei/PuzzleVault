@@ -21,16 +21,6 @@
 
    a. `git checkout develop && git pull origin develop`
    b. `git checkout -b claude/{Issue番号}`
-   b2. **実装を始める前にDraft PRを作成する**（セッション切れ時のコード消失防止）:
-       ```bash
-       git commit --allow-empty -m "wip: #{番号} {ゲーム名} 作業開始"
-       git push origin claude/{Issue番号}
-       gh pr create --base develop --draft \
-         --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
-         --body "作業中のDraft PRです。実装完了後にReadyに変換します。\n\nCloses #{番号}"
-       ```
-       → **Draft PRが存在することを確認してから実装を開始すること。**
-         セッション切れが起きてもブランチとDraft PRが残るため、次のWorkerが継続できる。
    c. `.github/CLAUDE.md` を読んでコーディング規約を確認する
    d. Issue本文に記載された仕様書パス（`docs/md/games/{name}.md`）を読む
    e. 以下のファイルを実装する:
@@ -51,19 +41,31 @@
    i. エラーがある場合は修正する（最大3回）
    j. `git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"`
    k. `git push origin claude/{Issue番号}`
+   k2. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
+       ```bash
+       DRAFT_PR_URL=$(gh pr create --base develop --draft \
+         --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
+         --body "作業中のDraft PRです。実装完了後にReadyに変換します。\n\nCloses #{番号}")
+       echo "Draft PR作成: $DRAFT_PR_URL"
+       ```
+   k3. **Draft PR作成確認**（作成直後に必ず検証する）:
+       ```bash
+       VERIFY_PR=$(gh pr list --head claude/{Issue番号} --base develop --json number --jq '.[0].number' 2>/dev/null)
+       if [ -z "$VERIFY_PR" ]; then
+         gh issue comment {番号} --body "[エラー] Draft PR作成に失敗しました。このIssueをWorkerキューに再投入します。次回のWorkerで再実装されます。"
+         gh issue edit {番号} --remove-label in-progress --add-label claude
+         continue  # 次のIssueに進む
+       fi
+       echo "PR #$VERIFY_PR の作成を確認しました"
+       ```
+       → PR作成確認後、実装を継続する。以降のpushは自動的にこのPRに反映される。
    l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
       ```bash
       gh pr ready {PR番号}
-      # Draft解除の確認（必須）
-      gh pr view {PR番号} --json isDraft --jq '.isDraft' | grep -q 'false' \
-        || { echo "[エラー] Draft解除に失敗しました。gh pr ready {PR番号} を再実行してください"; exit 1; }
       gh pr edit {PR番号} \
         --title "[ClaudeCode] #{番号} {ゲーム名} ゲームエンジン実装" \
         --body "{完成したPR本文（下記テンプレート）}"
       ```
-      **注意**: `gh pr ready` が成功したことを確認してから次のステップへ進むこと。
-      PRがDraftのままの場合は `in-progress` ラベルを付けてはいけない。
-
       PR本文（Readyに変換時に設定）:
 
       PR本文:
@@ -122,5 +124,6 @@
 
    m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
 
-5. 実装した件数を記録する:
-   `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました"`
+5. 実装した件数とPR番号を記録する:
+   `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました\n作成PR: #{PR番号1}, #{PR番号2}..."`
+   （PR番号が不明な場合は `gh pr list --head claude/{番号} --json number --jq '.[0].number'` で確認してから記録する）
