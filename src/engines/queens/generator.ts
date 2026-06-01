@@ -126,17 +126,24 @@ function hasUniqueSolution(n: number, regions: number[]): boolean {
   return count.value === 1
 }
 
-// 代替解（primary 以外の解）を1つ探す。なければ null を返す。
-function findAltSolution(n: number, regions: number[], primary: number[]): number[] | null {
+// 代替解（primary 以外の解）を1つ探す。limit を超えたら打ち切り exhausted=true を返す。
+function findAltSolution(
+  n: number,
+  regions: number[],
+  primary: number[],
+  limit = Infinity
+): { alt: number[] | null; exhausted: boolean } {
   const found: number[][] = []
+  let nodes = 0
 
   function bt(row: number, colMask: number, colorMask: number, prevCol: number, queens: number[]) {
-    if (found.length >= 1) return
+    if (found.length >= 1 || nodes >= limit) return
+    nodes++
     if (row === n) {
       for (let r = 0; r < n; r++) {
         if (queens[r] !== primary[r]) { found.push([...queens]); return }
       }
-      return  // this is the primary solution, skip
+      return
     }
     for (let col = 0; col < n; col++) {
       if (colMask & (1 << col)) continue
@@ -150,7 +157,7 @@ function findAltSolution(n: number, regions: number[], primary: number[]): numbe
   }
 
   bt(0, 0, 0, -100, [])
-  return found.length >= 1 ? found[0] : null
+  return { alt: found[0] ?? null, exhausted: nodes >= limit }
 }
 
 function isRegionConnected(n: number, regions: number[], color: number): boolean {
@@ -247,8 +254,9 @@ function applyTargetedAdjustment(
   return regions
 }
 
-// findAltSolution をラウンドごとに1回だけ呼び出し、その間はN回のターゲット調整をまとめて実行する。
-// これにより大グリッドでの findAltSolution 呼び出し回数を大幅削減し高速化する。
+// ラウンドごとに findAltSolution を1回呼び、1回の調整を行う。
+// これにより古い alt で複数回調整して変更を打ち消し合うバグを防ぐ。
+// limit 内で代替解が見つからない場合は1回だけフル探索を行い、それでも見つからなければ一意解確定。
 function adjustForUniqueness(
   n: number,
   regions: number[],
@@ -256,19 +264,25 @@ function adjustForUniqueness(
   rng: () => number
 ): { regions: number[]; unique: boolean } {
   const queenSet = new Set<number>(queenCols.map((c, r) => r * n + c))
-  // ラウンドごとの調整回数: グリッドが大きいほど多くの調整が必要
-  const adjustsPerRound = n * 3
-  // ラウンド数: これだけ findAltSolution を呼び出す
-  const maxRounds = 8
+  const FAST_NODES = 5000
+  const MAX_ROUNDS = 100
 
-  for (let round = 0; round < maxRounds; round++) {
-    const alt = findAltSolution(n, regions, queenCols)
-    if (alt === null) return { regions, unique: true }
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const { alt, exhausted } = findAltSolution(n, regions, queenCols, FAST_NODES)
 
-    // 同じ代替解を狙って複数回調整（findAltSolution は再呼び出しせず）
-    for (let adj = 0; adj < adjustsPerRound; adj++) {
-      regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt, rng)
+    if (!exhausted && alt === null) return { regions, unique: true }
+
+    if (exhausted && alt === null) {
+      // 近一意: 第2解がFAST_NODESより深い → フル探索で確認
+      const { alt: fullAlt } = findAltSolution(n, regions, queenCols)
+      if (fullAlt === null) return { regions, unique: true }
+      // 深い第2解が存在: 1回調整してこの試行を終了
+      regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, fullAlt, rng)
+      return { regions, unique: false }
     }
+
+    // alt が見つかった: 1回だけターゲット調整
+    regions = applyTargetedAdjustment(n, regions, queenCols, queenSet, alt!, rng)
   }
 
   return { regions, unique: false }
