@@ -7,15 +7,6 @@ interface Move {
   toCol: number
 }
 
-function makeKey(s: SpiderState): string {
-  const t = s.tableau.map(col => {
-    const fd = col.filter(c => !c.faceUp).length
-    const fu = col.filter(c => c.faceUp).map(c => `${c.suit[0]}${c.rank}`).join('-')
-    return `${fd}:${fu}`
-  }).join('|')
-  return `${s.foundation}/${t}/${s.stock.length}`
-}
-
 function isSameSuitDescending(cards: Card[]): boolean {
   if (cards.length <= 1) return true
   const suit = cards[0]!.suit
@@ -46,10 +37,10 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
   const firstEmpty = s.tableau.findIndex(col => col.length === 0)
 
   for (let fromCol = 0; fromCol < 10; fromCol++) {
-    const col = s.tableau[fromCol]
+    const col = s.tableau[fromCol]!
     if (col.length === 0) continue
-    const topCard = col[col.length - 1]
-    if (!topCard || !topCard.faceUp) continue
+    const topCard = col[col.length - 1]!
+    if (!topCard.faceUp) continue
 
     const seqStart = findSameSuitSeqStart(col, suitCount)
 
@@ -57,7 +48,7 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
       const card = col[fromIdx]!
       for (let toCol = 0; toCol < 10; toCol++) {
         if (toCol === fromCol) continue
-        const dst = s.tableau[toCol]
+        const dst = s.tableau[toCol]!
         if (dst.length === 0) continue
         const dstTop = dst[dst.length - 1]!
         if (dstTop.faceUp && dstTop.rank === card.rank + 1) {
@@ -66,12 +57,13 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
       }
     }
 
-    // 空き列への移動（最初の空き列のみ）
+    // Move to first empty column (only the same-suit seq start)
     if (firstEmpty !== -1 && firstEmpty !== fromCol) {
       moves.push({ fromCol, fromIdx: seqStart, toCol: firstEmpty })
     }
   }
 
+  // Deduplicate
   const seen = new Set<string>()
   return moves.filter(m => {
     const k = `${m.fromCol}-${m.fromIdx}-${m.toCol}`
@@ -83,12 +75,12 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
 
 function scoreMove(s: SpiderState, move: Move): number {
   let score = 0
-  const srcCol = s.tableau[move.fromCol]
-  const dstCol = s.tableau[move.toCol]
+  const srcCol = s.tableau[move.fromCol]!
+  const dstCol = s.tableau[move.toCol]!
   const seq = srcCol.slice(move.fromIdx)
   const bottomCard = seq[0]!
 
-  // 裏向きカードを表にする
+  // Highest priority: reveal a face-down card
   if (move.fromIdx > 0 && !srcCol[move.fromIdx - 1]!.faceUp) {
     score += 200
   }
@@ -96,29 +88,34 @@ function scoreMove(s: SpiderState, move: Move): number {
   if (dstCol.length > 0) {
     const dstTop = dstCol[dstCol.length - 1]!
     if (dstTop.suit === bottomCard.suit) {
-      // 同スートへの配置
       score += 80 + seq.length * 8
     } else {
-      score += 10
+      score += seq.length * 2
     }
   } else {
-    // 空き列への移動（コストあり）
-    score -= 20
+    // Empty column: good for Kings, neutral for others
+    score += bottomCard.rank === 13 ? 30 + seq.length * 5 : -5
   }
 
-  // 同スートシーケンスへのボーナス
+  // Bonus for moving a complete same-suit sequence
   if (isSameSuitDescending(seq)) score += 15 * seq.length
 
   return score
 }
 
 function applyMove(s: SpiderState, move: Move): void {
-  const cards = s.tableau[move.fromCol].splice(move.fromIdx)
-  for (const card of cards) s.tableau[move.toCol].push({ ...card })
-  const src = s.tableau[move.fromCol]
+  const cards = s.tableau[move.fromCol]!.splice(move.fromIdx)
+  for (const card of cards) s.tableau[move.toCol]!.push({ ...card })
+  const src = s.tableau[move.fromCol]!
   if (src.length > 0 && !src[src.length - 1]!.faceUp) {
     src[src.length - 1] = { ...src[src.length - 1]!, faceUp: true }
   }
+  removeCompleteSets(s)
+}
+
+function dealFromStock(s: SpiderState): void {
+  const deal = s.stock.shift()!
+  for (let col = 0; col < 10; col++) s.tableau[col]!.push({ ...deal[col]!, faceUp: true })
   removeCompleteSets(s)
 }
 
@@ -129,30 +126,24 @@ export function autoSolve(
 ): SpiderState | null {
   const s = cloneState(initial)
   removeCompleteSets(s)
-  const seen = new Set<string>()
+
+  // Track iterations without revealing a face-down card
+  let noRevealSteps = 0
 
   for (let iter = 0; iter < maxIter; iter++) {
     if (isComplete(s)) return s
 
-    const key = makeKey(s)
-    if (seen.has(key)) {
-      if (s.stock.length === 0 || s.tableau.some(col => col.length === 0)) return null
-      const deal = s.stock.shift()!
-      for (let col = 0; col < 10; col++) s.tableau[col].push({ ...deal[col]!, faceUp: true })
-      removeCompleteSets(s)
-      seen.clear()
-      continue
-    }
-    seen.add(key)
-
     const moves = findValidMoves(s, suitCount)
-    if (moves.length === 0) {
-      if (s.stock.length === 0 || s.tableau.some(col => col.length === 0)) return null
-      const deal = s.stock.shift()!
-      for (let col = 0; col < 10; col++) s.tableau[col].push({ ...deal[col]!, faceUp: true })
-      removeCompleteSets(s)
-      seen.clear()
-      continue
+
+    if (moves.length === 0 || noRevealSteps > 30) {
+      // Stuck: deal if possible
+      const hasEmpty = s.tableau.some(col => col.length === 0)
+      if (s.stock.length > 0 && !hasEmpty) {
+        dealFromStock(s)
+        noRevealSteps = 0
+        continue
+      }
+      return null
     }
 
     let bestMove = moves[0]!
@@ -161,7 +152,20 @@ export function autoSolve(
       const sc = scoreMove(s, m)
       if (sc > bestScore) { bestScore = sc; bestMove = m }
     }
+
+    const srcColBefore = s.tableau[bestMove.fromCol]!
+    const revealsCard =
+      bestMove.fromIdx > 0 &&
+      srcColBefore.length > bestMove.fromIdx &&
+      !srcColBefore[bestMove.fromIdx - 1]!.faceUp
+
     applyMove(s, bestMove)
+
+    if (revealsCard) {
+      noRevealSteps = 0
+    } else {
+      noRevealSteps++
+    }
   }
 
   return isComplete(s) ? s : null

@@ -11,15 +11,15 @@ const SUIT_COUNT: Record<Difficulty, 1 | 2 | 4> = {
 }
 
 const MAX_ATTEMPTS: Record<Difficulty, number> = {
-  easy: 300,
-  normal: 50,
+  easy: 500,
+  normal: 300,
   hard: 0,
   expert: 0,
 }
 
 const SOLVER_ITERS: Record<Difficulty, number> = {
-  easy: 3000,
-  normal: 1500,
+  easy: 5000,
+  normal: 3000,
   hard: 0,
   expert: 0,
 }
