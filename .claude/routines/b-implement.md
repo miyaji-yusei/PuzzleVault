@@ -63,12 +63,12 @@
       - countSolutions()の一意解チェックが正しいことを確認
       - 生成時間が500ms以内（Normal）
       - validateが正誤を正しく判定することを確認
-   g. `npm run typecheck` を実行してエラーがないことを確認する
-   h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
-   i. エラーがある場合は修正する（最大3回）
-   j. `git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"`
-   k. `git push origin claude/{Issue番号}`
-   k2. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
+   j. **実装完了後・テスト実行前**にコミット＋push＋Draft PR作成する（テスト中のトークン切れ対策）:
+      ```bash
+      git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"
+      git push origin claude/{Issue番号}
+      ```
+   k. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
        ```bash
        DRAFT_PR_URL=$(gh pr create --base develop --draft \
          --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
@@ -85,7 +85,14 @@
        fi
        echo "PR #$VERIFY_PR の作成を確認しました"
        ```
-       → PR作成確認後、実装を継続する。以降のpushは自動的にこのPRに反映される。
+       → PR作成確認後、テスト・typecheckを実行する。以降のpushは自動的にこのPRに反映される。
+   g. `npm run typecheck` を実行してエラーがないことを確認する
+   h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
+   i. エラーがある場合は修正して再コミット＋pushする（最大3回）:
+      ```bash
+      git add -A && git commit -m "fix: #{番号} {ゲーム名} テスト修正"
+      git push origin claude/{Issue番号}
+      ```
    l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
       ```bash
       gh pr ready {PR番号}
