@@ -57,13 +57,13 @@
       - `src/engines/{name}/validator.ts` - ValidationResult を返す
       - `src/engines/{name}/index.ts` - 全関数をエクスポート
       - `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
-   f. テストは以下をカバーする:
+   f. テストファイルは作成するが**ローカル実行はしない**（CIに任せる）。テストは以下をカバーする:
       - 各Difficultyで10問生成して全問解けることを確認
       - 同一seedで同一問題が生成されることを確認
       - countSolutions()の一意解チェックが正しいことを確認
       - 生成時間が500ms以内（Normal）
       - validateが正誤を正しく判定することを確認
-   j. **実装完了後・テスト実行前**にコミット＋push＋Draft PR作成する（テスト中のトークン切れ対策）:
+   j. **typecheck通過後すぐにコミット＋push**（テストはCIに任せる）:
       ```bash
       git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"
       git push origin claude/{Issue番号}
@@ -85,15 +85,8 @@
        fi
        echo "PR #$VERIFY_PR の作成を確認しました"
        ```
-       → PR作成確認後、テスト・typecheckを実行する。以降のpushは自動的にこのPRに反映される。
-   g. `npm run typecheck` を実行してエラーがないことを確認する
-   h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
-   i. エラーがある場合は修正して再コミット＋pushする（最大3回）:
-      ```bash
-      git add -A && git commit -m "fix: #{番号} {ゲーム名} テスト修正"
-      git push origin claude/{Issue番号}
-      ```
-   l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
+       → Draft PR作成後、CIが自動実行される。次回WorkerがCI結果を確認してReadyに変換・マージする。
+   l. Draft PRをReadyに変換して本文を更新する（typecheckが通っていればCIを待たずにReady化してよい）:
       ```bash
       gh pr ready {PR番号}
       # Draft解除確認（失敗時はキューに再投入してスキップ）
