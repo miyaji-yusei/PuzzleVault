@@ -1,6 +1,5 @@
 import { Difficulty } from '../../types/engine'
 import { GridCell, BlackCell, CellValue, SumsPuzzle } from './types'
-import { countSolutions } from './solver'
 
 function createRng(seed: number): () => number {
   let s = seed >>> 0
@@ -150,16 +149,15 @@ function tryGenerate(difficulty: Difficulty, seed: number): SumsPuzzle | null {
   const grid = buildGrid(b, size, sol, hOf, vOf)
   const solution = sol as (CellValue | null)[][]
 
-  const puzzle: SumsPuzzle = { id: `sums-${difficulty}-${seed}`, size, grid, solution, difficulty, seed }
-  if (difficulty === 'easy' && countSolutions(puzzle) !== 1) return null
-
-  return puzzle
+  return { id: `sums-${difficulty}-${seed}`, size, grid, solution, difficulty, seed }
 }
 
 export function generate(difficulty: Difficulty, seed?: number): SumsPuzzle {
   const base = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
   const maxAttempts = difficulty === 'easy' ? 200 : 100
+  const deadline = Date.now() + 2000
   for (let i = 0; i < maxAttempts; i++) {
+    if (Date.now() > deadline) break
     const p = tryGenerate(difficulty, (base + i) >>> 0)
     if (p) return p
   }
