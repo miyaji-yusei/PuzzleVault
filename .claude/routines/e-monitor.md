@@ -83,6 +83,23 @@
 
 ---
 
+### フェーズ1.5: 古いmonitoring-alertのクリーンアップ
+
+7. 解決済み・古いアラートIssueをクローズする:
+   ```bash
+   gh issue list --label monitoring-alert --state open --json number,title,createdAt
+   ```
+   以下の条件に該当するIssueをクローズする:
+   - タイトルが `[リリース判断] 基準未達` → 同じタイトルが複数あれば古い方をクローズ
+   - タイトルが `[改善]` → 対応する `.claude/routines/*.md` が既に改善済みであればクローズ
+   - タイトルが `[監視]` → 該当する異常状態が既に解消されていればクローズ
+   - 作成から7日以上経過したIssue → 内容に関わらずクローズ（陳腐化）
+   ```bash
+   gh issue close {番号} --comment "[Monitor] 解決済み/陳腐化のためクローズしました。"
+   ```
+
+---
+
 ### フェーズ2: プロンプト改善
 
 7. 直近の活動を確認する:

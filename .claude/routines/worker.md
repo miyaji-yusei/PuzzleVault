@@ -11,7 +11,15 @@
 
 ## Phase 1: PRレビュー・修正・マージ（c-review-merge.md の指示に従う）
 
-`.claude/routines/c-review-merge.md` を読み、その指示に従ってPRレビューを実行する。
+まずPR数を確認し、0件ならファイルを読まずにPhase 2へ進む（トークン節約）:
+```bash
+PR_COUNT=$(gh pr list --base develop --state open --json number --jq 'length')
+if [ "$PR_COUNT" -eq 0 ]; then
+  echo "レビュー対象PR無し。Phase 2へ。"
+else
+  # .claude/routines/c-review-merge.md を読んで実行する
+fi
+```
 
 ---
 
