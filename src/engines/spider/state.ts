@@ -63,8 +63,8 @@ export function dealState(seed: number, suitCount: 1 | 2 | 4): SpiderState {
 
 export function cloneState(s: SpiderState): SpiderState {
   return {
-    tableau: s.tableau.map(col => col.map(c => ({ ...c }))),
-    stock: s.stock.map(d => d.map(c => ({ ...c }))),
+    tableau: s.tableau.map(col => col.slice()),
+    stock: s.stock.map(d => d.slice()),
     foundation: s.foundation,
     moves: s.moves,
     startedAt: s.startedAt,

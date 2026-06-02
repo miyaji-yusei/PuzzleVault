@@ -7,16 +7,6 @@ interface Move {
   toCol: number
 }
 
-function isSameSuitDescending(cards: Card[]): boolean {
-  if (cards.length <= 1) return true
-  const suit = cards[0]!.suit
-  for (let i = 0; i < cards.length; i++) {
-    if (cards[i]!.suit !== suit) return false
-    if (i < cards.length - 1 && cards[i]!.rank !== cards[i + 1]!.rank + 1) return false
-  }
-  return true
-}
-
 function findSameSuitSeqStart(col: Card[], suitCount: 1 | 2 | 4): number {
   if (col.length === 0) return 0
   const topCard = col[col.length - 1]!
@@ -57,13 +47,11 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
       }
     }
 
-    // Move to first empty column (only the same-suit seq start)
     if (firstEmpty !== -1 && firstEmpty !== fromCol) {
       moves.push({ fromCol, fromIdx: seqStart, toCol: firstEmpty })
     }
   }
 
-  // Deduplicate
   const seen = new Set<string>()
   return moves.filter(m => {
     const k = `${m.fromCol}-${m.fromIdx}-${m.toCol}`
@@ -71,36 +59,6 @@ function findValidMoves(s: SpiderState, suitCount: 1 | 2 | 4): Move[] {
     seen.add(k)
     return true
   })
-}
-
-function scoreMove(s: SpiderState, move: Move): number {
-  let score = 0
-  const srcCol = s.tableau[move.fromCol]!
-  const dstCol = s.tableau[move.toCol]!
-  const seq = srcCol.slice(move.fromIdx)
-  const bottomCard = seq[0]!
-
-  // Highest priority: reveal a face-down card
-  if (move.fromIdx > 0 && !srcCol[move.fromIdx - 1]!.faceUp) {
-    score += 200
-  }
-
-  if (dstCol.length > 0) {
-    const dstTop = dstCol[dstCol.length - 1]!
-    if (dstTop.suit === bottomCard.suit) {
-      score += 80 + seq.length * 8
-    } else {
-      score += seq.length * 2
-    }
-  } else {
-    // Empty column: good for Kings, slight cost for others
-    score += bottomCard.rank === 13 ? 30 + seq.length * 5 : -5
-  }
-
-  // Bonus for moving a complete same-suit sequence
-  if (isSameSuitDescending(seq)) score += 15 * seq.length
-
-  return score
 }
 
 function applyMove(s: SpiderState, move: Move): void {
@@ -119,65 +77,160 @@ function dealFromStock(s: SpiderState): void {
   removeCompleteSets(s)
 }
 
-export function autoSolve(
-  initial: SpiderState,
-  suitCount: 1 | 2 | 4,
-  maxIter = 3000
-): SpiderState | null {
-  const s = cloneState(initial)
-  removeCompleteSets(s)
-
-  // noProgressSteps counts moves with no reveal AND no foundation increase
-  let noProgressSteps = 0
-  let lastFoundation = s.foundation
-
-  for (let iter = 0; iter < maxIter; iter++) {
-    if (isComplete(s)) return s
-
-    if (s.foundation > lastFoundation) {
-      noProgressSteps = 0
-      lastFoundation = s.foundation
+// Compact numeric hash to avoid expensive string operations in the visited set.
+function stateHash(s: SpiderState): number {
+  let h = 5381
+  for (const col of s.tableau) {
+    h = (h * 31 + col.length) | 0
+    for (const c of col) {
+      const suitOrd = c.suit === 'spades' ? 0 : c.suit === 'hearts' ? 1 : c.suit === 'diamonds' ? 2 : 3
+      h = (h * 127 + c.rank + suitOrd * 14 + (c.faceUp ? 56 : 0)) | 0
     }
+  }
+  h = (h * 31 + s.stock.length) | 0
+  return h
+}
 
-    const moves = findValidMoves(s, suitCount)
+function evaluate(s: SpiderState, suitCount: 1 | 2 | 4): number {
+  let score = s.foundation * 5000
 
-    if (moves.length === 0 || noProgressSteps > 50) {
-      const hasEmpty = s.tableau.some(col => col.length === 0)
-      if (s.stock.length > 0 && !hasEmpty) {
-        dealFromStock(s)
-        noProgressSteps = 0
-        lastFoundation = s.foundation
-        continue
+  // Empty columns are extremely valuable
+  const emptyCols = s.tableau.filter(col => col.length === 0).length
+  score += emptyCols * 200
+
+  // Cross-suit adjacency penalty. For 2-suit each cross-suit break permanently
+  // prevents forming a clean same-suit run, so it deserves a much larger penalty.
+  const crossSuitPenalty = suitCount === 1 ? 8 : suitCount === 2 ? 80 : 30
+
+  for (const col of s.tableau) {
+    if (col.length === 0) continue
+
+    // Measure same-suit run length from the top
+    let seqLen = 0
+    let seqSuit = ''
+    let seqRank = -1
+    for (let i = col.length - 1; i >= 0; i--) {
+      const c = col[i]!
+      if (!c.faceUp) break
+      if (seqLen === 0) {
+        seqLen = 1; seqSuit = c.suit; seqRank = c.rank
+      } else if (c.suit === seqSuit && c.rank === seqRank + 1) {
+        seqLen++; seqRank = c.rank
+      } else {
+        // Face-up card not in sequence — small bonus for being revealed
+        score += 3
+        break
       }
-      return null
+    }
+    // Exponential reward for long same-suit runs
+    score += Math.pow(seqLen, 2.5) * 3
+
+    // Cross-suit adjacency penalty
+    for (let i = col.length - 1; i > 0; i--) {
+      const above = col[i]!
+      const below = col[i - 1]!
+      if (!above.faceUp || !below.faceUp) break
+      if (above.rank + 1 === below.rank && above.suit !== below.suit) {
+        score -= crossSuitPenalty
+      }
     }
 
-    let bestMove = moves[0]!
-    let bestScore = scoreMove(s, moves[0]!)
-    for (const m of moves.slice(1)) {
-      const sc = scoreMove(s, m)
-      if (sc > bestScore) { bestScore = sc; bestMove = m }
-    }
-
-    const srcCol = s.tableau[bestMove.fromCol]!
-    const revealsCard =
-      bestMove.fromIdx > 0 && !srcCol[bestMove.fromIdx - 1]!.faceUp
-
-    applyMove(s, bestMove)
-
-    if (revealsCard) {
-      noProgressSteps = 0
-    } else {
-      noProgressSteps++
+    // Penalty for face-down cards
+    for (const c of col) {
+      if (!c.faceUp) score -= 14
     }
   }
 
-  return isComplete(s) ? s : null
+  // Remaining stock piles mean more disruption ahead
+  score -= s.stock.length * 60
+
+  return score
+}
+
+function beamSearch(
+  initial: SpiderState,
+  suitCount: 1 | 2 | 4,
+  beamWidth: number,
+  maxIter: number
+): SpiderState | null {
+  const s0 = cloneState(initial)
+  removeCompleteSets(s0)
+  if (isComplete(s0)) return s0
+
+  // Use a numeric hash set for O(1) lookups (vs O(key_len) for strings)
+  const visited = new Set<number>()
+  visited.add(stateHash(s0))
+
+  let beam: SpiderState[] = [s0]
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    const candidates: [SpiderState, number][] = []
+
+    for (const state of beam) {
+      if (isComplete(state)) return state
+
+      const moves = findValidMoves(state, suitCount)
+
+      for (const move of moves) {
+        const next = cloneState(state)
+        applyMove(next, move)
+        const h = stateHash(next)
+        if (!visited.has(h)) {
+          visited.add(h)
+          candidates.push([next, evaluate(next, suitCount)])
+        }
+      }
+
+      if (state.stock.length > 0) {
+        const next = cloneState(state)
+        dealFromStock(next)
+        const h = stateHash(next)
+        if (!visited.has(h)) {
+          visited.add(h)
+          candidates.push([next, evaluate(next, suitCount)])
+        }
+      }
+    }
+
+    if (candidates.length === 0) break
+
+    candidates.sort((a, b) => b[1] - a[1])
+    beam = candidates.slice(0, beamWidth).map(([s]) => s)
+
+    if (isComplete(beam[0]!)) return beam[0]!
+  }
+
+  return null
+}
+
+// Fast solvability check for generate() Phase-1.
+// Uses the SAME beam width as autoSolve to guarantee zero false positives:
+// if quickCheck finds a solution, autoSolve (same width, more iterations) will too.
+export function quickCheck(
+  initial: SpiderState,
+  suitCount: 1 | 2 | 4
+): SpiderState | null {
+  // Width must equal autoSolve width to prevent false positives.
+  // Fewer iterations keep each call fast enough for generate()'s timing budget.
+  const width = suitCount === 1 ? 8 : 8
+  const iter = suitCount === 1 ? 800 : 100
+  return beamSearch(initial, suitCount, width, iter)
+}
+
+// Accurate solver for solve() / countSolutions() — same beam width as quickCheck
+// so any seed quickCheck found will be confirmed here; more iterations finds more seeds.
+export function autoSolve(
+  initial: SpiderState,
+  suitCount: 1 | 2 | 4,
+  maxIter = 5000
+): SpiderState | null {
+  const width = suitCount === 1 ? 8 : 8
+  return beamSearch(initial, suitCount, width, maxIter)
 }
 
 export function solve(puzzle: SpiderPuzzle): SpiderPuzzle | null {
   const state = dealState(puzzle.seed, puzzle.suitCount)
-  const result = autoSolve(state, puzzle.suitCount, 5000)
+  const result = autoSolve(state, puzzle.suitCount, 8000)
   return result !== null ? puzzle : null
 }
 
