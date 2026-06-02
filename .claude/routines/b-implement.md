@@ -28,6 +28,20 @@
    echo "1件目完了。経過時間: ${ELAPSED_MIN}分"
    ```
 
+   **30分経過チェックポイント**（実装ループ内で定期確認）:
+   各ファイルの実装が一段落したタイミング（例: generator.ts完成時、solver.ts完成時）で経過時間を確認する:
+   ```bash
+   ELAPSED_MIN=$(( ( $(date +%s) - SESSION_START ) / 60 ))
+   if [ $ELAPSED_MIN -ge 30 ]; then
+     # 未コミットの変更があれば中間コミット
+     git add -A
+     git diff --cached --quiet || git commit -m "[WIP] #{番号} {ゲーム名} 実装中 (${ELAPSED_MIN}分経過)"
+     git push origin claude/{Issue番号}
+     echo "中間コミット完了（${ELAPSED_MIN}分経過）"
+   fi
+   ```
+   → Draft PRが作成済みであればpush後にGitHub上で自動反映される。トークン切れになっても作業途中のコードが保存される。
+
 5. **実装ループ**（上記ルールに従う）:
 
    各Issueについて以下を実行:
