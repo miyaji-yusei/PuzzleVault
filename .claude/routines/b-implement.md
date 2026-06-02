@@ -15,7 +15,20 @@
 
 3. Issueが0件なら「実装待ちIssueなし」と出力して終了する
 
-4. **実装ループ**（最大3件。トークン残量が少ない場合は途中で終了してよい）:
+4. **実装上限ルール**（Issue種別 × 経過時間で判断）:
+
+   | Issue種別 | 1セッション上限 | 1件完了後の継続条件 |
+   |---|---|---|
+   | エンジン実装（「ゲームエンジン実装」を含む） | 1件 | 継続しない（必ず終了） |
+   | UI実装（「UI」「基盤」「foundation」を含む） | 2件 | 経過70分未満なら継続 |
+
+   1件目完了後に必ず経過時間を確認する:
+   ```bash
+   ELAPSED_MIN=$(( ( $(date +%s) - SESSION_START ) / 60 ))
+   echo "1件目完了。経過時間: ${ELAPSED_MIN}分"
+   ```
+
+5. **実装ループ**（上記ルールに従う）:
 
    各Issueについて以下を実行:
 
@@ -132,6 +145,6 @@
 
    m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
 
-5. 実装した件数とPR番号を記録する:
+6. 実装した件数とPR番号を記録する:
    `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました\n作成PR: #{PR番号1}, #{PR番号2}..."`
    （PR番号が不明な場合は `gh pr list --head claude/{番号} --json number --jq '.[0].number'` で確認してから記録する）
