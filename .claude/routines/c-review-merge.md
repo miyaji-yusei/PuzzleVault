@@ -8,8 +8,8 @@
 
 ## 手順
 
-1. `develop` へのオープンPRを全件取得する:
-   `gh pr list --base develop --state open --json number,title,headRefName,labels`
+1. `develop` へのオープンPRを全件取得する（DraftとReadyの両方）:
+   `gh pr list --base develop --state open --json number,title,headRefName,labels,isDraft`
 
 2. PRが0件なら「レビュー対象PR無し」と出力して終了する
 
@@ -17,6 +17,10 @@
 
    ### a. スキップチェック
    - `do-not-merge` ラベルが付いていればスキップ
+   - `isDraft: true` かつタイトルが `[WIP]` で始まる場合 → 前回セッションの中断PR:
+     - ブランチをcheckoutしてコードを確認し、実装が途中であれば継続する
+     - 実装が完了していれば typecheck + test を実行してReadyに変換する（ステップl相当）
+     - 実装が途中の場合は実装を完了させてからステップg以降を実行する
 
    ### b. CI状態チェック
    `gh pr checks {番号}` でCI状態を確認する:
