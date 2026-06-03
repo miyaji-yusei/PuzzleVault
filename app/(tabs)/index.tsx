@@ -1,4 +1,5 @@
-import { StyleSheet, View, Text, ScrollView } from 'react-native'
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native'
+import { useRouter } from 'expo-router'
 
 type GameInfo = {
   id: string
@@ -15,71 +16,95 @@ const GAMES: GameInfo[] = [
     implemented: true,
   },
   {
-    id: 'hashi',
-    name: 'Hashi',
-    description: '橋をかけて島をすべてつなごう',
-    implemented: true,
-  },
-  {
-    id: 'seven',
-    name: 'Seven',
-    description: '7並べでトランプを出し切ろう',
-    implemented: true,
-  },
-  {
-    id: 'spider',
-    name: 'スパイダソリティア',
-    description: '2デッキで遊ぶ本格ソリティア',
-    implemented: true,
-  },
-  {
-    id: 'sums',
-    name: 'Sums',
-    description: '数字の合計を埋めるカカロパズル',
-    implemented: true,
-  },
-  {
     id: 'sudoku',
     name: 'ナンプレ',
     description: '9×9マスに数字を埋めよう',
-    implemented: false,
+    implemented: true,
+  },
+  {
+    id: 'nonogram',
+    name: 'イラストロジック',
+    description: 'ヒントを頼りにマスを塗りつぶそう',
+    implemented: true,
+  },
+  {
+    id: 'queens',
+    name: 'クイーンズマスター',
+    description: 'すべての色にクイーンを1つずつ置こう',
+    implemented: true,
   },
   {
     id: 'libra',
     name: 'Libra',
     description: '天秤のバランスを合わせよう',
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'panda',
     name: 'Panda',
     description: 'パンダをペアにしよう',
+    implemented: true,
+  },
+  {
+    id: 'hashi',
+    name: 'Hashi',
+    description: '橋をかけて島をすべてつなごう',
+    implemented: false,
+  },
+  {
+    id: 'seven',
+    name: 'Seven',
+    description: '7並べでトランプを出し切ろう',
+    implemented: false,
+  },
+  {
+    id: 'spider',
+    name: 'スパイダソリティア',
+    description: '2デッキで遊ぶ本格ソリティア',
+    implemented: false,
+  },
+  {
+    id: 'sums',
+    name: 'Sums',
+    description: '数字の合計を埋めるカカロパズル',
     implemented: false,
   },
 ]
 
 type GameCardProps = {
   game: GameInfo
+  onPress: () => void
 }
 
-function GameCard({ game }: GameCardProps) {
+function GameCard({ game, onPress }: GameCardProps) {
   return (
-    <View style={[styles.card, !game.implemented && styles.cardDisabled]}>
+    <TouchableOpacity
+      style={[styles.card, !game.implemented && styles.cardDisabled]}
+      onPress={onPress}
+      disabled={!game.implemented}
+      activeOpacity={0.7}
+    >
       <Text style={styles.cardName}>{game.name}</Text>
       <Text style={styles.cardDescription}>{game.description}</Text>
       {!game.implemented && (
         <Text style={styles.comingSoon}>準備中</Text>
       )}
-    </View>
+    </TouchableOpacity>
   )
 }
 
 export default function HomeScreen() {
+  const router = useRouter()
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.subtitle}>ゲームを選んでください</Text>
       {GAMES.map((game) => (
-        <GameCard key={game.id} game={game} />
+        <GameCard
+          key={game.id}
+          game={game}
+          onPress={() => router.push(`/games/${game.id}`)}
+        />
       ))}
     </ScrollView>
   )
