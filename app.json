@@ -2,7 +2,6 @@
   "expo": {
     "name": "PuzzleVault",
     "scheme": "puzzlevault",
-    "newArchEnabled": false,
     "slug": "PuzzleVault",
     "version": "1.0.0",
     "orientation": "portrait",
