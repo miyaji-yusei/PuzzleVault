@@ -1,12 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Animated } from 'react-native'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated'
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
 import { SelectedCard } from '../../../hooks/useSolitaireGame'
 
@@ -96,18 +90,20 @@ export function SolitaireBoard({
   const scrollYRef = useRef(0)
 
   // Drag overlay
-  const overlayX = useSharedValue(0)
-  const overlayY = useSharedValue(0)
-  const overlayOpacity = useSharedValue(0)
+  const overlayX = useRef(new Animated.Value(0)).current
+  const overlayY = useRef(new Animated.Value(0)).current
+  const overlayOpacity = useRef(new Animated.Value(0)).current
+  const overlayXVal = useRef(0)
+  const overlayYVal = useRef(0)
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    left: overlayX.value,
-    top: overlayY.value,
-    opacity: overlayOpacity.value,
+  const overlayStyle = {
+    position: 'absolute' as const,
+    left: overlayX,
+    top: overlayY,
+    opacity: overlayOpacity,
     zIndex: 999,
-  }))
+  }
 
   const measureBoard = useCallback(() => {
     boardRef.current?.measureInWindow((x, y) => {
@@ -143,16 +139,16 @@ export function SolitaireBoard({
 
   function makeTableauGesture(colIndex: number, cardIndex: number, card: Card) {
     if (!card.faceUp) {
-      return Gesture.Tap().onEnd(() => runOnJS(onTapTableau)(colIndex))
+      return Gesture.Tap().onEnd(() => (onTapTableau)(colIndex))
     }
 
     const doubleTap = Gesture.Tap()
       .numberOfTaps(2)
       .maxDuration(300)
-      .onEnd(() => runOnJS(onDoubleTapCard)(colIndex))
+      .onEnd(() => (onDoubleTapCard)(colIndex))
 
     const singleTap = Gesture.Tap()
-      .onEnd(() => runOnJS(onTapTableau)(colIndex, cardIndex))
+      .onEnd(() => (onTapTableau)(colIndex, cardIndex))
 
     const col = state.tableau[colIndex] ?? []
     const cards = col.slice(cardIndex)
@@ -160,22 +156,24 @@ export function SolitaireBoard({
     const pan = Gesture.Pan()
       .minDistance(8)
       .onStart((e) => {
-        overlayX.value = e.absoluteX - CARD_W / 2
-        overlayY.value = e.absoluteY - CARD_H / 4
-        overlayOpacity.value = withTiming(0.9, { duration: 80 })
-        runOnJS(setDragInfo)({ fromPile: 'tableau', colIndex, cardIndex, cards })
+        overlayXVal.current = e.absoluteX - CARD_W / 2
+        overlayYVal.current = e.absoluteY - CARD_H / 4
+        overlayX.setValue(overlayXVal.current)
+        overlayY.setValue(overlayYVal.current)
+        Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+        setDragInfo({ fromPile: 'tableau', colIndex, cardIndex, cards })
       })
       .onUpdate((e) => {
-        overlayX.value = e.absoluteX - CARD_W / 2
-        overlayY.value = e.absoluteY - CARD_H / 4
+        overlayX.setValue(e.absoluteX - CARD_W / 2)
+        overlayY.setValue(e.absoluteY - CARD_H / 4)
       })
       .onEnd((e) => {
-        overlayOpacity.value = withTiming(0, { duration: 120 })
-        runOnJS(handleDrop)(e.absoluteX, e.absoluteY, colIndex, cardIndex)
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+        handleDrop(e.absoluteX, e.absoluteY, colIndex, cardIndex)
       })
       .onFinalize(() => {
-        overlayOpacity.value = withTiming(0, { duration: 80 })
-        runOnJS(setDragInfo)(null)
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
+        setDragInfo(null)
       })
 
     return Gesture.Race(pan, Gesture.Exclusive(doubleTap, singleTap))
