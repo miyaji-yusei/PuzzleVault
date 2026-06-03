@@ -10,8 +10,14 @@
 
 1. `.claude/paused` ファイルが存在する場合は「一時停止中」と出力して終了する
 
-2. claudeラベルIssueを全件取得する:
-   `gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number)'`
+2. claudeラベルIssueを取得する（priorityラベル付きを優先、次に番号が小さい順）:
+   ```bash
+   # priorityラベル付きを先頭に
+   gh issue list --label claude,priority --state open --json number,title,body
+   # 残りは番号順
+   gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number)'
+   # 両方をマージして重複除外、priorityを先頭に並べる
+   ```
 
 3. Issueが0件なら「実装待ちIssueなし」と出力して終了する
 
