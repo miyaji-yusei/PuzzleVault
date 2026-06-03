@@ -231,7 +231,7 @@ function applyTargetedAdjustment(
     for (const newColor of targets) {
       const candidate = [...working]
       candidate[pos] = newColor
-      if (isRegionConnected(n, candidate, altColor)) {
+      if (isRegionConnected(n, candidate, altColor) && isRegionConnected(n, candidate, newColor)) {
         working = candidate
         anyChanged = true
         break
