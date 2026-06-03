@@ -107,6 +107,33 @@ function applyMove(s: SolitaireState, move: SolitaireMove, drawMode: 1 | 3): Sol
   return ns
 }
 
+function autoCompleteState(s: SolitaireState, drawMode: 1 | 3): SolitaireState {
+  let current = s
+  let changed = true
+  while (changed) {
+    changed = false
+    if (current.waste.length > 0) {
+      const move: SolitaireMove = { type: 'waste-to-foundation' }
+      if (validate(current, move).correct) {
+        current = applyMove(current, move, drawMode)
+        changed = true
+        continue
+      }
+    }
+    for (let i = 0; i < current.tableau.length; i++) {
+      if (current.tableau[i].length > 0) {
+        const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
+        if (validate(current, move).correct) {
+          current = applyMove(current, move, drawMode)
+          changed = true
+          break
+        }
+      }
+    }
+  }
+  return current
+}
+
 export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   const [puzzle] = useState(() => generate(difficulty, seed ?? Date.now()))
   const [state, setState] = useState<SolitaireState>(() => ({
@@ -115,18 +142,30 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   }))
   const [selected, setSelected] = useState<SelectedCard | null>(null)
   const [isComplete, setIsComplete] = useState(false)
+  const [history, setHistory] = useState<SolitaireState[]>([])
   const maxResets = MAX_RESETS[difficulty]
+
+  const canAutoComplete =
+    !isComplete &&
+    state.stock.length === 0 &&
+    state.tableau.every(col => col.every(c => c.faceUp))
+
+  const commitState = useCallback((newState: SolitaireState) => {
+    setHistory(prev => [...prev.slice(-30), state])
+    setState(newState)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
 
   const tapStock = useCallback(() => {
     setSelected(null)
     if (state.stock.length > 0) {
       const move: SolitaireMove = { type: 'stock-draw' }
-      if (validate(state, move).correct) setState(applyMove(state, move, puzzle.drawMode))
+      if (validate(state, move).correct) commitState(applyMove(state, move, puzzle.drawMode))
     } else if (state.stockResets < maxResets && state.waste.length > 0) {
       const move: SolitaireMove = { type: 'stock-reset' }
-      if (validate(state, move).correct) setState(applyMove(state, move, puzzle.drawMode))
+      if (validate(state, move).correct) commitState(applyMove(state, move, puzzle.drawMode))
     }
-  }, [state, puzzle.drawMode, maxResets])
+  }, [state, puzzle.drawMode, maxResets, commitState])
 
   const tapWaste = useCallback(() => {
     if (state.waste.length === 0) return
@@ -160,7 +199,7 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
       }
       const r = validate(state, move)
       if (r.correct) {
-        setState(applyMove(state, move, puzzle.drawMode))
+        commitState(applyMove(state, move, puzzle.drawMode))
         setSelected(null)
         if (r.isComplete) setIsComplete(true)
         return
@@ -174,28 +213,28 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     }
 
     setSelected({ pile: 'tableau', colIndex, cardIndex: idx })
-  }, [state, selected, puzzle.drawMode])
+  }, [state, selected, puzzle.drawMode, commitState])
 
   // Double-tap: auto-send top card to foundation
   const doubleTapCard = useCallback((colIndex: number) => {
     const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
     const r = validate(state, move)
     if (r.correct) {
-      setState(applyMove(state, move, puzzle.drawMode))
+      commitState(applyMove(state, move, puzzle.drawMode))
       setSelected(null)
       if (r.isComplete) setIsComplete(true)
     }
-  }, [state, puzzle.drawMode])
+  }, [state, puzzle.drawMode, commitState])
 
   // Direct move for drag & drop
   const directMove = useCallback((move: SolitaireMove) => {
     const r = validate(state, move)
     if (r.correct) {
-      setState(applyMove(state, move, puzzle.drawMode))
+      commitState(applyMove(state, move, puzzle.drawMode))
       setSelected(null)
       if (r.isComplete) setIsComplete(true)
     }
-  }, [state, puzzle.drawMode])
+  }, [state, puzzle.drawMode, commitState])
 
   // foundationIndex: which foundation pile was tapped (0=spades, 1=hearts, 2=diamonds, 3=clubs)
   const tapFoundation = useCallback((foundationIndex: number) => {
@@ -211,7 +250,7 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
       }
       const r = validate(state, move)
       if (r.correct) {
-        setState(applyMove(state, move, puzzle.drawMode))
+        commitState(applyMove(state, move, puzzle.drawMode))
         setSelected(null)
         if (r.isComplete) setIsComplete(true)
       } else {
@@ -225,7 +264,40 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     if (f && f.length > 0) {
       setSelected({ pile: 'foundation', index: foundationIndex })
     }
-  }, [state, selected, puzzle.drawMode])
+  }, [state, selected, puzzle.drawMode, commitState])
 
-  return { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove }
+  const undo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.length === 0) return prev
+      const next = [...prev]
+      const prevState = next.pop()!
+      setState(prevState)
+      setSelected(null)
+      return next
+    })
+  }, [])
+
+  const restart = useCallback(() => {
+    setState({
+      ...dealState(puzzle.seed, puzzle.drawMode),
+      startedAt: Date.now(),
+    })
+    setSelected(null)
+    setIsComplete(false)
+    setHistory([])
+  }, [puzzle])
+
+  const autoComplete = useCallback(() => {
+    const completed = autoCompleteState(state, puzzle.drawMode)
+    setState(completed)
+    setSelected(null)
+    if (completed.foundation.every(f => f.length === 13)) setIsComplete(true)
+  }, [state, puzzle.drawMode])
+
+  return {
+    state, puzzle, selected, isComplete, maxResets, canAutoComplete,
+    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove,
+    undo, restart, autoComplete,
+    canUndo: history.length > 0,
+  }
 }
