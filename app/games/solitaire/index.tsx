@@ -15,7 +15,7 @@ export default function SolitaireScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation } =
+  const { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove } =
     useSolitaireGame(difficulty)
 
   const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
@@ -53,6 +53,8 @@ export default function SolitaireScreen() {
         onTapWaste={tapWaste}
         onTapFoundation={tapFoundation}
         onTapTableau={tapTableau}
+        onDoubleTapCard={doubleTapCard}
+        onDirectMove={directMove}
       />
     </SafeAreaView>
   )
