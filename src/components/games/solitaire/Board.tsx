@@ -37,7 +37,7 @@ type Props = {
   selected: SelectedCard | null
   onTapStock: () => void
   onTapWaste: () => void
-  onTapFoundation: () => void
+  onTapFoundation: (foundationIndex: number) => void
   onTapTableau: (colIndex: number, cardIndex?: number) => void
   onDoubleTapCard: (colIndex: number) => void
   onDirectMove: (move: SolitaireMove) => void
@@ -196,15 +196,28 @@ export function SolitaireBoard({
         {/* Top row: foundation + stock/waste */}
         <View style={styles.topRow}>
           <View style={styles.foundationRow}>
-            {foundation.map((pile, fi) => (
-              <TouchableOpacity key={`f-${fi}`} onPress={onTapFoundation} style={{ marginRight: fi < 3 ? GAP : 0 }}>
-                {pile.length > 0 ? (
-                  <CardView card={pile[pile.length - 1]} width={CARD_W} height={CARD_H} />
-                ) : (
-                  <EmptySlot width={CARD_W} height={CARD_H} label={foundationLabels[fi]} />
-                )}
-              </TouchableOpacity>
-            ))}
+            {foundation.map((pile, fi) => {
+              const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
+              return (
+                <TouchableOpacity
+                  key={`f-${fi}`}
+                  onPress={() => onTapFoundation(fi)}
+                  style={{ marginRight: fi < 3 ? GAP : 0 }}
+                  activeOpacity={0.7}
+                >
+                  {pile.length > 0 ? (
+                    <CardView
+                      card={pile[pile.length - 1]}
+                      width={CARD_W}
+                      height={CARD_H}
+                      highlighted={isFoundationSelected}
+                    />
+                  ) : (
+                    <EmptySlot width={CARD_W} height={CARD_H} label={foundationLabels[fi]} />
+                  )}
+                </TouchableOpacity>
+              )
+            })}
           </View>
           <View style={{ flex: 1 }} />
           <View style={styles.stockRow}>

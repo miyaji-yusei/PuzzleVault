@@ -10,7 +10,10 @@ const MAX_RESETS: Record<Difficulty, number> = {
   expert: 1,
 }
 
-export type SelectedCard = { pile: 'tableau'; colIndex: number; cardIndex: number } | { pile: 'waste' }
+export type SelectedCard =
+  | { pile: 'tableau'; colIndex: number; cardIndex: number }
+  | { pile: 'waste' }
+  | { pile: 'foundation'; index: number }
 
 function suitIndex(suit: Suit): number {
   const map: Record<Suit, number> = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
@@ -90,6 +93,16 @@ function applyMove(s: SolitaireState, move: SolitaireMove, drawMode: 1 | 3): Sol
       }
       break
     }
+    case 'foundation-to-tableau': {
+      if (!move.from || !move.to) break
+      const f = ns.foundation[move.from.index]
+      const card = f?.pop()
+      if (card) {
+        ns.tableau[move.to.index].push({ ...card, faceUp: true })
+        ns.score = Math.max(0, ns.score - 15)
+      }
+      break
+    }
   }
   return ns
 }
@@ -128,6 +141,12 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
       let move: SolitaireMove
       if (selected.pile === 'waste') {
         move = { type: 'waste-to-tableau', to: { pile: 'tableau', index: colIndex } }
+      } else if (selected.pile === 'foundation') {
+        move = {
+          type: 'foundation-to-tableau',
+          from: { pile: 'foundation', index: selected.index },
+          to: { pile: 'tableau', index: colIndex },
+        }
       } else {
         if (selected.colIndex === colIndex) {
           setSelected(null)
@@ -178,21 +197,33 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     }
   }, [state, puzzle.drawMode])
 
-  const tapFoundation = useCallback(() => {
-    if (!selected) return
-    let move: SolitaireMove
-    if (selected.pile === 'waste') {
-      move = { type: 'waste-to-foundation' }
-    } else {
-      move = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: selected.colIndex } }
+  // foundationIndex: which foundation pile was tapped (0=spades, 1=hearts, 2=diamonds, 3=clubs)
+  const tapFoundation = useCallback((foundationIndex: number) => {
+    if (selected) {
+      let move: SolitaireMove
+      if (selected.pile === 'waste') {
+        move = { type: 'waste-to-foundation' }
+      } else if (selected.pile === 'foundation') {
+        setSelected(null)
+        return
+      } else {
+        move = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: selected.colIndex } }
+      }
+      const r = validate(state, move)
+      if (r.correct) {
+        setState(applyMove(state, move, puzzle.drawMode))
+        setSelected(null)
+        if (r.isComplete) setIsComplete(true)
+      } else {
+        setSelected(null)
+      }
+      return
     }
-    const r = validate(state, move)
-    if (r.correct) {
-      setState(applyMove(state, move, puzzle.drawMode))
-      setSelected(null)
-      if (r.isComplete) setIsComplete(true)
-    } else {
-      setSelected(null)
+
+    // No selection: select the foundation card for possible return to tableau
+    const f = state.foundation[foundationIndex]
+    if (f && f.length > 0) {
+      setSelected({ pile: 'foundation', index: foundationIndex })
     }
   }, [state, selected, puzzle.drawMode])
 

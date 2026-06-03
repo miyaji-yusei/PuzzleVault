@@ -30,7 +30,7 @@ export interface SolitaireState {
 
 export interface SolitaireMove {
   type: 'tableau-to-tableau' | 'tableau-to-foundation' | 'waste-to-tableau'
-        | 'waste-to-foundation' | 'stock-draw' | 'stock-reset'
+        | 'waste-to-foundation' | 'stock-draw' | 'stock-reset' | 'foundation-to-tableau'
   from?: { pile: 'tableau' | 'waste' | 'foundation'; index: number; cardIndex?: number }
   to?: { pile: 'tableau' | 'foundation'; index: number }
 }
