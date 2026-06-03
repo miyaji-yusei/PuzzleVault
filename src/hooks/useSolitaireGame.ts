@@ -154,20 +154,29 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
       return
     }
 
-    // Auto-send top card to foundation when no selection pending
-    if (!selected && idx === col.length - 1) {
-      const autoMove: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
-      const ar = validate(state, autoMove)
-      if (ar.correct) {
-        setState(applyMove(state, autoMove, puzzle.drawMode))
-        setSelected(null)
-        if (ar.isComplete) setIsComplete(true)
-        return
-      }
-    }
-
     setSelected({ pile: 'tableau', colIndex, cardIndex: idx })
   }, [state, selected, puzzle.drawMode])
+
+  // Double-tap: auto-send top card to foundation
+  const doubleTapCard = useCallback((colIndex: number) => {
+    const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
+    const r = validate(state, move)
+    if (r.correct) {
+      setState(applyMove(state, move, puzzle.drawMode))
+      setSelected(null)
+      if (r.isComplete) setIsComplete(true)
+    }
+  }, [state, puzzle.drawMode])
+
+  // Direct move for drag & drop
+  const directMove = useCallback((move: SolitaireMove) => {
+    const r = validate(state, move)
+    if (r.correct) {
+      setState(applyMove(state, move, puzzle.drawMode))
+      setSelected(null)
+      if (r.isComplete) setIsComplete(true)
+    }
+  }, [state, puzzle.drawMode])
 
   const tapFoundation = useCallback(() => {
     if (!selected) return
@@ -187,5 +196,5 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     }
   }, [state, selected, puzzle.drawMode])
 
-  return { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation }
+  return { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove }
 }
