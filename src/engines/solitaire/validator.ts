@@ -78,6 +78,18 @@ export function validate(state: SolitaireState, move: SolitaireMove): Validation
       return { correct, isComplete: false, lifeLost: false }
     }
 
+    case 'foundation-to-tableau': {
+      if (!move.from || !move.to) return { correct: false, isComplete: false, lifeLost: false }
+      const f = state.foundation[move.from.index]
+      if (!f || f.length === 0) return { correct: false, isComplete: false, lifeLost: false }
+      const card = f[f.length - 1]
+      const dstCol = state.tableau[move.to.index]
+      const correct = dstCol.length === 0
+        ? card.rank === 13
+        : canPlaceOnColumn(dstCol[dstCol.length - 1], card)
+      return { correct, isComplete: false, lifeLost: false }
+    }
+
     default:
       return { correct: false, isComplete: false, lifeLost: false }
   }
