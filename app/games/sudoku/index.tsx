@@ -15,7 +15,7 @@ export default function SudokuScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, selectedCell, selectCell, enterNumber, wrongCells, lives, isComplete, isGameOver } =
+  const { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete } =
     useSudokuGame(difficulty)
 
   return (
@@ -25,23 +25,12 @@ export default function SudokuScreen() {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.title}>ナンプレ</Text>
-        <View style={styles.lives}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <Text key={i} style={[styles.heart, i < lives ? styles.heartActive : styles.heartLost]}>
-              ♥
-            </Text>
-          ))}
-        </View>
+        <View style={{ width: 60 }} />
       </View>
 
       {isComplete && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 クリア！</Text>
-        </View>
-      )}
-      {isGameOver && (
-        <View style={[styles.banner, styles.bannerGameOver]}>
-          <Text style={styles.bannerText}>ゲームオーバー</Text>
         </View>
       )}
 
@@ -104,26 +93,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  lives: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  heart: {
-    fontSize: 20,
-  },
-  heartActive: {
-    color: '#e53935',
-  },
-  heartLost: {
-    color: '#ccc',
-  },
   banner: {
     backgroundColor: '#4caf50',
     padding: 12,
     alignItems: 'center',
-  },
-  bannerGameOver: {
-    backgroundColor: '#e53935',
   },
   bannerText: {
     color: '#fff',
