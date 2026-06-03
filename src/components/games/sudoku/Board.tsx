@@ -16,6 +16,10 @@ type Props = {
 export function SudokuBoard({ state, selectedCell, wrongCells, onSelectCell }: Props) {
   const { board, current } = state
 
+  const selectedValue = selectedCell
+    ? (current[selectedCell[0]]?.[selectedCell[1]] ?? null)
+    : null
+
   function getCellStyle(row: number, col: number) {
     const isSelected = selectedCell?.[0] === row && selectedCell?.[1] === col
     const isSameRow = selectedCell?.[0] === row
@@ -24,23 +28,34 @@ export function SudokuBoard({ state, selectedCell, wrongCells, onSelectCell }: P
       selectedCell !== null &&
       Math.floor(selectedCell[0] / 3) === Math.floor(row / 3) &&
       Math.floor(selectedCell[1] / 3) === Math.floor(col / 3)
+    const cellValue = current[row]?.[col] ?? null
+    const isSameNumber =
+      !isSelected && selectedValue !== null && cellValue === selectedValue
 
     return [
       styles.cell,
+      col === 8 && styles.cellNoBorderRight,
+      row === 8 && styles.cellNoBorderBottom,
       col % 3 === 2 && col !== 8 && styles.cellBorderRight,
       row % 3 === 2 && row !== 8 && styles.cellBorderBottom,
       isSelected && styles.cellSelected,
       !isSelected && (isSameRow || isSameCol || isSameBox) && styles.cellHighlight,
+      isSameNumber && styles.cellSameNumber,
     ]
   }
 
   function getTextStyle(row: number, col: number) {
     const isPreFilled = board[row]?.[col] !== null
     const isWrong = wrongCells.has(`${row}-${col}`)
+    const cellValue = current[row]?.[col] ?? null
+    const isSameNumber =
+      selectedValue !== null && cellValue === selectedValue &&
+      !(selectedCell?.[0] === row && selectedCell?.[1] === col)
     return [
       styles.cellText,
       isPreFilled ? styles.textPreFilled : styles.textUserFilled,
       isWrong && styles.textWrong,
+      isSameNumber && styles.textSameNumber,
     ]
   }
 
@@ -97,11 +112,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#333',
   },
+  cellNoBorderRight: {
+    borderRightWidth: 0,
+  },
+  cellNoBorderBottom: {
+    borderBottomWidth: 0,
+  },
   cellSelected: {
     backgroundColor: '#b8d4f8',
   },
   cellHighlight: {
     backgroundColor: '#e8f1fb',
+  },
+  cellSameNumber: {
+    backgroundColor: '#c5ddf7',
   },
   cellText: {
     fontSize: CELL_SIZE * 0.55,
@@ -116,5 +140,8 @@ const styles = StyleSheet.create({
   },
   textWrong: {
     color: '#e53935',
+  },
+  textSameNumber: {
+    fontWeight: 'bold',
   },
 })

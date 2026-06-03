@@ -23,9 +23,6 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null)
   const [wrongCells, setWrongCells] = useState<Set<string>>(new Set())
   const [isComplete, setIsComplete] = useState(false)
-  const [isGameOver, setIsGameOver] = useState(false)
-
-  const lives = MAX_LIVES - state.mistakes
 
   const selectCell = useCallback((row: number, col: number) => {
     setState(prev => {
@@ -39,7 +36,7 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
   }, [state.board])
 
   const enterNumber = useCallback((value: number | null) => {
-    if (!selectedCell || isComplete || isGameOver) return
+    if (!selectedCell || isComplete) return
     const [row, col] = selectedCell
     if (state.board[row]?.[col] !== null) return
 
@@ -55,25 +52,20 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
     setState(prev => {
       const newCurrent = prev.current.map(r => [...r])
       newCurrent[row][col] = value as SudokuMove['value']
-      return {
-        ...prev,
-        current: newCurrent,
-        mistakes: result.lifeLost ? prev.mistakes + 1 : prev.mistakes,
-      }
+      return { ...prev, current: newCurrent }
     })
 
-    if (result.lifeLost) {
-      setWrongCells(prev => new Set(prev).add(cellKey))
-      if (state.mistakes + 1 >= MAX_LIVES) setIsGameOver(true)
+    if (!result.correct || value === null) {
+      if (value !== null) {
+        setWrongCells(prev => new Set(prev).add(cellKey))
+      } else {
+        setWrongCells(prev => { const n = new Set(prev); n.delete(cellKey); return n })
+      }
     } else {
-      setWrongCells(prev => {
-        const next = new Set(prev)
-        next.delete(cellKey)
-        return next
-      })
+      setWrongCells(prev => { const n = new Set(prev); n.delete(cellKey); return n })
       if (result.isComplete) setIsComplete(true)
     }
-  }, [selectedCell, state, isComplete, isGameOver])
+  }, [selectedCell, state, isComplete])
 
-  return { state, selectedCell, selectCell, enterNumber, wrongCells, lives, isComplete, isGameOver }
+  return { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete }
 }
