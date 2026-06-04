@@ -49,7 +49,7 @@ const GAMES: GameInfo[] = [
     id: 'hashi',
     name: 'Hashi',
     description: '橋をかけて島をすべてつなごう',
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'seven',
@@ -61,7 +61,7 @@ const GAMES: GameInfo[] = [
     id: 'spider',
     name: 'スパイダソリティア',
     description: '2デッキで遊ぶ本格ソリティア',
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'sums',

@@ -164,6 +164,14 @@
       ```
 
    m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
+   n. **UI実装の場合（`app/games/{name}/` を作成・更新するPRの場合）**:
+      `app/(tabs)/index.tsx` の GAMES リストで対象ゲームの `implemented: false` を `implemented: true` に変更する:
+      ```bash
+      # app/(tabs)/index.tsx を開いて対象ゲームの implemented: false を true に変更
+      git add "app/(tabs)/index.tsx"
+      git commit -m "feat: {name}をゲーム一覧で選択可能にする（implemented: true）"
+      git push origin claude/{Issue番号}
+      ```
 
 6. 実装した件数とPR番号を記録する:
    `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました\n作成PR: #{PR番号1}, #{PR番号2}..."`
