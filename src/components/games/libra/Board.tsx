@@ -31,8 +31,10 @@ export function LibraBoard({ state, onPressCell }: Props) {
   onPressCellRef.current = onPressCell
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y) => {
-      boardPosRef.current = { x, y }
+    requestAnimationFrame(() => {
+      boardRef.current?.measureInWindow((x, y) => {
+        boardPosRef.current = { x, y }
+      })
     })
   }, [])
 

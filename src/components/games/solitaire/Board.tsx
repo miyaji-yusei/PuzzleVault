@@ -79,7 +79,6 @@ export function SolitaireBoard({
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
 
-  const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
   const boardLeftRef = useRef(0)
 
@@ -104,13 +103,6 @@ export function SolitaireBoard({
   onDirectMoveRef.current = onDirectMove
   const tableauRef = useRef(tableau)
   tableauRef.current = tableau
-
-  const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y) => {
-      boardTopRef.current = y
-      boardLeftRef.current = x
-    })
-  }, [])
 
   const getCardAt = useCallback((relX: number, relY: number) => {
     const col = Math.floor((relX - PAD) / (CARD_W + GAP))
@@ -169,8 +161,11 @@ export function SolitaireBoard({
     onPanResponderGrant: (e) => {
       const gs = gestureState.current
       gs.isDragging = false
-      const relY = e.nativeEvent.pageY - boardTopRef.current - TOP_ROW_H
-      const relX = e.nativeEvent.pageX - boardLeftRef.current
+      // Compute board position: panResponder is on the tableau (TOP_ROW_H below the board)
+      boardTopRef.current = e.nativeEvent.pageY - e.nativeEvent.locationY - TOP_ROW_H
+      boardLeftRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX
+      const relY = e.nativeEvent.locationY
+      const relX = e.nativeEvent.locationX
       gs.activeCard = relY >= 0 ? getCardAt(relX, relY) : null
     },
     onPanResponderMove: (e, g) => {
@@ -184,14 +179,15 @@ export function SolitaireBoard({
         if (!gs.isDragging) {
           gs.isDragging = true
           if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
-          overlayX.setValue(e.nativeEvent.pageX - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - CARD_H / 4)
+          // Position overlay relative to board (position: absolute within board view)
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
           Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
           const column = tableauRef.current[col] ?? []
           setDragInfo({ fromPile: 'tableau', colIndex: col, cardIndex: card, cards: column.slice(card) })
         }
-        overlayX.setValue(e.nativeEvent.pageX - CARD_W / 2)
-        overlayY.setValue(e.nativeEvent.pageY - CARD_H / 4)
+        overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+        overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
       }
     },
     onPanResponderRelease: (e) => {
@@ -244,7 +240,7 @@ export function SolitaireBoard({
   }), [getCardAt, handleDrop, overlayOpacity, overlayX, overlayY])
 
   return (
-    <View ref={boardRef} style={{ flex: 1 }} onLayout={measureBoard}>
+    <View style={{ flex: 1 }}>
       {/* Top row: foundation + stock/waste */}
       <View style={styles.topRow}>
         <View style={styles.foundationRow}>

@@ -27,8 +27,10 @@ export function NonogramBoard({ state, onSetCell }: Props) {
   onSetCellRef.current = onSetCell
 
   const measureGrid = useCallback(() => {
-    gridRef.current?.measureInWindow((x, y) => {
-      gridPosRef.current = { x, y }
+    requestAnimationFrame(() => {
+      gridRef.current?.measureInWindow((x, y) => {
+        gridPosRef.current = { x, y }
+      })
     })
   }, [])
 
