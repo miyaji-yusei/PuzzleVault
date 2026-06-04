@@ -28,10 +28,10 @@ const DIFFICULTY_CONFIG: Record<Difficulty, {
   revealRate: number
   constraintCount: number
 }> = {
-  easy:   { size: 6,  revealRate: 0.40, constraintCount: 6 },
-  normal: { size: 8,  revealRate: 0.30, constraintCount: 8 },
-  hard:   { size: 8,  revealRate: 0.20, constraintCount: 5 },
-  expert: { size: 10, revealRate: 0.15, constraintCount: 5 },
+  easy:   { size: 8, revealRate: 0.50, constraintCount: 12 },
+  normal: { size: 8, revealRate: 0.35, constraintCount: 8 },
+  hard:   { size: 8, revealRate: 0.22, constraintCount: 5 },
+  expert: { size: 8, revealRate: 0.14, constraintCount: 3 },
 }
 
 // Generate a complete valid solution grid using backtracking + constraint propagation
