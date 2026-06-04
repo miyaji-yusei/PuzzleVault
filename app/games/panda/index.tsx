@@ -15,7 +15,8 @@ export default function PandaScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, placeCross, placePanda, lives, isComplete, isGameOver, restart } = usePandaGame(difficulty)
+  const { state, tapCell, dragCross, fixError, confirmedCells, errorCell, lives, isComplete, isGameOver, restart } =
+    usePandaGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,11 +46,27 @@ export default function PandaScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
-        <PandaBoard state={state} onPlaceCross={placeCross} onPlacePanda={placePanda} />
+        <PandaBoard
+          state={state}
+          confirmedCells={confirmedCells}
+          errorCell={errorCell}
+          onPressCell={tapCell}
+          onDragCross={dragCross}
+        />
       </ScrollView>
 
+      {/* Error banner */}
+      {errorCell && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>🐼 の配置が間違っています</Text>
+          <TouchableOpacity style={styles.fixButton} onPress={fixError}>
+            <Text style={styles.fixButtonText}>修正</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.legend}>
-        <Text style={styles.legendText}>タップ: ×印 ／ ダブルタップ: 🐼配置</Text>
+        <Text style={styles.legendText}>タップ: 薄緑 → 🐼 → 消去 ／ ドラッグ: 薄緑をまとめて塗る</Text>
       </View>
 
       {/* Win dialog */}
@@ -172,6 +189,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ef9a9a',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#c62828',
+    fontWeight: '600',
+  },
+  fixButton: {
+    backgroundColor: '#c62828',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  fixButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 13,
   },
   legend: {
     padding: 12,
