@@ -31,6 +31,7 @@ type Props = {
   selected: SelectedCard | null
   onTapStock: () => void
   onTapWaste: () => void
+  onDoubleTapWaste: () => void
   onTapFoundation: (foundationIndex: number) => void
   onTapTableau: (colIndex: number, cardIndex?: number) => void
   onDoubleTapCard: (colIndex: number) => void
@@ -74,7 +75,7 @@ function EmptySlot({ width, height, label }: { width: number; height: number; la
 }
 
 export function SolitaireBoard({
-  state, selected, onTapStock, onTapWaste, onTapFoundation, onTapTableau, onDoubleTapCard, onDirectMove,
+  state, selected, onTapStock, onTapWaste, onDoubleTapWaste, onTapFoundation, onTapTableau, onDoubleTapCard, onDirectMove,
 }: Props) {
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
@@ -113,6 +114,8 @@ export function SolitaireBoard({
   tableauRef.current = tableau
   const onTapWasteRef = useRef(onTapWaste)
   onTapWasteRef.current = onTapWaste
+  const onDoubleTapWasteRef = useRef(onDoubleTapWaste)
+  onDoubleTapWasteRef.current = onDoubleTapWaste
   const wasteRef = useRef(waste)
   wasteRef.current = waste
   const wasteGestureState = useRef({ isDragging: false })
@@ -170,52 +173,71 @@ export function SolitaireBoard({
     setDragInfo(null)
   }, [])
 
-  const wastePanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, g) =>
-      (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) && wasteRef.current.length > 0,
-    onPanResponderGrant: () => {
-      wasteGestureState.current.isDragging = false
-    },
-    onPanResponderMove: (e, g) => {
-      if (wasteRef.current.length === 0) return
-      if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
-        if (!wasteGestureState.current.isDragging) {
-          wasteGestureState.current.isDragging = true
-          const card = wasteRef.current[wasteRef.current.length - 1]
+  const wastePanResponder = useMemo(() => {
+    let wasteTapTimer: ReturnType<typeof setTimeout> | null = null
+    let wastePendingTap = false
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) =>
+        (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) && wasteRef.current.length > 0,
+      onPanResponderGrant: () => {
+        wasteGestureState.current.isDragging = false
+      },
+      onPanResponderMove: (e, g) => {
+        if (wasteRef.current.length === 0) return
+        if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+          if (!wasteGestureState.current.isDragging) {
+            wasteGestureState.current.isDragging = true
+            if (wasteTapTimer) { clearTimeout(wasteTapTimer); wasteTapTimer = null; wastePendingTap = false }
+            const card = wasteRef.current[wasteRef.current.length - 1]
+            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+            Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+            setDragInfo({ fromPile: 'waste', colIndex: -1, cardIndex: 0, cards: [card] })
+          }
           overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
           overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
-          Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
-          setDragInfo({ fromPile: 'waste', colIndex: -1, cardIndex: 0, cards: [card] })
         }
-        overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-        overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
-      }
-    },
-    onPanResponderRelease: (e) => {
-      if (wasteGestureState.current.isDragging) {
+      },
+      onPanResponderRelease: (e) => {
+        if (wasteGestureState.current.isDragging) {
+          wasteGestureState.current.isDragging = false
+          Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+          setDragInfo(null)
+          const relY = e.nativeEvent.pageY - boardTopRef.current
+          const relX = e.nativeEvent.pageX - boardLeftRef.current
+          if (relY >= 0 && relY < TOP_ROW_H) {
+            onDirectMoveRef.current({ type: 'waste-to-foundation' })
+          } else if (relY >= TOP_ROW_H) {
+            const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+            const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
+            onDirectMoveRef.current({ type: 'waste-to-tableau', to: { pile: 'tableau', index: clampedCol } })
+          }
+        } else {
+          if (wastePendingTap && wasteTapTimer) {
+            clearTimeout(wasteTapTimer)
+            wasteTapTimer = null
+            wastePendingTap = false
+            onDoubleTapWasteRef.current()
+          } else {
+            wastePendingTap = true
+            wasteTapTimer = setTimeout(() => {
+              wasteTapTimer = null
+              wastePendingTap = false
+              onTapWasteRef.current()
+            }, DOUBLE_TAP_MS)
+          }
+        }
+      },
+      onPanResponderTerminate: () => {
         wasteGestureState.current.isDragging = false
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+        if (wasteTapTimer) { clearTimeout(wasteTapTimer); wasteTapTimer = null; wastePendingTap = false }
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
         setDragInfo(null)
-        const relY = e.nativeEvent.pageY - boardTopRef.current
-        const relX = e.nativeEvent.pageX - boardLeftRef.current
-        if (relY >= 0 && relY < TOP_ROW_H) {
-          onDirectMoveRef.current({ type: 'waste-to-foundation' })
-        } else if (relY >= TOP_ROW_H) {
-          const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
-          const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
-          onDirectMoveRef.current({ type: 'waste-to-tableau', to: { pile: 'tableau', index: clampedCol } })
-        }
-      } else {
-        onTapWasteRef.current()
-      }
-    },
-    onPanResponderTerminate: () => {
-      wasteGestureState.current.isDragging = false
-      Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
-      setDragInfo(null)
-    },
-  }), [overlayOpacity, overlayX, overlayY])
+      },
+    })
+  }, [overlayOpacity, overlayX, overlayY])
 
   const gestureState = useRef({
     isDragging: false,
