@@ -62,6 +62,7 @@ export function useLibraGame(difficulty: Difficulty, seed?: number) {
 
   const pressCell = useCallback((row: number, col: number) => {
     if (isComplete || isGameOver || flashWrongCell) return
+    if (stateRef.current.initial[row]?.[col] !== null) return
 
     const pending = pendingRef.current
     if (pending) {
@@ -70,13 +71,14 @@ export function useLibraGame(difficulty: Difficulty, seed?: number) {
       if (pending.row !== row || pending.col !== col) {
         commitValidation(pending.row, pending.col, pending.value)
       }
-      // Same cell: just cancel, user is cycling the value
     }
 
-    if (stateRef.current.initial[row]?.[col] !== null) return
-
-    const currentVal = stateRef.current.current[row]?.[col] ?? null
-    const next: CellValue = currentVal === null ? 'A' : currentVal === 'A' ? 'B' : null
+    // Use pending value as effective current to handle rapid taps without stale state
+    const effectiveCurrent =
+      pending?.row === row && pending?.col === col
+        ? pending.value
+        : (stateRef.current.current[row]?.[col] ?? null)
+    const next: CellValue = effectiveCurrent === null ? 'A' : effectiveCurrent === 'A' ? 'B' : null
 
     setState(prev => {
       if (prev.initial[row]?.[col] !== null) return prev
