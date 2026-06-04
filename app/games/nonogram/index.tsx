@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, ScrollView } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { NonogramBoard } from '../../../src/components/games/nonogram/Board'
 import { useNonogramGame } from '../../../src/hooks/useNonogramGame'
@@ -15,7 +15,7 @@ export default function NonogramScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, toggleCell, lives, isComplete, isGameOver } = useNonogramGame(difficulty)
+  const { state, setCell, mode, setMode, isComplete } = useNonogramGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,33 +24,52 @@ export default function NonogramScreen() {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.title}>イラストロジック</Text>
-        <View style={styles.lives}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <Text key={i} style={[styles.heart, i < lives ? styles.heartActive : styles.heartLost]}>
-              ♥
-            </Text>
-          ))}
-        </View>
+        <View style={{ width: 60 }} />
       </View>
 
-      {isComplete && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>🎉 クリア！</Text>
-        </View>
-      )}
-      {isGameOver && (
-        <View style={[styles.banner, styles.bannerGameOver]}>
-          <Text style={styles.bannerText}>ゲームオーバー</Text>
-        </View>
-      )}
+      <ScrollView contentContainerStyle={styles.boardContainer}>
+        <NonogramBoard state={state} onSetCell={setCell} />
+      </ScrollView>
 
-      <View style={styles.boardContainer}>
-        <NonogramBoard state={state} onToggleCell={toggleCell} />
+      {/* Mode toggle */}
+      <View style={styles.toolbar}>
+        <TouchableOpacity
+          style={[styles.modeButton, mode === 'fill' && styles.modeButtonActive]}
+          onPress={() => setMode('fill')}
+        >
+          <View style={styles.fillPreview} />
+          <Text style={[styles.modeButtonText, mode === 'fill' && styles.modeButtonTextActive]}>
+            塗る
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeButton, mode === 'cross' && styles.modeButtonActive]}
+          onPress={() => setMode('cross')}
+        >
+          <Text style={[styles.crossPreview, mode === 'cross' && styles.crossPreviewActive]}>×</Text>
+          <Text style={[styles.modeButtonText, mode === 'cross' && styles.modeButtonTextActive]}>
+            ×印
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.legend}>
-        <Text style={styles.legendText}>タップ: 塗る / もう一度: ×印 / もう一度: 消す</Text>
-      </View>
+      {/* Win dialog */}
+      <Modal visible={isComplete} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
+            <Text style={styles.dialogMessage}>おめでとうございます！</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -82,45 +101,103 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  lives: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  heart: {
-    fontSize: 20,
-  },
-  heartActive: {
-    color: '#e53935',
-  },
-  heartLost: {
-    color: '#ccc',
-  },
-  banner: {
-    backgroundColor: '#4caf50',
-    padding: 12,
-    alignItems: 'center',
-  },
-  bannerGameOver: {
-    backgroundColor: '#e53935',
-  },
-  bannerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   boardContainer: {
-    flex: 1,
+    flexGrow: 1,
     padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  legend: {
-    padding: 12,
+  toolbar: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    gap: 16,
+    justifyContent: 'center',
+  },
+  modeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
+    minWidth: 110,
+    justifyContent: 'center',
+  },
+  modeButtonActive: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#e8f1fb',
+  },
+  modeButtonText: {
+    fontSize: 15,
+    color: '#666',
+    fontWeight: '600',
+  },
+  modeButtonTextActive: {
+    color: '#4A90E2',
+  },
+  fillPreview: {
+    width: 16,
+    height: 16,
+    backgroundColor: '#333',
+    borderRadius: 2,
+  },
+  crossPreview: {
+    fontSize: 18,
+    color: '#999',
+    fontWeight: 'bold',
+  },
+  crossPreviewActive: {
+    color: '#4A90E2',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  legendText: {
-    fontSize: 12,
-    color: '#888',
+  dialog: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: 280,
+    alignItems: 'center',
+  },
+  dialogTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  dialogMessage: {
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  dialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  dialogButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  dialogButtonCancel: {
+    backgroundColor: '#4A90E2',
+  },
+  dialogButtonTextCancel: {
+    color: '#fff',
+    fontWeight: '600',
   },
 })

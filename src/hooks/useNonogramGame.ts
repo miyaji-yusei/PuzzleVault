@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react'
-import { generate, validate } from '../engines/nonogram'
-import { NonogramState, NonogramMove, CellState } from '../engines/nonogram/types'
+import { generate } from '../engines/nonogram'
+import { NonogramState, CellState } from '../engines/nonogram/types'
 import { Difficulty } from '../types/engine'
 
-const MAX_LIVES = 3
+export type NonogramMode = 'fill' | 'cross'
 
 export function useNonogramGame(difficulty: Difficulty, seed?: number) {
   const [state, setState] = useState<NonogramState>(() => {
@@ -20,34 +20,25 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
     }
   })
   const [isComplete, setIsComplete] = useState(false)
-  const [isGameOver, setIsGameOver] = useState(false)
+  const [mode, setMode] = useState<NonogramMode>('fill')
 
-  const lives = MAX_LIVES - state.mistakes
-
-  const toggleCell = useCallback((row: number, col: number) => {
-    if (isComplete || isGameOver) return
-
+  const setCell = useCallback((row: number, col: number) => {
+    if (isComplete) return
     setState(prev => {
-      const current = prev.current[row]?.[col] ?? 'empty'
-      // Cycle: empty → filled → crossed → empty
-      const next: CellState = current === 'empty' ? 'filled' : current === 'filled' ? 'crossed' : 'empty'
-      const move: NonogramMove = { row, col, state: next }
-      const result = validate(prev, move)
+      const nextCell: CellState = mode === 'fill' ? 'filled' : 'crossed'
+      if ((prev.current[row]?.[col] ?? 'empty') === nextCell) return prev
 
       const newCurrent = prev.current.map(r => [...r]) as CellState[][]
-      newCurrent[row][col] = next
-      const newState = {
-        ...prev,
-        current: newCurrent,
-        mistakes: result.lifeLost ? prev.mistakes + 1 : prev.mistakes,
-      }
+      newCurrent[row][col] = nextCell
 
-      if (result.isComplete) setIsComplete(true)
-      else if (result.lifeLost && newState.mistakes >= MAX_LIVES) setIsGameOver(true)
+      const complete = prev.solution.every((sRow, r) =>
+        sRow.every((sol, c) => sol === (newCurrent[r][c] === 'filled'))
+      )
+      if (complete) setIsComplete(true)
 
-      return newState
+      return { ...prev, current: newCurrent }
     })
-  }, [isComplete, isGameOver])
+  }, [isComplete, mode])
 
-  return { state, toggleCell, lives, isComplete, isGameOver }
+  return { state, setCell, mode, setMode, isComplete }
 }
