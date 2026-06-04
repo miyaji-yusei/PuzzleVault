@@ -1,10 +1,9 @@
-import React, { useRef, useCallback, useMemo } from 'react'
+import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { LibraState, CellValue, Constraint } from '../../../engines/libra/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_PADDING = 24
-const DOUBLE_TAP_MS = 280
 const CONSTRAINT_BOX = 14
 
 type Props = {
@@ -32,12 +31,12 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
   onPressCellRef.current = onPressCell
 
   const measureBoard = useCallback(() => {
-    requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => {
-        boardPosRef.current = { x, y }
-      })
+    boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      boardPosRef.current = { x: pageX, y: pageY }
     })
   }, [])
+
+  useEffect(() => { measureBoard() }, [measureBoard])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -46,42 +45,18 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
     return null
   }, [cellSize, size])
 
-  const panResponder = useMemo(() => {
-    let tapTimer: ReturnType<typeof setTimeout> | null = null
-    let pendingCell: string | null = null
-
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => false,
-      onPanResponderGrant: () => {
-        // Re-measure for next gesture (async)
-        boardRef.current?.measureInWindow((x, y) => { boardPosRef.current = { x, y } })
-      },
-      onPanResponderRelease: (e) => {
-        const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
-        if (!cell) return
-        const key = `${cell.row},${cell.col}`
-
-        if (pendingCell === key && tapTimer) {
-          clearTimeout(tapTimer)
-          tapTimer = null
-          pendingCell = null
-          onPressCellRef.current(cell.row, cell.col)
-        } else {
-          if (tapTimer) clearTimeout(tapTimer)
-          pendingCell = key
-          tapTimer = setTimeout(() => {
-            tapTimer = null
-            pendingCell = null
-            onPressCellRef.current(cell.row, cell.col)
-          }, DOUBLE_TAP_MS)
-        }
-      },
-      onPanResponderTerminate: () => {
-        if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; pendingCell = null }
-      },
-    })
-  }, [getCellAt])
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => false,
+    onPanResponderGrant: () => {
+      boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { boardPosRef.current = { x: pageX, y: pageY } })
+    },
+    onPanResponderRelease: (e) => {
+      const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+      if (cell) onPressCellRef.current(cell.row, cell.col)
+    },
+    onPanResponderTerminate: () => {},
+  }), [getCellAt])
 
   return (
     <View style={{ position: 'relative' }}>
