@@ -61,7 +61,18 @@
    `gh pr review {番号} --comment --body "レビュー指摘を修正しました: {修正内容}"` でコメントを残す
    「CI再実行待ち。次回Workerで再確認します」と出力してこのPRの処理を終了する
 
-   ### f. マージ（CI success + 問題なし + PR本文完備）
+   ### f. マージ前のIssueコメント確認（重要）
+   PR本文の `Closes #{Issue番号}` からIssue番号を特定し、最新コメントを確認する:
+   ```bash
+   gh issue view {Issue番号} --json comments --jq '.comments[-3:] | .[].body'
+   ```
+   - 最新コメントに「🚨」「do-not-merge」「未解決」「対応されていない」等のキーワードがある場合:
+     → `gh pr edit {番号} --add-label do-not-merge` を付与してスキップする
+     → `gh pr comment {番号} --body "[Worker] Issueに未解決事項があります。対応後にdo-not-mergeラベルを外してください。"` を追記
+   - 最新コメントが追加仕様・修正要求の場合:
+     → その内容を実装してからマージする（トークン不足なら次回Workerに持ち越す）
+
+   ### g. マージ（CI success + 問題なし + PR本文完備 + Issueコメント確認済み）
    ```bash
    gh pr merge {番号} --squash --delete-branch
    ```
