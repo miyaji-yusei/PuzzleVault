@@ -89,6 +89,18 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver])
 
+  // ドラッグ → ✕ を削除（クイーンは変更しない）
+  const dragRemoveCross = useCallback((row: number, col: number) => {
+    if (isComplete || isGameOver) return
+    setState(prev => {
+      const current = prev.current[row]?.[col] ?? 'empty'
+      if (current !== 'crossed') return prev
+      const newCurrent = prev.current.map(r => [...r]) as CellState[][]
+      newCurrent[row][col] = 'empty'
+      return { ...prev, current: newCurrent }
+    })
+  }, [isComplete, isGameOver])
+
   const restart = useCallback(() => {
     const puzzle = generate(difficulty, Date.now())
     setState({
@@ -105,5 +117,5 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
     setIsGameOver(false)
   }, [difficulty])
 
-  return { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart, flashWrongCell, lastCorrectCell }
+  return { state, placeCross, placeQueen, dragCross, dragRemoveCross, lives, isComplete, isGameOver, restart, flashWrongCell, lastCorrectCell }
 }
