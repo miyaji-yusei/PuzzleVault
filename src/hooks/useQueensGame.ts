@@ -70,5 +70,21 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver])
 
-  return { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver }
+  const restart = useCallback(() => {
+    const puzzle = generate(difficulty, Date.now())
+    setState({
+      ...puzzle,
+      current: Array.from({ length: puzzle.size }, () =>
+        Array(puzzle.size).fill('empty') as CellState[]
+      ),
+      mistakes: 0,
+      hintsUsed: 0,
+      startedAt: Date.now(),
+      elapsedSeconds: 0,
+    })
+    setIsComplete(false)
+    setIsGameOver(false)
+  }, [difficulty])
+
+  return { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart }
 }

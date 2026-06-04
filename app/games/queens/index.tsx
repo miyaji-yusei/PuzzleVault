@@ -15,7 +15,7 @@ export default function QueensScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver } =
+  const { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart } =
     useQueensGame(difficulty)
 
   return (
@@ -25,12 +25,17 @@ export default function QueensScreen() {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.title}>クイーンズマスター</Text>
-        <View style={styles.lives}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <Text key={i} style={[styles.heart, i < lives ? styles.heartActive : styles.heartLost]}>
-              ♥
-            </Text>
-          ))}
+        <View style={styles.headerRight}>
+          <View style={styles.lives}>
+            {Array.from({ length: 3 }, (_, i) => (
+              <Text key={i} style={[styles.heart, i < lives ? styles.heartActive : styles.heartLost]}>
+                ♥
+              </Text>
+            ))}
+          </View>
+          <TouchableOpacity onPress={restart} style={styles.restartButton}>
+            <Text style={styles.restartText}>↺</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -60,9 +65,15 @@ export default function QueensScreen() {
             <View style={styles.dialogButtons}>
               <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={restart}
+              >
+                <Text style={styles.dialogButtonText}>もう一度プレイ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.dialogButtonText}>戻る</Text>
+                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -78,9 +89,15 @@ export default function QueensScreen() {
             <View style={styles.dialogButtons}>
               <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={restart}
+              >
+                <Text style={styles.dialogButtonText}>もう一度プレイ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.dialogButtonText}>戻る</Text>
+                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -117,6 +134,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   lives: {
     flexDirection: 'row',
     gap: 4,
@@ -129,6 +151,13 @@ const styles = StyleSheet.create({
   },
   heartLost: {
     color: '#ccc',
+  },
+  restartButton: {
+    padding: 4,
+  },
+  restartText: {
+    fontSize: 22,
+    color: '#4A90E2',
   },
   infoRow: {
     paddingHorizontal: 16,
@@ -185,6 +214,8 @@ const styles = StyleSheet.create({
   },
   dialogButtons: {
     marginTop: 20,
+    gap: 10,
+    width: '100%',
   },
   dialogButton: {
     paddingHorizontal: 32,
@@ -195,8 +226,16 @@ const styles = StyleSheet.create({
   dialogButtonOk: {
     backgroundColor: '#4285f4',
   },
+  dialogButtonCancel: {
+    backgroundColor: '#f0f0f0',
+  },
   dialogButtonText: {
     color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  dialogButtonTextCancel: {
+    color: '#555',
     fontWeight: '600',
     fontSize: 15,
   },
