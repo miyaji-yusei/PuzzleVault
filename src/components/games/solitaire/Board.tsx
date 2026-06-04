@@ -79,8 +79,16 @@ export function SolitaireBoard({
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
 
+  const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
   const boardLeftRef = useRef(0)
+
+  const measureBoard = useCallback(() => {
+    boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      boardLeftRef.current = pageX
+      boardTopRef.current = pageY
+    })
+  }, [])
 
   const overlayX = useRef(new Animated.Value(0)).current
   const overlayY = useRef(new Animated.Value(0)).current
@@ -112,8 +120,14 @@ export function SolitaireBoard({
   const getCardAt = useCallback((relX: number, relY: number) => {
     const col = Math.floor((relX - PAD) / (CARD_W + GAP))
     if (col < 0 || col >= NUM_COLS) return null
+    // X bounds check: reject touches in the gap between columns
+    const colLeft = PAD + col * (CARD_W + GAP)
+    if (relX < colLeft || relX >= colLeft + CARD_W) return null
     const column = tableauRef.current[col] ?? []
-    if (column.length === 0) return { col, card: -1 }
+    if (column.length === 0) {
+      // Empty slot is only CARD_H tall; ignore touches below it
+      return relY < CARD_H ? { col, card: -1 } : null
+    }
 
     let topAcc = 0
     const offsets: number[] = []
@@ -122,8 +136,12 @@ export function SolitaireBoard({
       if (i < column.length - 1) topAcc += column[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
     }
 
+    const lastIdx = column.length - 1
+    // Ignore touches below the last card
+    if (relY >= offsets[lastIdx] + CARD_H) return null
+
     let cardIdx = 0
-    for (let i = column.length - 1; i >= 0; i--) {
+    for (let i = lastIdx; i >= 0; i--) {
       if (relY >= offsets[i]) { cardIdx = i; break }
     }
     return { col, card: cardIdx }
@@ -213,11 +231,8 @@ export function SolitaireBoard({
     onPanResponderGrant: (e) => {
       const gs = gestureState.current
       gs.isDragging = false
-      // Compute board position: panResponder is on the tableau (TOP_ROW_H below the board)
-      boardTopRef.current = e.nativeEvent.pageY - e.nativeEvent.locationY - TOP_ROW_H
-      boardLeftRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX
-      const relY = e.nativeEvent.locationY
-      const relX = e.nativeEvent.locationX
+      const relX = e.nativeEvent.pageX - boardLeftRef.current
+      const relY = e.nativeEvent.pageY - boardTopRef.current - TOP_ROW_H
       gs.activeCard = relY >= 0 ? getCardAt(relX, relY) : null
     },
     onPanResponderMove: (e, g) => {
@@ -292,7 +307,7 @@ export function SolitaireBoard({
   }), [getCardAt, handleDrop, overlayOpacity, overlayX, overlayY])
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} ref={boardRef} onLayout={measureBoard}>
       {/* Top row: foundation + stock/waste */}
       <View style={styles.topRow}>
         <View style={styles.foundationRow}>
