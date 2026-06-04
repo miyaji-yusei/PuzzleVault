@@ -23,7 +23,7 @@ export default function NonogramScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>イラストロジック</Text>
+        <Text style={styles.title}>{state.title ? `イラストロジック — ${state.title}` : 'イラストロジック'}</Text>
         <TouchableOpacity onPress={restart} style={styles.restartButton}>
           <Text style={styles.restartText}>↺</Text>
         </TouchableOpacity>
