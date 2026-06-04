@@ -24,7 +24,16 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
   const clueAreaHeight = maxColClues * 16
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
 
+  const gridRef = useRef<View>(null)
   const gridPosRef = useRef({ x: 0, y: 0 })
+
+  const measureGrid = useCallback(() => {
+    requestAnimationFrame(() => {
+      gridRef.current?.measureInWindow((x, y) => {
+        gridPosRef.current = { x, y }
+      })
+    })
+  }, [])
   const onSetCellRef = useRef(onSetCell)
   const onSetCellToRef = useRef(onSetCellTo)
   onSetCellRef.current = onSetCell
@@ -59,17 +68,14 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
-      gridPosRef.current = {
-        x: e.nativeEvent.pageX - e.nativeEvent.locationX,
-        y: e.nativeEvent.pageY - e.nativeEvent.locationY,
-      }
+      // Re-measure for next gesture (async, handles scroll between touches)
+      gridRef.current?.measureInWindow((x, y) => { gridPosRef.current = { x, y } })
       dragAxisRef.current = null
       lastCellRef.current = null
 
-      const locX = e.nativeEvent.locationX
-      const locY = e.nativeEvent.locationY
-      const startCol = Math.floor(locX / cellSize)
-      const startRow = Math.floor(locY / cellSize)
+      const { pageX, pageY } = e.nativeEvent
+      const startCol = Math.floor((pageX - gridPosRef.current.x) / cellSize)
+      const startRow = Math.floor((pageY - gridPosRef.current.y) / cellSize)
       dragStartRef.current = { row: startRow, col: startCol }
 
       const currentCellState = currentRef.current[startRow]?.[startCol] ?? 'empty'
@@ -138,6 +144,8 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
 
         {/* Cell grid with PanResponder */}
         <View
+          ref={gridRef}
+          onLayout={measureGrid}
           style={{ width: gridWidth, height: gridHeight }}
           {...panResponder.panHandlers}
         >
