@@ -1,7 +1,6 @@
 import { Difficulty } from '../../types/engine'
 import { NonogramPuzzle } from './types'
 import { solveLine, isUnique } from './solver'
-import { PUZZLE_DATASET } from './puzzleData'
 
 function createRng(seed: number): () => number {
   let s = seed >>> 0
@@ -37,27 +36,6 @@ const DIFFICULTY_CONFIG: Record<Difficulty, { minSize: number; maxSize: number; 
 
 export function generate(difficulty: Difficulty, seed?: number): NonogramPuzzle {
   const actualSeed = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
-
-  const candidates = PUZZLE_DATASET.filter(p => p.difficulty === difficulty)
-  if (candidates.length > 0) {
-    const entry = candidates[actualSeed % candidates.length]
-    const solution: boolean[][] = entry.rows.map(row => row.split('').map(c => c === '1'))
-    const rowClues = solution.map(row => computeClues(row))
-    const colClues: number[][] = []
-    for (let c = 0; c < entry.size; c++) {
-      colClues.push(computeClues(solution.map(row => row[c])))
-    }
-    return {
-      id: `nonogram-${difficulty}-themed-${actualSeed % candidates.length}`,
-      size: entry.size,
-      rowClues,
-      colClues,
-      solution,
-      difficulty,
-      seed: actualSeed,
-      title: entry.title,
-    }
-  }
 
   const rng = createRng(actualSeed)
 
