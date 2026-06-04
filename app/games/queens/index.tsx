@@ -76,7 +76,7 @@ export default function QueensScreen() {
                 style={[styles.dialogButton, styles.dialogButtonCancel]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
+                <Text style={styles.dialogButtonTextCancel}>タイトルに戻る</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -100,7 +100,7 @@ export default function QueensScreen() {
                 style={[styles.dialogButton, styles.dialogButtonCancel]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
+                <Text style={styles.dialogButtonTextCancel}>タイトルに戻る</Text>
               </TouchableOpacity>
             </View>
           </View>
