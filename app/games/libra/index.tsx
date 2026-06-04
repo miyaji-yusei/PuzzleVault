@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Modal } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { LibraBoard } from '../../../src/components/games/libra/Board'
 import { useLibraGame } from '../../../src/hooks/useLibraGame'
@@ -46,9 +46,9 @@ export default function LibraScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.boardContainer}>
+      <View style={[styles.boardContainer, { flex: 1 }]}>
         <LibraBoard state={state} onPressCell={pressCell} flashWrongCell={flashWrongCell} />
-      </ScrollView>
+      </View>
 
       <View style={styles.legend}>
         <Text style={styles.legendText}>タップ: ☀️ → 🌙 → 消去（1秒後に判定）</Text>
