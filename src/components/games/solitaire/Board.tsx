@@ -79,18 +79,8 @@ export function SolitaireBoard({
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
 
-  const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
   const boardLeftRef = useRef(0)
-
-  const measureBoard = useCallback(() => {
-    requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => {
-        boardTopRef.current = y
-        boardLeftRef.current = x
-      })
-    })
-  }, [])
 
   const overlayX = useRef(new Animated.Value(0)).current
   const overlayY = useRef(new Animated.Value(0)).current
@@ -223,8 +213,11 @@ export function SolitaireBoard({
     onPanResponderGrant: (e) => {
       const gs = gestureState.current
       gs.isDragging = false
-      const relY = e.nativeEvent.pageY - boardTopRef.current - TOP_ROW_H
-      const relX = e.nativeEvent.pageX - boardLeftRef.current
+      // Compute board position: panResponder is on the tableau (TOP_ROW_H below the board)
+      boardTopRef.current = e.nativeEvent.pageY - e.nativeEvent.locationY - TOP_ROW_H
+      boardLeftRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX
+      const relY = e.nativeEvent.locationY
+      const relX = e.nativeEvent.locationX
       gs.activeCard = relY >= 0 ? getCardAt(relX, relY) : null
     },
     onPanResponderMove: (e, g) => {
@@ -299,7 +292,7 @@ export function SolitaireBoard({
   }), [getCardAt, handleDrop, overlayOpacity, overlayX, overlayY])
 
   return (
-    <View ref={boardRef} style={{ flex: 1 }} onLayout={measureBoard}>
+    <View style={{ flex: 1 }}>
       {/* Top row: foundation + stock/waste */}
       <View style={styles.topRow}>
         <View style={styles.foundationRow}>
