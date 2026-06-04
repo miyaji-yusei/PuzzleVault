@@ -1,6 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Animated } from 'react-native'
-import { GestureDetector, Gesture } from 'react-native-gesture-handler'
+import React, { useRef, useState, useCallback, useMemo } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native'
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
 import { SelectedCard } from '../../../hooks/useSolitaireGame'
 
@@ -12,8 +11,9 @@ const CARD_W = Math.floor((SW - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
 const CARD_H = Math.floor(CARD_W * 1.45)
 const FACE_DOWN_STEP = 10
 const FACE_UP_STEP = 22
-// Y where tableau starts (within the ScrollView content)
 const TOP_ROW_H = 8 + CARD_H + 8
+const DOUBLE_TAP_MS = 280
+const DRAG_THRESHOLD = 8
 
 const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
@@ -65,15 +65,11 @@ function CardView({ card, width, height, highlighted, dimmed }: {
   )
 }
 
-function EmptySlot({ width, height, label, onPress }: { width: number; height: number; label?: string; onPress?: () => void }) {
+function EmptySlot({ width, height, label }: { width: number; height: number; label?: string }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      style={[cStyles.empty, { width, height }]}
-    >
+    <View style={[cStyles.empty, { width, height }]}>
       {label ? <Text style={cStyles.emptyLabel}>{label}</Text> : null}
-    </TouchableOpacity>
+    </View>
   )
 }
 
@@ -83,18 +79,13 @@ export function SolitaireBoard({
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
 
-  // Board absolute position (measured once on layout)
   const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
   const boardLeftRef = useRef(0)
-  const scrollYRef = useRef(0)
 
-  // Drag overlay
   const overlayX = useRef(new Animated.Value(0)).current
   const overlayY = useRef(new Animated.Value(0)).current
   const overlayOpacity = useRef(new Animated.Value(0)).current
-  const overlayXVal = useRef(0)
-  const overlayYVal = useRef(0)
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
 
   const overlayStyle = {
@@ -105,6 +96,15 @@ export function SolitaireBoard({
     zIndex: 999,
   }
 
+  const onTapTableauRef = useRef(onTapTableau)
+  onTapTableauRef.current = onTapTableau
+  const onDoubleTapCardRef = useRef(onDoubleTapCard)
+  onDoubleTapCardRef.current = onDoubleTapCard
+  const onDirectMoveRef = useRef(onDirectMove)
+  onDirectMoveRef.current = onDirectMove
+  const tableauRef = useRef(tableau)
+  tableauRef.current = tableau
+
   const measureBoard = useCallback(() => {
     boardRef.current?.measureInWindow((x, y) => {
       boardTopRef.current = y
@@ -112,22 +112,40 @@ export function SolitaireBoard({
     })
   }, [])
 
+  const getCardAt = useCallback((relX: number, relY: number) => {
+    const col = Math.floor((relX - PAD) / (CARD_W + GAP))
+    if (col < 0 || col >= NUM_COLS) return null
+    const column = tableauRef.current[col] ?? []
+    if (column.length === 0) return { col, card: -1 }
+
+    let topAcc = 0
+    const offsets: number[] = []
+    for (let i = 0; i < column.length; i++) {
+      offsets.push(topAcc)
+      if (i < column.length - 1) topAcc += column[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
+    }
+
+    let cardIdx = 0
+    for (let i = column.length - 1; i >= 0; i--) {
+      if (relY >= offsets[i]) { cardIdx = i; break }
+    }
+    return { col, card: cardIdx }
+  }, [])
+
   const handleDrop = useCallback((absX: number, absY: number, fromCol: number, fromCardIdx: number) => {
-    const relY = absY - boardTopRef.current + scrollYRef.current
+    const relY = absY - boardTopRef.current
     const relX = absX - boardLeftRef.current
 
     if (relY >= 0 && relY < TOP_ROW_H) {
-      // Dropped on foundation row
-      onDirectMove({
+      onDirectMoveRef.current({
         type: 'tableau-to-foundation',
         from: { pile: 'tableau', index: fromCol, cardIndex: fromCardIdx },
       })
     } else if (relY >= TOP_ROW_H) {
-      // Dropped on tableau
       const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
       const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
       if (clampedCol !== fromCol) {
-        onDirectMove({
+        onDirectMoveRef.current({
           type: 'tableau-to-tableau',
           from: { pile: 'tableau', index: fromCol, cardIndex: fromCardIdx },
           to: { pile: 'tableau', index: clampedCol },
@@ -135,167 +153,178 @@ export function SolitaireBoard({
       }
     }
     setDragInfo(null)
-  }, [onDirectMove])
+  }, [])
 
-  function makeTableauGesture(colIndex: number, cardIndex: number, card: Card) {
-    if (!card.faceUp) {
-      return Gesture.Tap().onEnd(() => (onTapTableau)(colIndex))
-    }
+  const gestureState = useRef({
+    isDragging: false,
+    tapTimer: null as ReturnType<typeof setTimeout> | null,
+    pendingTap: null as { col: number; card: number } | null,
+    activeCard: null as { col: number; card: number } | null,
+  })
 
-    const doubleTap = Gesture.Tap()
-      .numberOfTaps(2)
-      .maxDuration(300)
-      .onEnd(() => (onDoubleTapCard)(colIndex))
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, g) =>
+      Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+    onPanResponderGrant: (e) => {
+      const gs = gestureState.current
+      gs.isDragging = false
+      const relY = e.nativeEvent.pageY - boardTopRef.current - TOP_ROW_H
+      const relX = e.nativeEvent.pageX - boardLeftRef.current
+      gs.activeCard = relY >= 0 ? getCardAt(relX, relY) : null
+    },
+    onPanResponderMove: (e, g) => {
+      const gs = gestureState.current
+      if (!gs.activeCard || gs.activeCard.card < 0) return
+      const { col, card } = gs.activeCard
+      const cardObj = tableauRef.current[col]?.[card]
+      if (!cardObj?.faceUp) return
 
-    const singleTap = Gesture.Tap()
-      .onEnd(() => (onTapTableau)(colIndex, cardIndex))
-
-    const col = state.tableau[colIndex] ?? []
-    const cards = col.slice(cardIndex)
-
-    const pan = Gesture.Pan()
-      .minDistance(8)
-      .onStart((e) => {
-        overlayXVal.current = e.absoluteX - CARD_W / 2
-        overlayYVal.current = e.absoluteY - CARD_H / 4
-        overlayX.setValue(overlayXVal.current)
-        overlayY.setValue(overlayYVal.current)
-        Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
-        setDragInfo({ fromPile: 'tableau', colIndex, cardIndex, cards })
-      })
-      .onUpdate((e) => {
-        overlayX.setValue(e.absoluteX - CARD_W / 2)
-        overlayY.setValue(e.absoluteY - CARD_H / 4)
-      })
-      .onEnd((e) => {
+      if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+        if (!gs.isDragging) {
+          gs.isDragging = true
+          if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
+          overlayX.setValue(e.nativeEvent.pageX - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - CARD_H / 4)
+          Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+          const column = tableauRef.current[col] ?? []
+          setDragInfo({ fromPile: 'tableau', colIndex: col, cardIndex: card, cards: column.slice(card) })
+        }
+        overlayX.setValue(e.nativeEvent.pageX - CARD_W / 2)
+        overlayY.setValue(e.nativeEvent.pageY - CARD_H / 4)
+      }
+    },
+    onPanResponderRelease: (e) => {
+      const gs = gestureState.current
+      if (gs.isDragging) {
+        gs.isDragging = false
         Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
-        handleDrop(e.absoluteX, e.absoluteY, colIndex, cardIndex)
-      })
-      .onFinalize(() => {
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
         setDragInfo(null)
-      })
+        if (gs.activeCard && gs.activeCard.card >= 0) {
+          handleDrop(e.nativeEvent.pageX, e.nativeEvent.pageY, gs.activeCard.col, gs.activeCard.card)
+        }
+        gs.activeCard = null
+        return
+      }
 
-    return Gesture.Race(pan, Gesture.Exclusive(doubleTap, singleTap))
-  }
+      if (!gs.activeCard) return
+      const { col, card } = gs.activeCard
+      gs.activeCard = null
+
+      if (card < 0) {
+        onTapTableauRef.current(col)
+        return
+      }
+
+      if (gs.pendingTap && gs.pendingTap.col === col && gs.pendingTap.card === card) {
+        clearTimeout(gs.tapTimer!)
+        gs.tapTimer = null
+        gs.pendingTap = null
+        const cardObj = tableauRef.current[col]?.[card]
+        if (cardObj?.faceUp) onDoubleTapCardRef.current(col)
+        else onTapTableauRef.current(col, card)
+      } else {
+        if (gs.tapTimer) clearTimeout(gs.tapTimer)
+        gs.pendingTap = { col, card }
+        gs.tapTimer = setTimeout(() => {
+          gs.tapTimer = null
+          gs.pendingTap = null
+          onTapTableauRef.current(col, card)
+        }, DOUBLE_TAP_MS)
+      }
+    },
+    onPanResponderTerminate: () => {
+      const gs = gestureState.current
+      gs.isDragging = false
+      gs.activeCard = null
+      if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
+      setDragInfo(null)
+    },
+  }), [getCardAt, handleDrop, overlayOpacity, overlayX, overlayY])
 
   return (
-    <View
-      ref={boardRef}
-      style={{ flex: 1 }}
-      onLayout={measureBoard}
-    >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
-      >
-        {/* Top row: foundation + stock/waste */}
-        <View style={styles.topRow}>
-          <View style={styles.foundationRow}>
-            {foundation.map((pile, fi) => {
-              const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
-              return (
-                <TouchableOpacity
-                  key={`f-${fi}`}
-                  onPress={() => onTapFoundation(fi)}
-                  style={{ marginRight: fi < 3 ? GAP : 0 }}
-                  activeOpacity={0.7}
-                >
-                  {pile.length > 0 ? (
-                    <CardView
-                      card={pile[pile.length - 1]}
-                      width={CARD_W}
-                      height={CARD_H}
-                      highlighted={isFoundationSelected}
-                    />
-                  ) : (
-                    <EmptySlot width={CARD_W} height={CARD_H} label={foundationLabels[fi]} />
-                  )}
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-          <View style={{ flex: 1 }} />
-          <View style={styles.stockRow}>
-            <TouchableOpacity onPress={onTapStock} style={{ marginRight: GAP }}>
-              {stock.length > 0 ? (
-                <View style={[cStyles.base, { width: CARD_W, height: CARD_H }, cStyles.back]}>
-                  <Text style={[cStyles.backText, { fontSize: 11 }]}>{stock.length}</Text>
-                </View>
-              ) : (
-                <EmptySlot width={CARD_W} height={CARD_H} label="↺" onPress={onTapStock} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onTapWaste}>
-              {waste.length > 0 ? (
-                <CardView
-                  card={waste[waste.length - 1]}
-                  width={CARD_W}
-                  height={CARD_H}
-                  highlighted={selected?.pile === 'waste'}
-                />
-              ) : (
-                <EmptySlot width={CARD_W} height={CARD_H} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tableau */}
-        <View style={styles.tableau}>
-          {tableau.map((col, ci) => {
-            if (col.length === 0) {
-              return (
-                <EmptySlot
-                  key={`col-${ci}`}
-                  width={CARD_W}
-                  height={CARD_H}
-                  onPress={() => onTapTableau(ci)}
-                />
-              )
-            }
-
-            const offsets: number[] = []
-            let topAcc = 0
-            for (let i = 0; i < col.length; i++) {
-              offsets.push(topAcc)
-              if (i < col.length - 1) topAcc += col[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
-            }
-            const colHeight = topAcc + CARD_H
-
+    <View ref={boardRef} style={{ flex: 1 }} onLayout={measureBoard}>
+      {/* Top row: foundation + stock/waste */}
+      <View style={styles.topRow}>
+        <View style={styles.foundationRow}>
+          {foundation.map((pile, fi) => {
+            const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
             return (
-              <View key={`col-${ci}`} style={{ width: CARD_W, height: colHeight, position: 'relative' }}>
-                {col.map((card, cardi) => {
-                  const inStack =
-                    selected?.pile === 'tableau' &&
-                    selected.colIndex === ci &&
-                    cardi >= selected.cardIndex
-                  const isDragged =
-                    dragInfo?.fromPile === 'tableau' &&
-                    dragInfo.colIndex === ci &&
-                    cardi >= dragInfo.cardIndex
-                  const gesture = makeTableauGesture(ci, cardi, card)
-                  return (
-                    <GestureDetector key={`card-${ci}-${cardi}`} gesture={gesture}>
-                      <View style={{ position: 'absolute', top: offsets[cardi] }}>
-                        <CardView
-                          card={card}
-                          width={CARD_W}
-                          height={CARD_H}
-                          highlighted={inStack}
-                          dimmed={isDragged}
-                        />
-                      </View>
-                    </GestureDetector>
-                  )
-                })}
-              </View>
+              <TouchableOpacity
+                key={`f-${fi}`}
+                onPress={() => onTapFoundation(fi)}
+                style={{ marginRight: fi < 3 ? GAP : 0 }}
+                activeOpacity={0.7}
+              >
+                {pile.length > 0 ? (
+                  <CardView card={pile[pile.length - 1]} width={CARD_W} height={CARD_H} highlighted={isFoundationSelected} />
+                ) : (
+                  <EmptySlot width={CARD_W} height={CARD_H} label={foundationLabels[fi]} />
+                )}
+              </TouchableOpacity>
             )
           })}
         </View>
-      </ScrollView>
+        <View style={{ flex: 1 }} />
+        <View style={styles.stockRow}>
+          <TouchableOpacity onPress={onTapStock} style={{ marginRight: GAP }}>
+            {stock.length > 0 ? (
+              <View style={[cStyles.base, { width: CARD_W, height: CARD_H }, cStyles.back]}>
+                <Text style={[cStyles.backText, { fontSize: 11 }]}>{stock.length}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={onTapStock}>
+                <EmptySlot width={CARD_W} height={CARD_H} label="↺" />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onTapWaste}>
+            {waste.length > 0 ? (
+              <CardView card={waste[waste.length - 1]} width={CARD_W} height={CARD_H} highlighted={selected?.pile === 'waste'} />
+            ) : (
+              <EmptySlot width={CARD_W} height={CARD_H} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Tableau */}
+      <View style={styles.tableau} {...panResponder.panHandlers}>
+        {tableau.map((col, ci) => {
+          if (col.length === 0) {
+            return <EmptySlot key={`col-${ci}`} width={CARD_W} height={CARD_H} />
+          }
+
+          const offsets: number[] = []
+          let topAcc = 0
+          for (let i = 0; i < col.length; i++) {
+            offsets.push(topAcc)
+            if (i < col.length - 1) topAcc += col[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
+          }
+          const colHeight = topAcc + CARD_H
+
+          return (
+            <View key={`col-${ci}`} style={{ width: CARD_W, height: colHeight, position: 'relative' }}>
+              {col.map((card, cardi) => {
+                const inStack =
+                  selected?.pile === 'tableau' &&
+                  selected.colIndex === ci &&
+                  cardi >= selected.cardIndex
+                const isDragged =
+                  dragInfo?.fromPile === 'tableau' &&
+                  dragInfo.colIndex === ci &&
+                  cardi >= dragInfo.cardIndex
+                return (
+                  <View key={`card-${ci}-${cardi}`} style={{ position: 'absolute', top: offsets[cardi] }}>
+                    <CardView card={card} width={CARD_W} height={CARD_H} highlighted={inStack} dimmed={isDragged} />
+                  </View>
+                )
+              })}
+            </View>
+          )
+        })}
+      </View>
 
       {/* Drag overlay */}
       {dragInfo && (
@@ -372,14 +401,11 @@ const cStyles = StyleSheet.create({
 })
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: PAD,
-    paddingVertical: 8,
-  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    paddingHorizontal: PAD,
+    paddingVertical: 8,
   },
   foundationRow: {
     flexDirection: 'row',
@@ -391,5 +417,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: GAP,
     alignItems: 'flex-start',
+    paddingHorizontal: PAD,
+    paddingBottom: 8,
+    flex: 1,
   },
 })
