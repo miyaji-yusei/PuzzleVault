@@ -15,7 +15,7 @@ export default function NonogramScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, setCell, mode, setMode, isComplete, restart } = useNonogramGame(difficulty)
+  const { state, setCell, setCellTo, mode, setMode, isComplete, restart } = useNonogramGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -30,7 +30,7 @@ export default function NonogramScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
-        <NonogramBoard state={state} onSetCell={setCell} />
+        <NonogramBoard state={state} mode={mode} onSetCell={setCell} onSetCellTo={setCellTo} />
       </ScrollView>
 
       {/* Mode toggle */}
