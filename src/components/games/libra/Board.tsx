@@ -10,6 +10,7 @@ const CONSTRAINT_BOX = 14
 type Props = {
   state: LibraState
   onPressCell: (row: number, col: number) => void
+  flashWrongCell?: { row: number; col: number } | null
 }
 
 function getConstraintBetween(
@@ -20,7 +21,7 @@ function getConstraintBetween(
   return constraints.find(c => c.r1 === r1 && c.c1 === c1 && c.r2 === r2 && c.c2 === c2)
 }
 
-export function LibraBoard({ state, onPressCell }: Props) {
+export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
   const { size, current, initial, constraints } = state
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
   const boardSize = cellSize * size
@@ -44,7 +45,6 @@ export function LibraBoard({ state, onPressCell }: Props) {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => false,
       onPanResponderGrant: (e) => {
-        // Compute board position accurately from the first touch event
         boardPosRef.current = {
           x: e.nativeEvent.pageX - e.nativeEvent.locationX,
           y: e.nativeEvent.pageY - e.nativeEvent.locationY,
@@ -56,7 +56,6 @@ export function LibraBoard({ state, onPressCell }: Props) {
         const key = `${cell.row},${cell.col}`
 
         if (pendingCell === key && tapTimer) {
-          // ダブルタップ: タイマーキャンセルして即座に実行
           clearTimeout(tapTimer)
           tapTimer = null
           pendingCell = null
@@ -89,6 +88,7 @@ export function LibraBoard({ state, onPressCell }: Props) {
             {Array.from({ length: size }, (_, col) => {
               const value = current[row]?.[col] ?? null
               const isFixed = initial[row]?.[col] !== null
+              const isFlashing = flashWrongCell?.row === row && flashWrongCell?.col === col
               return (
                 <View
                   key={`cell-${row}-${col}`}
@@ -98,6 +98,7 @@ export function LibraBoard({ state, onPressCell }: Props) {
                     isFixed && styles.cellFixed,
                     col === size - 1 && styles.cellRightBorder,
                     row === size - 1 && styles.cellBottomBorder,
+                    isFlashing && styles.cellFlash,
                   ]}
                 >
                   {value !== null && (
@@ -110,7 +111,7 @@ export function LibraBoard({ state, onPressCell }: Props) {
                         value === 'B' && styles.cellTextB,
                       ]}
                     >
-                      {value === 'A' ? '🌙' : '☀️'}
+                      {value === 'A' ? '☀️' : '🌙'}
                     </Text>
                   )}
                 </View>
@@ -123,7 +124,7 @@ export function LibraBoard({ state, onPressCell }: Props) {
       {/* Constraint overlays */}
       {constraints.map((c, i) => {
         const isHorizontal = c.r1 === c.r2
-        const label = c.type === 'eq' ? '=' : '≠'
+        const label = c.type === 'eq' ? '=' : '×'
         const textStyle = c.type === 'eq' ? styles.constraintEq : styles.constraintNeq
 
         if (isHorizontal) {
@@ -180,6 +181,9 @@ const styles = StyleSheet.create({
   cellFixed: {
     backgroundColor: '#e8eaf6',
   },
+  cellFlash: {
+    backgroundColor: 'rgba(244, 67, 54, 0.35)',
+  },
   cellRightBorder: {
     borderRightWidth: 2,
     borderRightColor: '#555',
@@ -193,10 +197,10 @@ const styles = StyleSheet.create({
   },
   cellTextFixed: {},
   cellTextA: {
-    color: '#1a237e',
+    color: '#e65100',
   },
   cellTextB: {
-    color: '#b71c1c',
+    color: '#1a237e',
   },
   constraintBox: {
     position: 'absolute',
