@@ -27,8 +27,17 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
   const { size, regions, current } = state
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
 
+  const boardRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
   const queenScale = useRef(new Animated.Value(1)).current
+
+  const measureBoard = useCallback(() => {
+    requestAnimationFrame(() => {
+      boardRef.current?.measureInWindow((x, y) => {
+        boardPosRef.current = { x, y }
+      })
+    })
+  }, [])
 
   const onPlaceCrossRef = useRef(onPlaceCross)
   const onPlaceQueenRef = useRef(onPlaceQueen)
@@ -66,14 +75,9 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) =>
         Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD,
-      onPanResponderGrant: (e) => {
+      onPanResponderGrant: () => {
         isDragging = false
         lastDragCell = null
-        // Compute board position accurately from the first touch
-        boardPosRef.current = {
-          x: e.nativeEvent.pageX - e.nativeEvent.locationX,
-          y: e.nativeEvent.pageY - e.nativeEvent.locationY,
-        }
       },
       onPanResponderMove: (e, gs) => {
         if (Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD) {
@@ -121,6 +125,8 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
 
   return (
     <View
+      ref={boardRef}
+      onLayout={measureBoard}
       style={[styles.board, { width: cellSize * size, height: cellSize * size }]}
       {...panResponder.panHandlers}
     >
