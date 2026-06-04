@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
@@ -15,8 +16,25 @@ export default function SolitaireScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, puzzle, selected, isComplete, maxResets, tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove } =
-    useSolitaireGame(difficulty)
+  const {
+    state, puzzle, selected, isComplete, maxResets,
+    canAutoComplete, canUndo,
+    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove,
+    undo, restart, autoComplete,
+  } = useSolitaireGame(difficulty)
+
+  const [showAutoCompleteDialog, setShowAutoCompleteDialog] = useState(false)
+  const [autoCompleteHandled, setAutoCompleteHandled] = useState(false)
+
+  useEffect(() => {
+    if (canAutoComplete && !autoCompleteHandled) {
+      setShowAutoCompleteDialog(true)
+      setAutoCompleteHandled(true)
+    }
+    if (!canAutoComplete) {
+      setAutoCompleteHandled(false)
+    }
+  }, [canAutoComplete, autoCompleteHandled])
 
   const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
 
@@ -29,20 +47,24 @@ export default function SolitaireScreen() {
         <Text style={styles.title}>ソリティア</Text>
         <View style={styles.headerRight}>
           <Text style={styles.metaText}>スコア: {state.score}</Text>
-          <Text style={styles.metaText}>手数: {state.moves}</Text>
-          <Text style={styles.metaText}>リセット残: {resetLeft}</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              onPress={undo}
+              disabled={!canUndo}
+              style={[styles.iconButton, !canUndo && styles.iconButtonDisabled]}
+            >
+              <Text style={styles.iconButtonText}>↩</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={restart} style={styles.iconButton}>
+              <Text style={styles.iconButtonText}>↺</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      {isComplete && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>🎉 クリア！ スコア: {state.score}</Text>
-        </View>
-      )}
-
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ タップで移動（Aタップ→自動組み札）
+          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ リセット残: {resetLeft} ・ 手数: {state.moves}
         </Text>
       </View>
 
@@ -56,6 +78,58 @@ export default function SolitaireScreen() {
         onDoubleTapCard={doubleTapCard}
         onDirectMove={directMove}
       />
+
+      {/* Auto-complete dialog */}
+      <Modal visible={showAutoCompleteDialog} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>自動完成</Text>
+            <Text style={styles.dialogMessage}>すべてのカードを組み札に移動しますか？</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                onPress={() => setShowAutoCompleteDialog(false)}
+              >
+                <Text style={styles.dialogButtonTextCancel}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => {
+                  setShowAutoCompleteDialog(false)
+                  autoComplete()
+                }}
+              >
+                <Text style={styles.dialogButtonTextOk}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Win dialog */}
+      <Modal visible={isComplete} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
+            <Text style={styles.dialogMessage}>スコア: {state.score}点</Text>
+            <Text style={styles.dialogMessage}>手数: {state.moves}手</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonTextCancel}>戻る</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={restart}
+              >
+                <Text style={styles.dialogButtonTextOk}>もう一度プレイ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -89,21 +163,28 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     alignItems: 'flex-end',
-    gap: 2,
+    gap: 4,
   },
   metaText: {
     fontSize: 11,
     color: '#c8e6c9',
   },
-  banner: {
-    backgroundColor: '#f9a825',
-    padding: 10,
-    alignItems: 'center',
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  bannerText: {
+  iconButton: {
+    backgroundColor: '#2e7d32',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  iconButtonDisabled: {
+    opacity: 0.4,
+  },
+  iconButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
   },
   infoRow: {
     paddingHorizontal: 12,
@@ -114,5 +195,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#c8e6c9',
     textAlign: 'center',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialog: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: 280,
+    alignItems: 'center',
+  },
+  dialogTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1b5e20',
+    marginBottom: 8,
+  },
+  dialogMessage: {
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  dialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  dialogButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  dialogButtonCancel: {
+    backgroundColor: '#eee',
+  },
+  dialogButtonOk: {
+    backgroundColor: '#1b5e20',
+  },
+  dialogButtonTextCancel: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  dialogButtonTextOk: {
+    color: '#fff',
+    fontWeight: '600',
   },
 })
