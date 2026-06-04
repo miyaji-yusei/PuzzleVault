@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { NonogramBoard } from '../../../src/components/games/nonogram/Board'
 import { useNonogramGame } from '../../../src/hooks/useNonogramGame'
@@ -29,9 +29,9 @@ export default function NonogramScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.boardContainer}>
+      <View style={[styles.boardContainer, { flex: 1 }]}>
         <NonogramBoard state={state} mode={mode} onSetCell={setCell} onSetCellTo={setCellTo} />
-      </ScrollView>
+      </View>
 
       {/* Mode toggle */}
       <View style={styles.toolbar}>

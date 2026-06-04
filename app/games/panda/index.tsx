@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Modal } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { PandaBoard } from '../../../src/components/games/panda/Board'
 import { usePandaGame } from '../../../src/hooks/usePandaGame'
@@ -45,7 +45,7 @@ export default function PandaScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.boardContainer}>
+      <View style={[styles.boardContainer, { flex: 1 }]}>
         <PandaBoard
           state={state}
           confirmedCells={confirmedCells}
@@ -53,7 +53,7 @@ export default function PandaScreen() {
           onPressCell={tapCell}
           onDragCross={dragCross}
         />
-      </ScrollView>
+      </View>
 
       {/* Error banner */}
       {errorCell && (
