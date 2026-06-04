@@ -20,19 +20,10 @@ export function NonogramBoard({ state, onSetCell }: Props) {
   const clueAreaHeight = maxColClues * 16
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
 
-  const gridRef = useRef<View>(null)
   const gridPosRef = useRef({ x: 0, y: 0 })
   const lastCellRef = useRef<string | null>(null)
   const onSetCellRef = useRef(onSetCell)
   onSetCellRef.current = onSetCell
-
-  const measureGrid = useCallback(() => {
-    requestAnimationFrame(() => {
-      gridRef.current?.measureInWindow((x, y) => {
-        gridPosRef.current = { x, y }
-      })
-    })
-  }, [])
 
   const applyAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - gridPosRef.current.x) / cellSize)
@@ -48,6 +39,11 @@ export function NonogramBoard({ state, onSetCell }: Props) {
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
+      // Compute grid position accurately from the first touch event
+      gridPosRef.current = {
+        x: e.nativeEvent.pageX - e.nativeEvent.locationX,
+        y: e.nativeEvent.pageY - e.nativeEvent.locationY,
+      }
       lastCellRef.current = null
       applyAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
     },
@@ -94,8 +90,6 @@ export function NonogramBoard({ state, onSetCell }: Props) {
 
         {/* Cell grid with PanResponder */}
         <View
-          ref={gridRef}
-          onLayout={measureGrid}
           style={{ width: gridWidth, height: gridHeight }}
           {...panResponder.panHandlers}
         >

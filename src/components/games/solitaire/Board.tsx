@@ -103,6 +103,11 @@ export function SolitaireBoard({
   onDirectMoveRef.current = onDirectMove
   const tableauRef = useRef(tableau)
   tableauRef.current = tableau
+  const onTapWasteRef = useRef(onTapWaste)
+  onTapWasteRef.current = onTapWaste
+  const wasteRef = useRef(waste)
+  wasteRef.current = waste
+  const wasteGestureState = useRef({ isDragging: false })
 
   const getCardAt = useCallback((relX: number, relY: number) => {
     const col = Math.floor((relX - PAD) / (CARD_W + GAP))
@@ -146,6 +151,53 @@ export function SolitaireBoard({
     }
     setDragInfo(null)
   }, [])
+
+  const wastePanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, g) =>
+      (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) && wasteRef.current.length > 0,
+    onPanResponderGrant: () => {
+      wasteGestureState.current.isDragging = false
+    },
+    onPanResponderMove: (e, g) => {
+      if (wasteRef.current.length === 0) return
+      if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+        if (!wasteGestureState.current.isDragging) {
+          wasteGestureState.current.isDragging = true
+          const card = wasteRef.current[wasteRef.current.length - 1]
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+          Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+          setDragInfo({ fromPile: 'waste', colIndex: -1, cardIndex: 0, cards: [card] })
+        }
+        overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+        overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+      }
+    },
+    onPanResponderRelease: (e) => {
+      if (wasteGestureState.current.isDragging) {
+        wasteGestureState.current.isDragging = false
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+        setDragInfo(null)
+        const relY = e.nativeEvent.pageY - boardTopRef.current
+        const relX = e.nativeEvent.pageX - boardLeftRef.current
+        if (relY >= 0 && relY < TOP_ROW_H) {
+          onDirectMoveRef.current({ type: 'waste-to-foundation' })
+        } else if (relY >= TOP_ROW_H) {
+          const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+          const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
+          onDirectMoveRef.current({ type: 'waste-to-tableau', to: { pile: 'tableau', index: clampedCol } })
+        }
+      } else {
+        onTapWasteRef.current()
+      }
+    },
+    onPanResponderTerminate: () => {
+      wasteGestureState.current.isDragging = false
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
+      setDragInfo(null)
+    },
+  }), [overlayOpacity, overlayX, overlayY])
 
   const gestureState = useRef({
     isDragging: false,
@@ -275,13 +327,19 @@ export function SolitaireBoard({
               </TouchableOpacity>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={onTapWaste}>
+          <View {...wastePanResponder.panHandlers}>
             {waste.length > 0 ? (
-              <CardView card={waste[waste.length - 1]} width={CARD_W} height={CARD_H} highlighted={selected?.pile === 'waste'} />
+              <CardView
+                card={waste[waste.length - 1]}
+                width={CARD_W}
+                height={CARD_H}
+                highlighted={selected?.pile === 'waste'}
+                dimmed={dragInfo?.fromPile === 'waste'}
+              />
             ) : (
               <EmptySlot width={CARD_W} height={CARD_H} />
             )}
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
 

@@ -25,18 +25,9 @@ export function LibraBoard({ state, onPressCell }: Props) {
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
   const boardSize = cellSize * size
 
-  const boardRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
   const onPressCellRef = useRef(onPressCell)
   onPressCellRef.current = onPressCell
-
-  const measureBoard = useCallback(() => {
-    requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => {
-        boardPosRef.current = { x, y }
-      })
-    })
-  }, [])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -52,6 +43,13 @@ export function LibraBoard({ state, onPressCell }: Props) {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => false,
+      onPanResponderGrant: (e) => {
+        // Compute board position accurately from the first touch event
+        boardPosRef.current = {
+          x: e.nativeEvent.pageX - e.nativeEvent.locationX,
+          y: e.nativeEvent.pageY - e.nativeEvent.locationY,
+        }
+      },
       onPanResponderRelease: (e) => {
         const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
         if (!cell) return
@@ -83,8 +81,6 @@ export function LibraBoard({ state, onPressCell }: Props) {
     <View style={{ position: 'relative' }}>
       {/* Cell grid */}
       <View
-        ref={boardRef}
-        onLayout={measureBoard}
         style={[styles.grid, { width: boardSize, height: boardSize }]}
         {...panResponder.panHandlers}
       >
