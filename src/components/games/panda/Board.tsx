@@ -5,31 +5,28 @@ import { PandaState, CellContent } from '../../../engines/panda/types'
 const SCREEN_WIDTH = Dimensions.get('window').width
 const HINT_SIZE = 28
 const BOARD_PADDING = 32
-const DOUBLE_TAP_MS = 280
+const DRAG_THRESHOLD = 5
 
 type Props = {
   state: PandaState
-  onPlaceCross: (row: number, col: number) => void
-  onPlacePanda: (row: number, col: number) => void
+  confirmedCells: Set<string>
+  errorCell: { row: number; col: number } | null
+  onPressCell: (row: number, col: number) => void
+  onDragCross: (row: number, col: number) => void
 }
 
-export function PandaBoard({ state, onPlaceCross, onPlacePanda }: Props) {
+export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDragCross }: Props) {
   const { size, current, fixed, rowCounts, colCounts } = state
   const availableWidth = SCREEN_WIDTH - BOARD_PADDING - HINT_SIZE
   const cellSize = Math.floor(availableWidth / size)
 
-  const boardRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
-  const onPlaceCrossRef = useRef(onPlaceCross)
-  const onPlacePandaRef = useRef(onPlacePanda)
-  onPlaceCrossRef.current = onPlaceCross
-  onPlacePandaRef.current = onPlacePanda
+  const onPressCellRef = useRef(onPressCell)
+  const onDragCrossRef = useRef(onDragCross)
+  onPressCellRef.current = onPressCell
+  onDragCrossRef.current = onDragCross
 
-  const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y) => {
-      boardPosRef.current = { x, y }
-    })
-  }, [])
+  const lastDragCellRef = useRef<string | null>(null)
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -39,47 +36,74 @@ export function PandaBoard({ state, onPlaceCross, onPlacePanda }: Props) {
   }, [cellSize, size])
 
   const panResponder = useMemo(() => {
-    let tapTimer: ReturnType<typeof setTimeout> | null = null
-    let pendingCell: string | null = null
+    let isDragging = false
 
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => false,
-      onPanResponderRelease: (e) => {
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+      onPanResponderGrant: (e) => {
+        boardPosRef.current = {
+          x: e.nativeEvent.pageX - e.nativeEvent.locationX,
+          y: e.nativeEvent.pageY - e.nativeEvent.locationY,
+        }
+        isDragging = false
+        lastDragCellRef.current = null
+      },
+      onPanResponderMove: (e) => {
+        isDragging = true
         const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
         if (!cell) return
         const key = `${cell.row},${cell.col}`
-
-        if (pendingCell === key && tapTimer) {
-          clearTimeout(tapTimer)
-          tapTimer = null
-          pendingCell = null
-          onPlacePandaRef.current(cell.row, cell.col)
-        } else {
-          if (tapTimer) clearTimeout(tapTimer)
-          pendingCell = key
-          tapTimer = setTimeout(() => {
-            tapTimer = null
-            pendingCell = null
-            onPlaceCrossRef.current(cell.row, cell.col)
-          }, DOUBLE_TAP_MS)
+        if (key === lastDragCellRef.current) return
+        lastDragCellRef.current = key
+        onDragCrossRef.current(cell.row, cell.col)
+      },
+      onPanResponderRelease: (e) => {
+        if (!isDragging) {
+          const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+          if (cell) onPressCellRef.current(cell.row, cell.col)
         }
+        isDragging = false
+        lastDragCellRef.current = null
       },
       onPanResponderTerminate: () => {
-        if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; pendingCell = null }
+        isDragging = false
+        lastDragCellRef.current = null
       },
     })
   }, [getCellAt])
 
+  // Compute row/col panda counts for color hints
+  const rowPandaCounts = Array.from({ length: size }, (_, r) =>
+    (current[r] ?? []).filter(c => c === 'B').length
+  )
+  const colPandaCounts = Array.from({ length: size }, (_, col) =>
+    current.reduce((acc, row) => acc + (row[col] === 'B' ? 1 : 0), 0)
+  )
+
   function renderCellContent(row: number, col: number) {
     const cell = current[row]?.[col] ?? 'empty'
     const isFixed = fixed[row]?.[col] === 'A'
+    const isError = errorCell?.row === row && errorCell?.col === col
+    const isConfirmed = confirmedCells.has(`${row},${col}`)
 
     if (isFixed || cell === 'A') {
       return <Text style={[styles.cellText, { fontSize: cellSize * 0.55 }]}>🎋</Text>
     }
     if (cell === 'B') {
-      return <Text style={[styles.cellText, { fontSize: cellSize * 0.55 }]}>🐼</Text>
+      return (
+        <Text
+          style={[
+            styles.cellText,
+            { fontSize: cellSize * 0.55 },
+            isError && styles.cellTextError,
+            isConfirmed && styles.cellTextConfirmed,
+          ]}
+        >
+          🐼
+        </Text>
+      )
     }
     if (cell === 'crossed') {
       return <Text style={[styles.cellText, { fontSize: cellSize * 0.45 }, styles.cellTextCross]}>×</Text>
@@ -94,28 +118,32 @@ export function PandaBoard({ state, onPlaceCross, onPlacePanda }: Props) {
       {/* Column hints row */}
       <View style={styles.row}>
         <View style={{ width: HINT_SIZE, height: HINT_SIZE }} />
-        {colCounts.map((count, col) => (
-          <View key={`ch-${col}`} style={[styles.hint, { width: cellSize, height: HINT_SIZE }]}>
-            <Text style={styles.hintText}>{count}</Text>
-          </View>
-        ))}
+        {colCounts.map((count, col) => {
+          const isComplete = colPandaCounts[col] === count
+          return (
+            <View key={`ch-${col}`} style={[styles.hint, { width: cellSize, height: HINT_SIZE }]}>
+              <Text style={[styles.hintText, isComplete && styles.hintTextComplete]}>{count}</Text>
+            </View>
+          )
+        })}
       </View>
 
       {/* Row clues + grid */}
       <View style={styles.gridRow}>
         {/* Row hints */}
         <View>
-          {Array.from({ length: size }, (_, row) => (
-            <View key={`rh-${row}`} style={[styles.hint, { width: HINT_SIZE, height: cellSize }]}>
-              <Text style={styles.hintText}>{rowCounts[row]}</Text>
-            </View>
-          ))}
+          {Array.from({ length: size }, (_, row) => {
+            const isComplete = rowPandaCounts[row] === rowCounts[row]
+            return (
+              <View key={`rh-${row}`} style={[styles.hint, { width: HINT_SIZE, height: cellSize }]}>
+                <Text style={[styles.hintText, isComplete && styles.hintTextComplete]}>{rowCounts[row]}</Text>
+              </View>
+            )
+          })}
         </View>
 
         {/* Cell grid with PanResponder */}
         <View
-          ref={boardRef}
-          onLayout={measureBoard}
           style={{ width: gridSize, height: gridSize }}
           {...panResponder.panHandlers}
         >
@@ -123,6 +151,9 @@ export function PandaBoard({ state, onPlaceCross, onPlacePanda }: Props) {
             <View key={`row-${row}`} style={[styles.row, { height: cellSize }]}>
               {Array.from({ length: size }, (_, col) => {
                 const isFixed = fixed[row]?.[col] === 'A'
+                const isError = errorCell?.row === row && errorCell?.col === col
+                const cell = current[row]?.[col] ?? 'empty'
+                const isCrossed = cell === 'crossed'
                 return (
                   <View
                     key={`cell-${row}-${col}`}
@@ -130,6 +161,8 @@ export function PandaBoard({ state, onPlaceCross, onPlacePanda }: Props) {
                       styles.cell,
                       { width: cellSize, height: cellSize },
                       isFixed && styles.cellFixed,
+                      isCrossed && styles.cellCrossed,
+                      isError && styles.cellError,
                     ]}
                   >
                     {renderCellContent(row, col)}
@@ -161,6 +194,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#555',
   },
+  hintTextComplete: {
+    color: '#2e7d32',
+  },
   cell: {
     borderWidth: 1,
     borderColor: '#bbb',
@@ -171,10 +207,22 @@ const styles = StyleSheet.create({
   cellFixed: {
     backgroundColor: '#e8f5e9',
   },
+  cellCrossed: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  cellError: {
+    backgroundColor: 'rgba(244, 67, 54, 0.25)',
+  },
   cellText: {
     fontWeight: 'bold',
   },
+  cellTextError: {
+    opacity: 0.7,
+  },
+  cellTextConfirmed: {
+    opacity: 1,
+  },
   cellTextCross: {
-    color: 'rgba(0,0,0,0.4)',
+    color: 'rgba(0,150,0,0.5)',
   },
 })
