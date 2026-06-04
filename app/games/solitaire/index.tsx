@@ -18,13 +18,15 @@ export default function SolitaireScreen() {
 
   const {
     state, puzzle, selected, isComplete, maxResets,
-    canAutoComplete, canUndo,
+    canAutoComplete, canUndo, isDeadlocked,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove,
-    undo, restart, autoComplete,
+    undo, restart, newGame, autoComplete,
   } = useSolitaireGame(difficulty)
 
   const [showAutoCompleteDialog, setShowAutoCompleteDialog] = useState(false)
   const [autoCompleteHandled, setAutoCompleteHandled] = useState(false)
+  const [showDeadlockDialog, setShowDeadlockDialog] = useState(false)
+  const [deadlockHandled, setDeadlockHandled] = useState(false)
 
   useEffect(() => {
     if (canAutoComplete && !autoCompleteHandled) {
@@ -35,6 +37,16 @@ export default function SolitaireScreen() {
       setAutoCompleteHandled(false)
     }
   }, [canAutoComplete, autoCompleteHandled])
+
+  useEffect(() => {
+    if (isDeadlocked && !deadlockHandled) {
+      setShowDeadlockDialog(true)
+      setDeadlockHandled(true)
+    }
+    if (!isDeadlocked) {
+      setDeadlockHandled(false)
+    }
+  }, [isDeadlocked, deadlockHandled])
 
   const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
 
@@ -100,6 +112,47 @@ export default function SolitaireScreen() {
                 }}
               >
                 <Text style={styles.dialogButtonTextOk}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Deadlock dialog */}
+      <Modal visible={showDeadlockDialog} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>詰みました</Text>
+            <Text style={styles.dialogMessage}>これ以上有効な手がありません。</Text>
+            <View style={styles.dialogButtons}>
+              {canUndo && (
+                <TouchableOpacity
+                  style={[styles.dialogButton, styles.dialogButtonCancel]}
+                  onPress={() => {
+                    setShowDeadlockDialog(false)
+                    undo()
+                  }}
+                >
+                  <Text style={styles.dialogButtonTextCancel}>手を戻す</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                onPress={() => {
+                  setShowDeadlockDialog(false)
+                  restart()
+                }}
+              >
+                <Text style={styles.dialogButtonTextCancel}>リセット</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => {
+                  setShowDeadlockDialog(false)
+                  newGame()
+                }}
+              >
+                <Text style={styles.dialogButtonTextOk}>新しいゲーム</Text>
               </TouchableOpacity>
             </View>
           </View>
