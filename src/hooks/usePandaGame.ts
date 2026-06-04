@@ -25,17 +25,27 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
 
   const lives = MAX_LIVES - state.mistakes
 
-  const pressCell = useCallback((row: number, col: number) => {
+  // シングルタップ → ✕ を配置（ライフ消費なし）
+  const placeCross = useCallback((row: number, col: number) => {
     if (isComplete || isGameOver) return
-
     setState(prev => {
-      // A cells are fixed
       if (prev.fixed[row][col] === 'A') return prev
-
       const current = prev.current[row]?.[col] ?? 'empty'
-      // Cycle: empty → B → crossed → empty
-      const next: CellContent =
-        current === 'empty' ? 'B' : current === 'B' ? 'crossed' : 'empty'
+      if (current === 'B') return prev
+      const next: CellContent = current === 'empty' ? 'crossed' : 'empty'
+      const newCurrent = prev.current.map(r => [...r]) as CellContent[][]
+      newCurrent[row][col] = next
+      return { ...prev, current: newCurrent }
+    })
+  }, [isComplete, isGameOver])
+
+  // ダブルタップ → 🐼 を配置（誤配置でライフ消費）
+  const placePanda = useCallback((row: number, col: number) => {
+    if (isComplete || isGameOver) return
+    setState(prev => {
+      if (prev.fixed[row][col] === 'A') return prev
+      const current = prev.current[row]?.[col] ?? 'empty'
+      const next: CellContent = current === 'B' ? 'empty' : 'B'
 
       if (next === 'empty') {
         const newCurrent = prev.current.map(r => [...r]) as CellContent[][]
@@ -43,16 +53,11 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
         return { ...prev, current: newCurrent }
       }
 
-      const move: PandaMove = { row, col, value: next as 'B' | 'crossed' | 'empty' }
+      const move: PandaMove = { row, col, value: 'B' }
       const result = validate(prev, move)
 
       const newCurrent = prev.current.map(r => [...r]) as CellContent[][]
-      if (result.correct) {
-        newCurrent[row][col] = next
-      } else {
-        // Wrong B placement: stay empty (lifeLost)
-        newCurrent[row][col] = 'empty'
-      }
+      newCurrent[row][col] = result.correct ? 'B' : 'empty'
 
       const newState = {
         ...prev,
@@ -67,5 +72,5 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver])
 
-  return { state, pressCell, lives, isComplete, isGameOver }
+  return { state, placeCross, placePanda, lives, isComplete, isGameOver }
 }

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { PandaBoard } from '../../../src/components/games/panda/Board'
 import { usePandaGame } from '../../../src/hooks/usePandaGame'
@@ -15,7 +15,7 @@ export default function PandaScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, pressCell, lives, isComplete, isGameOver } = usePandaGame(difficulty)
+  const { state, placeCross, placePanda, lives, isComplete, isGameOver } = usePandaGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -33,30 +33,55 @@ export default function PandaScreen() {
         </View>
       </View>
 
-      {isComplete && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>🎉 クリア！</Text>
-        </View>
-      )}
-      {isGameOver && (
-        <View style={[styles.banner, styles.bannerGameOver]}>
-          <Text style={styles.bannerText}>ゲームオーバー</Text>
-        </View>
-      )}
-
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          A（固定）の隣に各1つだけBを配置。B同士は隣接不可。行・列のB数ヒントを参考に。
+          🎋（固定）の隣に各1つだけ🐼を配置。🐼同士は隣接不可。行・列の🐼数ヒントを参考に。
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
-        <PandaBoard state={state} onPressCell={pressCell} />
+        <PandaBoard state={state} onPlaceCross={placeCross} onPlacePanda={placePanda} />
       </ScrollView>
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>タップ: B配置 → ×（除外マーク） → 消去</Text>
+        <Text style={styles.legendText}>タップ: ×印 ／ ダブルタップ: 🐼配置</Text>
       </View>
+
+      {/* Win dialog */}
+      <Modal visible={isComplete} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
+            <Text style={styles.dialogMessage}>おめでとうございます！</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonText}>戻る</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Game over dialog */}
+      <Modal visible={isGameOver} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>💔 ゲームオーバー</Text>
+            <Text style={styles.dialogMessage}>ライフがなくなりました</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonText}>戻る</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -101,29 +126,16 @@ const styles = StyleSheet.create({
   heartLost: {
     color: '#ccc',
   },
-  banner: {
-    backgroundColor: '#4caf50',
-    padding: 12,
-    alignItems: 'center',
-  },
-  bannerGameOver: {
-    backgroundColor: '#e53935',
-  },
-  bannerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   infoRow: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#fffde7',
+    backgroundColor: '#e8f5e9',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   infoText: {
     fontSize: 12,
-    color: '#795548',
+    color: '#2e7d32',
     textAlign: 'center',
   },
   boardContainer: {
@@ -142,5 +154,46 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: '#888',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialog: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: 280,
+    alignItems: 'center',
+  },
+  dialogTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  dialogMessage: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+  },
+  dialogButtons: {
+    marginTop: 20,
+  },
+  dialogButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dialogButtonOk: {
+    backgroundColor: '#4285f4',
+  },
+  dialogButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
 })
