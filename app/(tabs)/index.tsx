@@ -52,12 +52,6 @@ const GAMES: GameInfo[] = [
     implemented: true,
   },
   {
-    id: 'seven',
-    name: 'Seven',
-    description: '7並べでトランプを出し切ろう',
-    implemented: false,
-  },
-  {
     id: 'spider',
     name: 'スパイダソリティア',
     description: '2デッキで遊ぶ本格ソリティア',
