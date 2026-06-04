@@ -23,15 +23,16 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return result
 }
 
+const GRID_SIZE = 6
+
 const DIFFICULTY_CONFIG: Record<Difficulty, {
-  size: number
   revealRate: number
   constraintCount: number
 }> = {
-  easy:   { size: 8, revealRate: 0.50, constraintCount: 12 },
-  normal: { size: 8, revealRate: 0.35, constraintCount: 8 },
-  hard:   { size: 8, revealRate: 0.22, constraintCount: 5 },
-  expert: { size: 8, revealRate: 0.14, constraintCount: 3 },
+  easy:   { revealRate: 0.55, constraintCount: 8 },
+  normal: { revealRate: 0.38, constraintCount: 5 },
+  hard:   { revealRate: 0.22, constraintCount: 3 },
+  expert: { revealRate: 0.12, constraintCount: 1 },
 }
 
 // Generate a complete valid solution grid using backtracking + constraint propagation
@@ -139,7 +140,8 @@ export function generate(difficulty: Difficulty, seed?: number): LibraPuzzle {
   const actualSeed = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
   const rng = createRng(actualSeed)
 
-  const { size, revealRate, constraintCount } = DIFFICULTY_CONFIG[difficulty]
+  const { revealRate, constraintCount } = DIFFICULTY_CONFIG[difficulty]
+  const size = GRID_SIZE
 
   // Generate complete solution
   const solution = generateSolution(size, rng)
