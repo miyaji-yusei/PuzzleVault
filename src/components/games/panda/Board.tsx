@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo } from 'react'
+import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { PandaState, CellContent } from '../../../engines/panda/types'
 
@@ -30,12 +30,12 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
   const lastDragCellRef = useRef<string | null>(null)
 
   const measureGrid = useCallback(() => {
-    requestAnimationFrame(() => {
-      gridRef.current?.measureInWindow((x, y) => {
-        boardPosRef.current = { x, y }
-      })
+    gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      boardPosRef.current = { x: pageX, y: pageY }
     })
   }, [])
+
+  useEffect(() => { measureGrid() }, [measureGrid])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -52,8 +52,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
       onPanResponderGrant: () => {
-        // Re-measure for next gesture (async)
-        gridRef.current?.measureInWindow((x, y) => { boardPosRef.current = { x, y } })
+        gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { boardPosRef.current = { x: pageX, y: pageY } })
         isDragging = false
         lastDragCellRef.current = null
       },

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
 import { NonogramMode } from '../../../hooks/useNonogramGame'
@@ -68,12 +68,12 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
   const gridPosRef = useRef({ x: 0, y: 0 })
 
   const measureGrid = useCallback(() => {
-    requestAnimationFrame(() => {
-      gridRef.current?.measureInWindow((x, y) => {
-        gridPosRef.current = { x, y }
-      })
+    gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      gridPosRef.current = { x: pageX, y: pageY }
     })
   }, [])
+
+  useEffect(() => { measureGrid() }, [measureGrid])
 
   const onSetCellRef = useRef(onSetCell)
   const onSetCellToRef = useRef(onSetCellTo)
@@ -99,7 +99,7 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
-      gridRef.current?.measureInWindow((x, y) => { gridPosRef.current = { x, y } })
+      gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { gridPosRef.current = { x: pageX, y: pageY } })
       dragAxisRef.current = null
 
       const { pageX, pageY } = e.nativeEvent

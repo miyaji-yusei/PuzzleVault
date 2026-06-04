@@ -19,7 +19,7 @@ export default function SolitaireScreen() {
   const {
     state, puzzle, selected, isComplete, maxResets,
     canAutoComplete, canUndo, isDeadlocked,
-    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove,
+    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
   } = useSolitaireGame(difficulty)
 
@@ -85,6 +85,7 @@ export default function SolitaireScreen() {
         selected={selected}
         onTapStock={tapStock}
         onTapWaste={tapWaste}
+        onDoubleTapWaste={doubleTapWaste}
         onTapFoundation={tapFoundation}
         onTapTableau={tapTableau}
         onDoubleTapCard={doubleTapCard}

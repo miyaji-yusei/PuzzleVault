@@ -133,8 +133,15 @@ function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
   return false
 }
 
-function autoCompleteState(s: SolitaireState, drawMode: 1 | 3): SolitaireState {
+function computeAutoCompleteSteps(s: SolitaireState, drawMode: 1 | 3): SolitaireState[] {
+  const steps: SolitaireState[] = []
   let current = s
+
+  while (current.stock.length > 0) {
+    current = applyMove(current, { type: 'stock-draw' }, 1)
+    steps.push(current)
+  }
+
   let changed = true
   while (changed) {
     changed = false
@@ -142,6 +149,7 @@ function autoCompleteState(s: SolitaireState, drawMode: 1 | 3): SolitaireState {
       const move: SolitaireMove = { type: 'waste-to-foundation' }
       if (validate(current, move).correct) {
         current = applyMove(current, move, drawMode)
+        steps.push(current)
         changed = true
         continue
       }
@@ -151,13 +159,14 @@ function autoCompleteState(s: SolitaireState, drawMode: 1 | 3): SolitaireState {
         const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
         if (validate(current, move).correct) {
           current = applyMove(current, move, drawMode)
+          steps.push(current)
           changed = true
           break
         }
       }
     }
   }
-  return current
+  return steps
 }
 
 export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
@@ -173,7 +182,6 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
 
   const canAutoComplete =
     !isComplete &&
-    state.stock.length === 0 &&
     state.tableau.every(col => col.every(c => c.faceUp))
 
   const isDeadlocked = useMemo(
@@ -246,6 +254,30 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
 
     setSelected({ pile: 'tableau', colIndex, cardIndex: idx })
   }, [state, selected, puzzle.drawMode, commitState])
+
+  const doubleTapWaste = useCallback(() => {
+    if (state.waste.length === 0) return
+    const foundationMove: SolitaireMove = { type: 'waste-to-foundation' }
+    if (validate(state, foundationMove).correct) {
+      const ns = applyMove(state, foundationMove, puzzle.drawMode)
+      commitState(ns)
+      setSelected(null)
+      if (ns.foundation.every(f => f.length === 13)) setIsComplete(true)
+      return
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < state.tableau.length; i++) {
+        const hasCards = state.tableau[i].length > 0
+        if ((pass === 0) !== hasCards) continue
+        const move: SolitaireMove = { type: 'waste-to-tableau', to: { pile: 'tableau', index: i } }
+        if (validate(state, move).correct) {
+          commitState(applyMove(state, move, puzzle.drawMode))
+          setSelected(null)
+          return
+        }
+      }
+    }
+  }, [state, puzzle.drawMode, commitState])
 
   // Double-tap: auto-send top card to foundation
   const doubleTapCard = useCallback((colIndex: number) => {
@@ -332,15 +364,20 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   }, [difficulty])
 
   const autoComplete = useCallback(() => {
-    const completed = autoCompleteState(state, puzzle.drawMode)
-    setState(completed)
-    setSelected(null)
-    if (completed.foundation.every(f => f.length === 13)) setIsComplete(true)
+    const steps = computeAutoCompleteSteps(state, puzzle.drawMode)
+    if (steps.length === 0) return
+    steps.forEach((step, i) => {
+      setTimeout(() => {
+        setState(step)
+        setSelected(null)
+        if (step.foundation.every(f => f.length === 13)) setIsComplete(true)
+      }, i * 80)
+    })
   }, [state, puzzle.drawMode])
 
   return {
     state, puzzle, selected, isComplete, maxResets, canAutoComplete, isDeadlocked,
-    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, directMove,
+    tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
     canUndo: history.length > 0,
   }
