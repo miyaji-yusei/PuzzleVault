@@ -67,5 +67,23 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
     }
   }, [selectedCell, state, isComplete])
 
-  return { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete }
+  const restart = useCallback(() => {
+    const puzzle = generate(difficulty)
+    setState({
+      ...puzzle,
+      current: puzzle.board.map(row => [...row]),
+      notes: Array.from({ length: 9 }, () =>
+        Array.from({ length: 9 }, () => Array(10).fill(false) as boolean[])
+      ),
+      mistakes: 0,
+      hintsUsed: 0,
+      startedAt: Date.now(),
+      elapsedSeconds: 0,
+    })
+    setSelectedCell(null)
+    setWrongCells(new Set())
+    setIsComplete(false)
+  }, [difficulty])
+
+  return { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete, restart }
 }

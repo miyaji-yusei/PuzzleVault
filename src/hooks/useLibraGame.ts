@@ -59,5 +59,19 @@ export function useLibraGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver])
 
-  return { state, pressCell, lives, isComplete, isGameOver }
+  const restart = useCallback(() => {
+    const puzzle = generate(difficulty, Date.now())
+    setState({
+      ...puzzle,
+      current: puzzle.initial.map(row => [...row]) as CellValue[][],
+      mistakes: 0,
+      hintsUsed: 0,
+      startedAt: Date.now(),
+      elapsedSeconds: 0,
+    })
+    setIsComplete(false)
+    setIsGameOver(false)
+  }, [difficulty])
+
+  return { state, pressCell, lives, isComplete, isGameOver, restart }
 }

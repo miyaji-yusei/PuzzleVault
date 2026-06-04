@@ -15,7 +15,7 @@ export default function NonogramScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, setCell, mode, setMode, isComplete } = useNonogramGame(difficulty)
+  const { state, setCell, mode, setMode, isComplete, restart } = useNonogramGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,7 +24,9 @@ export default function NonogramScreen() {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.title}>イラストロジック</Text>
-        <View style={{ width: 60 }} />
+        <TouchableOpacity onPress={restart} style={styles.restartButton}>
+          <Text style={styles.restartText}>↺</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
@@ -61,6 +63,12 @@ export default function NonogramScreen() {
             <Text style={styles.dialogMessage}>おめでとうございます！</Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={restart}
+              >
+                <Text style={styles.dialogButtonText}>もう一度プレイ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonCancel]}
                 onPress={() => router.back()}
               >
@@ -91,6 +99,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    minWidth: 60,
   },
   backText: {
     fontSize: 16,
@@ -100,6 +109,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+  },
+  restartButton: {
+    padding: 4,
+    minWidth: 60,
+    alignItems: 'flex-end',
+  },
+  restartText: {
+    fontSize: 22,
+    color: '#4A90E2',
   },
   boardContainer: {
     flexGrow: 1,
@@ -190,14 +208,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    minWidth: 100,
     alignItems: 'center',
   },
-  dialogButtonCancel: {
-    backgroundColor: '#4A90E2',
+  dialogButtonOk: {
+    backgroundColor: '#4285f4',
   },
-  dialogButtonTextCancel: {
+  dialogButtonCancel: {
+    backgroundColor: '#f0f0f0',
+  },
+  dialogButtonText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 15,
+  },
+  dialogButtonTextCancel: {
+    color: '#555',
+    fontWeight: '600',
+    fontSize: 15,
   },
 })

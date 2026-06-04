@@ -40,5 +40,20 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, mode])
 
-  return { state, setCell, mode, setMode, isComplete }
+  const restart = useCallback(() => {
+    const puzzle = generate(difficulty)
+    setState({
+      ...puzzle,
+      current: Array.from({ length: puzzle.size }, () =>
+        Array(puzzle.size).fill('empty') as CellState[]
+      ),
+      mistakes: 0,
+      hintsUsed: 0,
+      startedAt: Date.now(),
+      elapsedSeconds: 0,
+    })
+    setIsComplete(false)
+  }, [difficulty])
+
+  return { state, setCell, mode, setMode, isComplete, restart }
 }

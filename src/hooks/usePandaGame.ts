@@ -72,5 +72,22 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver])
 
-  return { state, placeCross, placePanda, lives, isComplete, isGameOver }
+  const restart = useCallback(() => {
+    const puzzle = generate(difficulty, Date.now())
+    const current: CellContent[][] = puzzle.fixed.map(row =>
+      row.map(cell => (cell === 'A' ? 'A' : 'empty'))
+    )
+    setState({
+      ...puzzle,
+      current,
+      mistakes: 0,
+      hintsUsed: 0,
+      startedAt: Date.now(),
+      elapsedSeconds: 0,
+    })
+    setIsComplete(false)
+    setIsGameOver(false)
+  }, [difficulty])
+
+  return { state, placeCross, placePanda, lives, isComplete, isGameOver, restart }
 }
