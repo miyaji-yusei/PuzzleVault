@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
 import { NonogramMode } from '../../../hooks/useNonogramGame'
@@ -12,6 +12,46 @@ type Props = {
   mode: NonogramMode
   onSetCell: (row: number, col: number) => void
   onSetCellTo: (row: number, col: number, target: CellState) => void
+}
+
+type PreviewRange = {
+  axis: 'h' | 'v' | null
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
+  target: CellState
+} | null
+
+function isCellInPreview(row: number, col: number, p: PreviewRange): boolean {
+  if (!p) return false
+  if (p.axis === null) return row === p.startRow && col === p.startCol
+  if (p.axis === 'h') {
+    if (row !== p.startRow) return false
+    const min = Math.min(p.startCol, p.endCol)
+    const max = Math.max(p.startCol, p.endCol)
+    return col >= min && col <= max
+  }
+  if (col !== p.startCol) return false
+  const min = Math.min(p.startRow, p.endRow)
+  const max = Math.max(p.startRow, p.endRow)
+  return row >= min && row <= max
+}
+
+function listPreviewCells(p: PreviewRange): { row: number; col: number }[] {
+  if (!p) return []
+  if (p.axis === null) return [{ row: p.startRow, col: p.startCol }]
+  const result: { row: number; col: number }[] = []
+  if (p.axis === 'h') {
+    const min = Math.min(p.startCol, p.endCol)
+    const max = Math.max(p.startCol, p.endCol)
+    for (let c = min; c <= max; c++) result.push({ row: p.startRow, col: c })
+  } else {
+    const min = Math.min(p.startRow, p.endRow)
+    const max = Math.max(p.startRow, p.endRow)
+    for (let r = min; r <= max; r++) result.push({ row: r, col: p.startCol })
+  }
+  return result
 }
 
 export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
@@ -34,6 +74,7 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
   }, [])
 
   useEffect(() => { measureGrid() }, [measureGrid])
+
   const onSetCellRef = useRef(onSetCell)
   const onSetCellToRef = useRef(onSetCellTo)
   onSetCellRef.current = onSetCell
@@ -43,26 +84,16 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
   currentRef.current = current
   const modeRef = useRef(mode)
   modeRef.current = mode
+  const sizeRef = useRef(size)
+  sizeRef.current = size
 
-  // State for the current gesture
   const paintTargetRef = useRef<CellState>('filled')
   const dragAxisRef = useRef<'h' | 'v' | null>(null)
   const dragStartRef = useRef({ row: 0, col: 0 })
-  const lastCellRef = useRef<string | null>(null)
 
-  const getCellCoords = useCallback((pageX: number, pageY: number) => {
-    const col = Math.floor((pageX - gridPosRef.current.x) / cellSize)
-    const row = Math.floor((pageY - gridPosRef.current.y) / cellSize)
-    return { row, col }
-  }, [cellSize])
-
-  const applyCell = useCallback((row: number, col: number) => {
-    if (row < 0 || row >= size || col < 0 || col >= size) return
-    const key = `${row},${col}`
-    if (key === lastCellRef.current) return
-    lastCellRef.current = key
-    onSetCellToRef.current(row, col, paintTargetRef.current)
-  }, [size])
+  const [preview, setPreview] = useState<PreviewRange>(null)
+  const previewRef = useRef<PreviewRange>(null)
+  previewRef.current = preview
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -70,20 +101,31 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
     onPanResponderGrant: (e) => {
       gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { gridPosRef.current = { x: pageX, y: pageY } })
       dragAxisRef.current = null
-      lastCellRef.current = null
 
       const { pageX, pageY } = e.nativeEvent
       const startCol = Math.floor((pageX - gridPosRef.current.x) / cellSize)
       const startRow = Math.floor((pageY - gridPosRef.current.y) / cellSize)
+      const sz = sizeRef.current
+
+      if (startRow < 0 || startRow >= sz || startCol < 0 || startCol >= sz) {
+        previewRef.current = null
+        setPreview(null)
+        return
+      }
+
       dragStartRef.current = { row: startRow, col: startCol }
 
       const currentCellState = currentRef.current[startRow]?.[startCol] ?? 'empty'
       const targetFill: CellState = modeRef.current === 'fill' ? 'filled' : 'crossed'
       paintTargetRef.current = currentCellState === targetFill ? 'empty' : targetFill
 
-      applyCell(startRow, startCol)
+      const p: PreviewRange = { axis: null, startRow, startCol, endRow: startRow, endCol: startCol, target: paintTargetRef.current }
+      previewRef.current = p
+      setPreview(p)
     },
     onPanResponderMove: (e, g) => {
+      if (!previewRef.current) return
+
       if (dragAxisRef.current === null) {
         if (Math.abs(g.dx) > AXIS_THRESHOLD || Math.abs(g.dy) > AXIS_THRESHOLD) {
           dragAxisRef.current = Math.abs(g.dx) >= Math.abs(g.dy) ? 'h' : 'v'
@@ -92,24 +134,39 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
         }
       }
 
+      const start = dragStartRef.current
+      const sz = sizeRef.current
+      let p: PreviewRange
       if (dragAxisRef.current === 'h') {
-        const col = Math.floor((e.nativeEvent.pageX - gridPosRef.current.x) / cellSize)
-        applyCell(dragStartRef.current.row, col)
+        const col = Math.max(0, Math.min(sz - 1, Math.floor((e.nativeEvent.pageX - gridPosRef.current.x) / cellSize)))
+        p = { axis: 'h', startRow: start.row, startCol: start.col, endRow: start.row, endCol: col, target: paintTargetRef.current }
       } else {
-        const row = Math.floor((e.nativeEvent.pageY - gridPosRef.current.y) / cellSize)
-        applyCell(row, dragStartRef.current.col)
+        const row = Math.max(0, Math.min(sz - 1, Math.floor((e.nativeEvent.pageY - gridPosRef.current.y) / cellSize)))
+        p = { axis: 'v', startRow: start.row, startCol: start.col, endRow: row, endCol: start.col, target: paintTargetRef.current }
       }
+      previewRef.current = p
+      setPreview(p)
     },
     onPanResponderRelease: () => {
-      lastCellRef.current = null
+      const p = previewRef.current
+      if (p) {
+        const sz = sizeRef.current
+        listPreviewCells(p).forEach(({ row, col }) => {
+          if (row >= 0 && row < sz && col >= 0 && col < sz) {
+            onSetCellToRef.current(row, col, p.target)
+          }
+        })
+      }
+      previewRef.current = null
+      setPreview(null)
       dragAxisRef.current = null
     },
-  }), [applyCell, cellSize])
-
-  function getCellBg(cell: CellState): string {
-    if (cell === 'filled') return '#333'
-    return '#fff'
-  }
+    onPanResponderTerminate: () => {
+      previewRef.current = null
+      setPreview(null)
+      dragAxisRef.current = null
+    },
+  }), [cellSize])
 
   const gridWidth = cellSize * size
   const gridHeight = cellSize * size
@@ -152,18 +209,27 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
             <View key={row} style={[styles.row, { height: cellSize }]}>
               {Array.from({ length: size }, (_, col) => {
                 const cell = current[row]?.[col] ?? 'empty'
+                const inPreview = isCellInPreview(row, col, preview)
+                const bg = inPreview
+                  ? (preview!.target === 'filled' ? '#888'
+                    : preview!.target === 'crossed' ? '#eee'
+                    : cell === 'filled' ? '#bbb' : '#f5f5f5')
+                  : (cell === 'filled' ? '#333' : '#fff')
                 return (
                   <View
                     key={col}
                     style={[
                       styles.cell,
-                      { width: cellSize, height: cellSize, backgroundColor: getCellBg(cell) },
+                      { width: cellSize, height: cellSize, backgroundColor: bg },
                       col % 5 === 4 && col !== size - 1 && styles.cellBorderRightThick,
                       row % 5 === 4 && row !== size - 1 && styles.cellBorderBottomThick,
                     ]}
                   >
-                    {cell === 'crossed' && (
+                    {cell === 'crossed' && !inPreview && (
                       <Text style={[styles.crossText, { fontSize: cellSize * 0.6 }]}>×</Text>
+                    )}
+                    {inPreview && preview!.target === 'crossed' && (
+                      <Text style={[styles.crossText, styles.crossTextPreview, { fontSize: cellSize * 0.6 }]}>×</Text>
                     )}
                   </View>
                 )
@@ -225,5 +291,8 @@ const styles = StyleSheet.create({
   crossText: {
     color: '#999',
     fontWeight: 'bold',
+  },
+  crossTextPreview: {
+    color: 'rgba(153, 153, 153, 0.5)',
   },
 })
