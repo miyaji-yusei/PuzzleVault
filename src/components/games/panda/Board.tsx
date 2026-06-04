@@ -20,6 +20,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
   const availableWidth = SCREEN_WIDTH - BOARD_PADDING - HINT_SIZE
   const cellSize = Math.floor(availableWidth / size)
 
+  const gridRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
   const onPressCellRef = useRef(onPressCell)
   const onDragCrossRef = useRef(onDragCross)
@@ -27,6 +28,14 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
   onDragCrossRef.current = onDragCross
 
   const lastDragCellRef = useRef<string | null>(null)
+
+  const measureGrid = useCallback(() => {
+    requestAnimationFrame(() => {
+      gridRef.current?.measureInWindow((x, y) => {
+        boardPosRef.current = { x, y }
+      })
+    })
+  }, [])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -42,11 +51,9 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
-      onPanResponderGrant: (e) => {
-        boardPosRef.current = {
-          x: e.nativeEvent.pageX - e.nativeEvent.locationX,
-          y: e.nativeEvent.pageY - e.nativeEvent.locationY,
-        }
+      onPanResponderGrant: () => {
+        // Re-measure for next gesture (async)
+        gridRef.current?.measureInWindow((x, y) => { boardPosRef.current = { x, y } })
         isDragging = false
         lastDragCellRef.current = null
       },
@@ -144,6 +151,8 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
 
         {/* Cell grid with PanResponder */}
         <View
+          ref={gridRef}
+          onLayout={measureGrid}
           style={{ width: gridSize, height: gridSize }}
           {...panResponder.panHandlers}
         >
