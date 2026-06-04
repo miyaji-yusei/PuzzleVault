@@ -6,89 +6,140 @@
 - マージ先: `develop`（`--base develop` のPRのみ処理）
 - `main` へのPRは**触らない**（リリースPRはManagerが管理）
 
+## ラベルの意味
+- `do-not-merge`: 意図的にマージを保留（人間が判断するまで絶対にマージしない）
+- `needs-fix`: Workerが自己修正すべき問題がある（修正完了後にラベルを外してマージへ）
+
+---
+
 ## 手順
 
 1. `develop` へのオープンPRを全件取得する（DraftとReadyの両方）:
-   `gh pr list --base develop --state open --json number,title,headRefName,labels,isDraft`
+   ```bash
+   gh pr list --base develop --state open --json number,title,headRefName,labels,isDraft
+   ```
 
 2. PRが0件なら「レビュー対象PR無し」と出力して終了する
 
 3. **各PRを全件処理する**（番号が小さい順）:
 
-   ### a. スキップチェック
-   - `do-not-merge` ラベルが付いている場合:
-     1. PRのコメントを読んで、なぜ `do-not-merge` が付いているか理由を確認する:
-        ```bash
-        gh pr view {番号} --json comments --jq '.comments[-5:] | .[].body'
-        ```
-     2. 理由を読んで対応を判断する:
-        - **「先に #{別Issue番号} を対応してから」** という依存関係がある場合:
-          → その依存IssueがCLOSED/completedか確認する: `gh issue view {別Issue番号} --json state,labels`
-          → 依存Issueが完了していなければスキップ（次回Workerで再確認）
-          → 依存Issueが完了していれば、依存関係は解消されているので次のステップへ進む
-        - **コードの不具合・未実装仕様がある場合**:
-          → ブランチをcheckoutして問題を修正する（ステップeと同様の手順）
-          → 修正完了後に `gh pr edit {番号} --remove-label do-not-merge` でラベルを外す
-          → `gh pr comment {番号} --body "指摘事項を修正しました: {修正内容の要約}"` でコメントを残す
-          → ステップbへ進む
-        - **理由が不明・修正方法がわからない場合**:
-          → スキップして次のPRへ（手動確認が必要）
-   - `isDraft: true` かつタイトルが `[WIP]` で始まる場合 → 前回セッションの中断PR:
-     - ブランチをcheckoutしてコードを確認し、実装が途中であれば継続する
-     - 実装が完了していればReadyに変換する（ステップlへ）
-     - 実装が途中の場合は実装を完了させてからステップjへ
+   ### a. スキップ・ラベルチェック
+
+   **`do-not-merge` ラベルがある場合**:
+   → 無条件でスキップ（理由を確認したり修正したりしない）
+
+   **`needs-fix` ラベルがある場合**:
+   1. PRのコメントと対応するIssueの最新コメントを読んで問題を把握する:
+      ```bash
+      gh pr view {番号} --json comments --jq '.comments[-5:] | .[].body'
+      gh issue view {Issue番号} --json comments --jq '.comments[-5:] | .[].body'
+      ```
+   2. 問題を修正する（ステップeと同様）
+   3. 修正完了後:
+      ```bash
+      gh pr edit {番号} --remove-label needs-fix
+      gh pr comment {番号} --body "[Worker] needs-fixの問題を修正しました: {修正内容の要約}"
+      ```
+   4. ステップbへ進む（CI確認・レビューを続ける）
+
+   **`isDraft: true` かつタイトルが `[WIP]` で始まる場合** → 前回セッションの中断PR:
+   - ブランチをcheckoutしてコードを確認し、実装が途中であれば継続する
+   - 実装が完了していればReadyに変換する（ステップlへ）
+   - 実装が途中の場合は実装を完了させてからステップjへ
+
+   ---
 
    ### b. CI状態チェック
-   `gh pr checks {番号}` でCI状態を確認する:
+   ```bash
+   gh pr checks {番号}
+   ```
    - 全て `pending` または `in_progress` → 「CI実行中、スキップ」と出力して次のPRへ
-   - `failure` あり → 差分を確認してtypecheckエラーなど明確な問題を修正してpush（ステップeへ）
-     ※ テストの失敗はコードレビューで判断してから修正を検討する
+   - `failure` あり → 差分とCIログを確認して修正（ステップeへ）
    - 全て `success` → コードレビューへ（ステップcへ）
 
-   ### c. コードレビュー
-   `gh pr diff {番号}` で差分を取得してレビューする:
-   1. `any` 型が使われていないか
-   2. `src/types/engine.ts` の共通型（Difficulty等）を正しく参照しているか
-   3. `generator.ts` にseed引数があり同一seedで同一問題を再現できるか
-   4. `solver.ts` に `countSolutions()` が実装されているか
-   5. `validator.ts` が `ValidationResult` を返しているか
-   6. `index.ts` が全関数をエクスポートしているか
-   7. テストがDifficulty×10問をカバーしているか
-   8. seed再現性テストがあるか
-   9. 生成時間500ms以内のテストがあるか
-   10. `console.log` が残っていないか（warn/errorはOK）
+   ---
+
+   ### c. コードレビュー（強化版）
+   ```bash
+   gh pr diff {番号}
+   ```
+
+   #### c-1. 基本品質チェック
+   1. `any` 型が使われていないか（TypeScript strict準拠）
+   2. `console.log` が残っていないか（`warn`/`error` はOK）
+   3. 未使用importがないか
+   4. `src/types/engine.ts` の共通型（`Difficulty`、`ValidationResult` 等）を正しく参照しているか
+
+   #### c-2. ゲームエンジンPRのチェック（`src/engines/` 配下の変更がある場合）
+   5. `generator.ts` にseed引数があり同一seedで同一問題を再現できるか
+   6. `solver.ts` に `solve()` と `countSolutions()` が実装されているか
+   7. `validator.ts` が `ValidationResult` を返しているか
+   8. `index.ts` が全関数をエクスポートしているか
+   9. テストが以下をカバーしているか:
+      - 各Difficultyで10問生成・全問解けること
+      - 同一seedで同一問題が生成されること
+      - 生成時間500ms以内（Normal）
+      - validateが正誤を正しく判定すること
+
+   #### c-3. UI/画面PRのチェック（`app/` 配下の変更がある場合）
+   10. 対応するIssueの**全仕様**が実装されているか（Issueコメントの追加仕様も含む）:
+       ```bash
+       gh issue view {Issue番号} --json body,comments --jq '.body, (.comments[].body)'
+       ```
+   11. タップ・ドラッグの座標計算に `useSafeAreaInsets()` 等が正しく使われているか
+   12. `react-native-reanimated` を使っていないか（Expo Go SDK 54非互換。RN標準の `Animated` APIを使うこと）
+   13. ゲームロジック（勝利判定・エラー判定等）とUIが正しく分離されているか
+   14. エラーハンドリングが適切か（クラッシュしうる箇所に対処があるか）
+   15. 画面遷移（`router.push` 等）が正しく実装されているか
+
+   #### c-4. 共通UI品質チェック
+   16. `SafeAreaView` の代わりに `react-native-safe-area-context` を使っているか
+   17. ハードコードされた数値（座標・サイズ）がなく `Dimensions.get` や `useWindowDimensions` を使っているか
+   18. Keyboardを使うフォームに `KeyboardAvoidingView` があるか（該当する場合）
+
+   ---
 
    ### d. PR本文チェック・補完
-   `gh pr view {番号} --json body` でPR本文を確認する:
+   ```bash
+   gh pr view {番号} --json body
+   ```
    - 「🎮 このPRで遊べるようになるゲーム」セクションがなければ追記
    - 「🖥️ ローカルで動作確認する手順」セクションがなければ追記
    - `gh pr edit {番号} --body "{更新した本文}"` で更新する
 
+   ---
+
    ### e. 問題がある場合（CIエラーまたはレビュー指摘）
    ```bash
    git fetch origin
-   git checkout {headブランチ名}  # claude/{番号}
+   git checkout {headブランチ名}
    # 問題を修正する
    npm run typecheck
-   npm test -- --testPathPattern={ゲーム名}
    git add -A && git commit -m "fix: レビュー修正 - {修正内容の要約}"
    git push origin {headブランチ名}
    ```
-   `gh pr review {番号} --comment --body "レビュー指摘を修正しました: {修正内容}"` でコメントを残す
-   「CI再実行待ち。次回Workerで再確認します」と出力してこのPRの処理を終了する
+   - 軽微な修正（型エラー・未使用import等）は自分で直してpushする
+   - 大きな仕様変更・設計の問題は `needs-fix` ラベルを付けてコメントを残し、次回Workerに持ち越す:
+     ```bash
+     gh pr edit {番号} --add-label needs-fix
+     gh pr comment {番号} --body "[Worker] 以下の問題があります:\n{問題の詳細}\n修正方針: {方針}"
+     ```
+   - 「CI再実行待ち。次回Workerで再確認します」と出力してこのPRの処理を終了する
 
-   ### f. マージ前のIssueコメント確認（重要）
+   ---
+
+   ### f. マージ前の最終確認
    PR本文の `Closes #{Issue番号}` からIssue番号を特定し、最新コメントを確認する:
    ```bash
    gh issue view {Issue番号} --json comments --jq '.comments[-3:] | .[].body'
    ```
-   - 最新コメントに「🚨」「do-not-merge」「未解決」「対応されていない」等のキーワードがある場合:
-     → `gh pr edit {番号} --add-label do-not-merge` を付与してスキップする
-     → `gh pr comment {番号} --body "[Worker] Issueに未解決事項があります。対応後にdo-not-mergeラベルを外してください。"` を追記
-   - 最新コメントが追加仕様・修正要求の場合:
-     → その内容を実装してからマージする（トークン不足なら次回Workerに持ち越す）
+   - 最新コメントに未対応の仕様追加・修正要求がある場合:
+     → その内容を実装するか、`needs-fix` を付けて次回Workerに持ち越す
+   - 問題なければステップgへ
 
-   ### g. マージ（CI success + 問題なし + PR本文完備 + Issueコメント確認済み）
+   ---
+
+   ### g. マージ（CI success + レビューOK + 最終確認済み）
    ```bash
    gh pr merge {番号} --squash --delete-branch
    ```
