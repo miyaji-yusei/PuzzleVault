@@ -15,7 +15,7 @@ export default function QueensScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart } =
+  const { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart, flashWrongCell, lastCorrectCell } =
     useQueensGame(difficulty)
 
   return (
@@ -49,6 +49,8 @@ export default function QueensScreen() {
           onPlaceCross={placeCross}
           onPlaceQueen={placeQueen}
           onDragCross={dragCross}
+          flashWrongCell={flashWrongCell}
+          lastCorrectCell={lastCorrectCell}
         />
       </View>
 

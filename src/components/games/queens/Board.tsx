@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import React, { useRef, useCallback, useMemo, useEffect } from 'react'
+import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
 import { QueensState } from '../../../engines/queens/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -11,22 +11,33 @@ const REGION_COLORS = [
   '#607d8b', '#ff5722',
 ]
 
-const DOUBLE_TAP_MS = 280
 const DRAG_THRESHOLD = 8
+const DOUBLE_TAP_MS = 280
 
 type Props = {
   state: QueensState
   onPlaceCross: (row: number, col: number) => void
   onPlaceQueen: (row: number, col: number) => void
   onDragCross: (row: number, col: number) => void
+  flashWrongCell?: { row: number; col: number } | null
+  lastCorrectCell?: { row: number; col: number } | null
 }
 
-export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: Props) {
+export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, flashWrongCell, lastCorrectCell }: Props) {
   const { size, regions, current } = state
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
 
   const boardRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
+  const queenScale = useRef(new Animated.Value(1)).current
+
+  const measureBoard = useCallback(() => {
+    requestAnimationFrame(() => {
+      boardRef.current?.measureInWindow((x, y) => {
+        boardPosRef.current = { x, y }
+      })
+    })
+  }, [])
 
   const onPlaceCrossRef = useRef(onPlaceCross)
   const onPlaceQueenRef = useRef(onPlaceQueen)
@@ -35,11 +46,17 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
   onPlaceQueenRef.current = onPlaceQueen
   onDragCrossRef.current = onDragCross
 
-  const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y) => {
-      boardPosRef.current = { x, y }
-    })
-  }, [])
+  useEffect(() => {
+    if (lastCorrectCell) {
+      queenScale.setValue(0.3)
+      Animated.spring(queenScale, {
+        toValue: 1,
+        friction: 5,
+        tension: 150,
+        useNativeDriver: true,
+      }).start()
+    }
+  }, [lastCorrectCell?.row, lastCorrectCell?.col, queenScale])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
@@ -49,7 +66,6 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
   }, [cellSize, size])
 
   const panResponder = useMemo(() => {
-    let touchStartTime = 0
     let isDragging = false
     let lastDragCell: string | null = null
     let tapTimer: ReturnType<typeof setTimeout> | null = null
@@ -59,8 +75,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) =>
         Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD,
-      onPanResponderGrant: (e) => {
-        touchStartTime = Date.now()
+      onPanResponderGrant: () => {
         isDragging = false
         lastDragCell = null
       },
@@ -87,13 +102,11 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
         const key = `${cell.row},${cell.col}`
 
         if (pendingTapCell === key && tapTimer) {
-          // ダブルタップ: ♕ を配置
           clearTimeout(tapTimer)
           tapTimer = null
           pendingTapCell = null
           onPlaceQueenRef.current(cell.row, cell.col)
         } else {
-          // 最初のタップ: 待機してシングルタップか確認
           if (tapTimer) { clearTimeout(tapTimer) }
           pendingTapCell = key
           tapTimer = setTimeout(() => {
@@ -123,6 +136,8 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
             const regionId = regions[row]?.[col] ?? 0
             const bgColor = REGION_COLORS[regionId % REGION_COLORS.length] ?? '#ccc'
             const cellState = current[row]?.[col] ?? 'empty'
+            const isFlashing = flashWrongCell?.row === row && flashWrongCell?.col === col
+            const isNewCorrect = lastCorrectCell?.row === row && lastCorrectCell?.col === col
 
             return (
               <View
@@ -130,10 +145,23 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross }: 
                 style={[
                   styles.cell,
                   { width: cellSize, height: cellSize, backgroundColor: bgColor },
+                  isFlashing && styles.cellFlash,
                 ]}
               >
                 {cellState === 'queen' && (
-                  <Text style={[styles.queen, { fontSize: cellSize * 0.55 }]}>♛</Text>
+                  isNewCorrect ? (
+                    <Animated.Text
+                      style={[styles.queen, { fontSize: cellSize * 0.55, transform: [{ scale: queenScale }] }]}
+                    >
+                      ♛
+                    </Animated.Text>
+                  ) : (
+                    <Text
+                      style={[styles.queen, { fontSize: cellSize * 0.55 }, isFlashing && styles.queenWrong]}
+                    >
+                      ♛
+                    </Text>
+                  )
                 )}
                 {cellState === 'crossed' && (
                   <Text style={[styles.cross, { fontSize: cellSize * 0.5 }]}>×</Text>
@@ -162,11 +190,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cellFlash: {
+    backgroundColor: 'rgba(244, 67, 54, 0.4)',
+  },
   queen: {
     color: '#fff',
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  queenWrong: {
+    color: '#f44336',
+    textShadowColor: 'rgba(0,0,0,0.3)',
   },
   cross: {
     color: 'rgba(0,0,0,0.5)',

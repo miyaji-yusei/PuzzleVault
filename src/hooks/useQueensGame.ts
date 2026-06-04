@@ -21,6 +21,8 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
   })
   const [isComplete, setIsComplete] = useState(false)
   const [isGameOver, setIsGameOver] = useState(false)
+  const [flashWrongCell, setFlashWrongCell] = useState<{ row: number; col: number } | null>(null)
+  const [lastCorrectCell, setLastCorrectCell] = useState<{ row: number; col: number } | null>(null)
 
   const lives = MAX_LIVES - state.mistakes
 
@@ -47,13 +49,30 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
       const result = validate(prev, move)
       const newCurrent = prev.current.map(r => [...r]) as CellState[][]
       newCurrent[row][col] = next
-      const newState = {
-        ...prev,
-        current: newCurrent,
-        mistakes: result.lifeLost ? prev.mistakes + 1 : prev.mistakes,
+      const newMistakes = result.lifeLost ? prev.mistakes + 1 : prev.mistakes
+      const newState = { ...prev, current: newCurrent, mistakes: newMistakes }
+
+      if (result.isComplete) {
+        setIsComplete(true)
+        setLastCorrectCell({ row, col })
+      } else if (result.lifeLost) {
+        // 間違いクイーン: 赤フラッシュ後に自動削除
+        setFlashWrongCell({ row, col })
+        setTimeout(() => {
+          setState(s => {
+            const nc = s.current.map(r => [...r]) as CellState[][]
+            if (nc[row]?.[col] === 'queen') nc[row][col] = 'empty'
+            return { ...s, current: nc }
+          })
+          setFlashWrongCell(null)
+        }, 600)
+        if (newMistakes >= MAX_LIVES) setIsGameOver(true)
+      } else if (next === 'queen') {
+        // 正しいクイーン配置: アニメーション
+        setLastCorrectCell({ row, col })
+        setTimeout(() => setLastCorrectCell(null), 500)
       }
-      if (result.isComplete) setIsComplete(true)
-      else if (result.lifeLost && newState.mistakes >= MAX_LIVES) setIsGameOver(true)
+
       return newState
     })
   }, [isComplete, isGameOver])
@@ -86,5 +105,5 @@ export function useQueensGame(difficulty: Difficulty, seed?: number) {
     setIsGameOver(false)
   }, [difficulty])
 
-  return { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart }
+  return { state, placeCross, placeQueen, dragCross, lives, isComplete, isGameOver, restart, flashWrongCell, lastCorrectCell }
 }
