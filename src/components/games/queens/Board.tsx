@@ -19,16 +19,19 @@ type Props = {
   onPlaceCross: (row: number, col: number) => void
   onPlaceQueen: (row: number, col: number) => void
   onDragCross: (row: number, col: number) => void
+  onDragRemoveCross: (row: number, col: number) => void
   flashWrongCell?: { row: number; col: number } | null
   lastCorrectCell?: { row: number; col: number } | null
 }
 
-export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, flashWrongCell, lastCorrectCell }: Props) {
+export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, onDragRemoveCross, flashWrongCell, lastCorrectCell }: Props) {
   const { size, regions, current } = state
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
 
   const boardRef = useRef<View>(null)
   const boardPosRef = useRef({ x: 0, y: 0 })
+  const stateRef = useRef(state)
+  stateRef.current = state
   const queenScale = useRef(new Animated.Value(1)).current
 
   const measureBoard = useCallback(() => {
@@ -42,9 +45,11 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
   const onPlaceCrossRef = useRef(onPlaceCross)
   const onPlaceQueenRef = useRef(onPlaceQueen)
   const onDragCrossRef = useRef(onDragCross)
+  const onDragRemoveCrossRef = useRef(onDragRemoveCross)
   onPlaceCrossRef.current = onPlaceCross
   onPlaceQueenRef.current = onPlaceQueen
   onDragCrossRef.current = onDragCross
+  onDragRemoveCrossRef.current = onDragRemoveCross
 
   useEffect(() => {
     if (lastCorrectCell) {
@@ -67,6 +72,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
 
   const panResponder = useMemo(() => {
     let isDragging = false
+    let dragMode: 'add' | 'remove' = 'add'
     let lastDragCell: string | null = null
     let tapTimer: ReturnType<typeof setTimeout> | null = null
     let pendingTapCell: string | null = null
@@ -75,9 +81,11 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) =>
         Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (e) => {
         isDragging = false
         lastDragCell = null
+        const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+        dragMode = cell && stateRef.current.current[cell.row]?.[cell.col] === 'crossed' ? 'remove' : 'add'
       },
       onPanResponderMove: (e, gs) => {
         if (Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD) {
@@ -90,7 +98,11 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, fl
             const key = `${cell.row},${cell.col}`
             if (key !== lastDragCell) {
               lastDragCell = key
-              onDragCrossRef.current(cell.row, cell.col)
+              if (dragMode === 'remove') {
+                onDragRemoveCrossRef.current(cell.row, cell.col)
+              } else {
+                onDragCrossRef.current(cell.row, cell.col)
+              }
             }
           }
         }
