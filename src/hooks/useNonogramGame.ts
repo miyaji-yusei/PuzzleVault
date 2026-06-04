@@ -22,6 +22,9 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
   const [isComplete, setIsComplete] = useState(false)
   const [mode, setMode] = useState<NonogramMode>('fill')
 
+  const checkComplete = (solution: boolean[][], current: CellState[][]): boolean =>
+    solution.every((sRow, r) => sRow.every((sol, c) => sol === (current[r]?.[c] === 'filled')))
+
   const setCell = useCallback((row: number, col: number) => {
     if (isComplete) return
     setState(prev => {
@@ -31,14 +34,21 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
       const newCurrent = prev.current.map(r => [...r]) as CellState[][]
       newCurrent[row][col] = nextCell
 
-      const complete = prev.solution.every((sRow, r) =>
-        sRow.every((sol, c) => sol === (newCurrent[r][c] === 'filled'))
-      )
-      if (complete) setIsComplete(true)
-
+      if (checkComplete(prev.solution, newCurrent)) setIsComplete(true)
       return { ...prev, current: newCurrent }
     })
   }, [isComplete, mode])
+
+  const setCellTo = useCallback((row: number, col: number, target: CellState) => {
+    if (isComplete) return
+    setState(prev => {
+      if ((prev.current[row]?.[col] ?? 'empty') === target) return prev
+      const newCurrent = prev.current.map(r => [...r]) as CellState[][]
+      newCurrent[row][col] = target
+      if (target === 'filled' && checkComplete(prev.solution, newCurrent)) setIsComplete(true)
+      return { ...prev, current: newCurrent }
+    })
+  }, [isComplete])
 
   const restart = useCallback(() => {
     const puzzle = generate(difficulty)
@@ -55,5 +65,5 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
     setIsComplete(false)
   }, [difficulty])
 
-  return { state, setCell, mode, setMode, isComplete, restart }
+  return { state, setCell, setCellTo, mode, setMode, isComplete, restart }
 }

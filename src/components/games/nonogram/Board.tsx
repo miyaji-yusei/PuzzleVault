@@ -1,16 +1,20 @@
 import React, { useRef, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
+import { NonogramMode } from '../../../hooks/useNonogramGame'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const MAX_BOARD = SCREEN_WIDTH - 32
+const AXIS_THRESHOLD = 6
 
 type Props = {
   state: NonogramState
+  mode: NonogramMode
   onSetCell: (row: number, col: number) => void
+  onSetCellTo: (row: number, col: number, target: CellState) => void
 }
 
-export function NonogramBoard({ state, onSetCell }: Props) {
+export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
   const { size, rowClues, colClues, current } = state
 
   const maxRowClues = Math.max(...rowClues.map(c => c.length))
@@ -21,37 +25,81 @@ export function NonogramBoard({ state, onSetCell }: Props) {
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
 
   const gridPosRef = useRef({ x: 0, y: 0 })
-  const lastCellRef = useRef<string | null>(null)
   const onSetCellRef = useRef(onSetCell)
+  const onSetCellToRef = useRef(onSetCellTo)
   onSetCellRef.current = onSetCell
+  onSetCellToRef.current = onSetCellTo
 
-  const applyAt = useCallback((pageX: number, pageY: number) => {
+  const currentRef = useRef(current)
+  currentRef.current = current
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+
+  // State for the current gesture
+  const paintTargetRef = useRef<CellState>('filled')
+  const dragAxisRef = useRef<'h' | 'v' | null>(null)
+  const dragStartRef = useRef({ row: 0, col: 0 })
+  const lastCellRef = useRef<string | null>(null)
+
+  const getCellCoords = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - gridPosRef.current.x) / cellSize)
     const row = Math.floor((pageY - gridPosRef.current.y) / cellSize)
+    return { row, col }
+  }, [cellSize])
+
+  const applyCell = useCallback((row: number, col: number) => {
     if (row < 0 || row >= size || col < 0 || col >= size) return
     const key = `${row},${col}`
     if (key === lastCellRef.current) return
     lastCellRef.current = key
-    onSetCellRef.current(row, col)
-  }, [cellSize, size])
+    onSetCellToRef.current(row, col, paintTargetRef.current)
+  }, [size])
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
-      // Compute grid position accurately from the first touch event
       gridPosRef.current = {
         x: e.nativeEvent.pageX - e.nativeEvent.locationX,
         y: e.nativeEvent.pageY - e.nativeEvent.locationY,
       }
+      dragAxisRef.current = null
       lastCellRef.current = null
-      applyAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+
+      const locX = e.nativeEvent.locationX
+      const locY = e.nativeEvent.locationY
+      const startCol = Math.floor(locX / cellSize)
+      const startRow = Math.floor(locY / cellSize)
+      dragStartRef.current = { row: startRow, col: startCol }
+
+      const currentCellState = currentRef.current[startRow]?.[startCol] ?? 'empty'
+      const targetFill: CellState = modeRef.current === 'fill' ? 'filled' : 'crossed'
+      paintTargetRef.current = currentCellState === targetFill ? 'empty' : targetFill
+
+      applyCell(startRow, startCol)
     },
-    onPanResponderMove: (e) => {
-      applyAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+    onPanResponderMove: (e, g) => {
+      if (dragAxisRef.current === null) {
+        if (Math.abs(g.dx) > AXIS_THRESHOLD || Math.abs(g.dy) > AXIS_THRESHOLD) {
+          dragAxisRef.current = Math.abs(g.dx) >= Math.abs(g.dy) ? 'h' : 'v'
+        } else {
+          return
+        }
+      }
+
+      if (dragAxisRef.current === 'h') {
+        const col = Math.floor((e.nativeEvent.pageX - gridPosRef.current.x) / cellSize)
+        applyCell(dragStartRef.current.row, col)
+      } else {
+        const row = Math.floor((e.nativeEvent.pageY - gridPosRef.current.y) / cellSize)
+        applyCell(row, dragStartRef.current.col)
+      }
     },
-    onPanResponderRelease: () => { lastCellRef.current = null },
-  }), [applyAt])
+    onPanResponderRelease: () => {
+      lastCellRef.current = null
+      dragAxisRef.current = null
+    },
+  }), [applyCell, cellSize])
 
   function getCellBg(cell: CellState): string {
     if (cell === 'filled') return '#333'
