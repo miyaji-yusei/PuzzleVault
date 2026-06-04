@@ -34,7 +34,26 @@
       gh pr view {番号} --json comments --jq '.comments[-5:] | .[].body'
       gh issue view {Issue番号} --json comments --jq '.comments[-5:] | .[].body'
       ```
-   2. 問題を修正する（ステップeと同様）
+   2. コメントに「先に #XX」「#XX 完了後」「依存」等のキーワードがあるか確認する:
+      - **キーワードあり（依存Issueが存在する）**:
+        ```bash
+        gh issue view {依存Issue番号} --json state,labels --jq '{state:.state, labels:[.labels[].name]}'
+        ```
+        - `state=OPEN` かつ `completed` ラベルなし
+          → **スキップ**（依存Issue未完了）
+          ```bash
+          gh pr comment {番号} --body "[Worker] 依存Issue #{依存Issue番号} が未完了のためスキップします。完了後に再処理されます。"
+          ```
+          → 次のPRへ
+        - `state=CLOSED` または `completed` ラベルあり
+          → 依存解消。コードの問題を修正してラベルを外す（下記ステップ3へ）
+      - **キーワードなし（コードの問題のみ）**:
+        → コードの問題を修正してラベルを外す（下記ステップ3へ）
+        → 修正が複雑でWorkerだけでは対応不可な場合:
+          ```bash
+          gh pr comment {番号} --body "[Worker] 問題が複雑なため手動対応が必要です: {問題の詳細}"
+          ```
+          → スキップ
    3. 修正完了後:
       ```bash
       gh pr edit {番号} --remove-label needs-fix
