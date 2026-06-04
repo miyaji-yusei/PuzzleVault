@@ -1,9 +1,11 @@
-import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native'
+import React, { useRef, useCallback, useMemo } from 'react'
+import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { LibraState, CellValue, Constraint } from '../../../engines/libra/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const BOARD_PADDING = 32
+const BOARD_PADDING = 24
+const DOUBLE_TAP_MS = 280
+const CONSTRAINT_BOX = 14
 
 type Props = {
   state: LibraState
@@ -12,162 +14,203 @@ type Props = {
 
 function getConstraintBetween(
   constraints: Constraint[],
-  r1: number,
-  c1: number,
-  r2: number,
-  c2: number
+  r1: number, c1: number,
+  r2: number, c2: number
 ): Constraint | undefined {
-  return constraints.find(
-    c => c.r1 === r1 && c.c1 === c1 && c.r2 === r2 && c.c2 === c2
-  )
+  return constraints.find(c => c.r1 === r1 && c.c1 === c1 && c.r2 === r2 && c.c2 === c2)
 }
 
 export function LibraBoard({ state, onPressCell }: Props) {
   const { size, current, initial, constraints } = state
-  // Each cell takes cellSize, constraints between cells take constraintSize
-  const constraintSize = 16
-  const totalGaps = size - 1
-  const cellSize = Math.floor(
-    (SCREEN_WIDTH - BOARD_PADDING - totalGaps * constraintSize) / size
-  )
+  const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
+  const boardSize = cellSize * size
 
-  function renderCell(row: number, col: number) {
-    const value = current[row]?.[col] ?? null
-    const isFixed = initial[row]?.[col] !== null
+  const boardRef = useRef<View>(null)
+  const boardPosRef = useRef({ x: 0, y: 0 })
+  const onPressCellRef = useRef(onPressCell)
+  onPressCellRef.current = onPressCell
 
-    return (
-      <TouchableOpacity
-        key={`cell-${row}-${col}`}
-        style={[
-          styles.cell,
-          { width: cellSize, height: cellSize },
-          isFixed && styles.cellFixed,
-        ]}
-        onPress={() => onPressCell(row, col)}
-        activeOpacity={isFixed ? 1 : 0.7}
-        disabled={isFixed}
-      >
-        {value !== null && (
-          <Text style={[styles.cellText, { fontSize: cellSize * 0.45 }, isFixed && styles.cellTextFixed]}>
-            {value}
-          </Text>
-        )}
-      </TouchableOpacity>
-    )
-  }
+  const measureBoard = useCallback(() => {
+    boardRef.current?.measureInWindow((x, y) => {
+      boardPosRef.current = { x, y }
+    })
+  }, [])
 
-  function renderHorizontalConstraint(row: number, col: number) {
-    const constraint = getConstraintBetween(constraints, row, col, row, col + 1)
-    return (
-      <View key={`hc-${row}-${col}`} style={[styles.constraintH, { width: constraintSize, height: cellSize }]}>
-        {constraint && (
-          <Text style={[styles.constraintText, constraint.type === 'neq' ? styles.constraintNeq : styles.constraintEq]}>
-            {constraint.type === 'eq' ? '=' : '×'}
-          </Text>
-        )}
-      </View>
-    )
-  }
+  const getCellAt = useCallback((pageX: number, pageY: number) => {
+    const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)
+    const row = Math.floor((pageY - boardPosRef.current.y) / cellSize)
+    if (row >= 0 && row < size && col >= 0 && col < size) return { row, col }
+    return null
+  }, [cellSize, size])
 
-  function renderVerticalConstraint(row: number, col: number) {
-    const constraint = getConstraintBetween(constraints, row, col, row + 1, col)
-    return (
-      <View key={`vc-${row}-${col}`} style={[styles.constraintV, { width: cellSize, height: constraintSize }]}>
-        {constraint && (
-          <Text style={[styles.constraintText, constraint.type === 'neq' ? styles.constraintNeq : styles.constraintEq]}>
-            {constraint.type === 'eq' ? '=' : '×'}
-          </Text>
-        )}
-      </View>
-    )
-  }
+  const panResponder = useMemo(() => {
+    let tapTimer: ReturnType<typeof setTimeout> | null = null
+    let pendingCell: string | null = null
 
-  function renderRow(row: number) {
-    const cells: React.ReactNode[] = []
-    for (let col = 0; col < size; col++) {
-      cells.push(renderCell(row, col))
-      if (col < size - 1) {
-        cells.push(renderHorizontalConstraint(row, col))
-      }
-    }
-    return (
-      <View key={`row-${row}`} style={styles.row}>
-        {cells}
-      </View>
-    )
-  }
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => false,
+      onPanResponderRelease: (e) => {
+        const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
+        if (!cell) return
+        const key = `${cell.row},${cell.col}`
 
-  function renderConstraintRow(row: number) {
-    const items: React.ReactNode[] = []
-    for (let col = 0; col < size; col++) {
-      items.push(renderVerticalConstraint(row, col))
-      if (col < size - 1) {
-        // spacer for the horizontal constraint gap
-        items.push(
-          <View key={`vc-spacer-${row}-${col}`} style={{ width: constraintSize, height: constraintSize }} />
-        )
-      }
-    }
-    return (
-      <View key={`crow-${row}`} style={styles.row}>
-        {items}
-      </View>
-    )
-  }
-
-  const rows: React.ReactNode[] = []
-  for (let row = 0; row < size; row++) {
-    rows.push(renderRow(row))
-    if (row < size - 1) {
-      rows.push(renderConstraintRow(row))
-    }
-  }
+        if (pendingCell === key && tapTimer) {
+          // ダブルタップ: タイマーキャンセルして即座に実行
+          clearTimeout(tapTimer)
+          tapTimer = null
+          pendingCell = null
+          onPressCellRef.current(cell.row, cell.col)
+        } else {
+          if (tapTimer) clearTimeout(tapTimer)
+          pendingCell = key
+          tapTimer = setTimeout(() => {
+            tapTimer = null
+            pendingCell = null
+            onPressCellRef.current(cell.row, cell.col)
+          }, DOUBLE_TAP_MS)
+        }
+      },
+      onPanResponderTerminate: () => {
+        if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; pendingCell = null }
+      },
+    })
+  }, [getCellAt])
 
   return (
-    <View style={styles.board}>
-      {rows}
+    <View style={{ position: 'relative' }}>
+      {/* Cell grid */}
+      <View
+        ref={boardRef}
+        onLayout={measureBoard}
+        style={[styles.grid, { width: boardSize, height: boardSize }]}
+        {...panResponder.panHandlers}
+      >
+        {Array.from({ length: size }, (_, row) => (
+          <View key={`row-${row}`} style={[styles.row, { height: cellSize }]}>
+            {Array.from({ length: size }, (_, col) => {
+              const value = current[row]?.[col] ?? null
+              const isFixed = initial[row]?.[col] !== null
+              return (
+                <View
+                  key={`cell-${row}-${col}`}
+                  style={[
+                    styles.cell,
+                    { width: cellSize, height: cellSize },
+                    isFixed && styles.cellFixed,
+                    col === size - 1 && styles.cellRightBorder,
+                    row === size - 1 && styles.cellBottomBorder,
+                  ]}
+                >
+                  {value !== null && (
+                    <Text
+                      style={[
+                        styles.cellText,
+                        { fontSize: cellSize * 0.42 },
+                        isFixed && styles.cellTextFixed,
+                        value === 'A' && styles.cellTextA,
+                        value === 'B' && styles.cellTextB,
+                      ]}
+                    >
+                      {value === 'A' ? '🌙' : '☀️'}
+                    </Text>
+                  )}
+                </View>
+              )
+            })}
+          </View>
+        ))}
+      </View>
+
+      {/* Constraint overlays */}
+      {constraints.map((c, i) => {
+        const isHorizontal = c.r1 === c.r2
+        const label = c.type === 'eq' ? '=' : '≠'
+        const textStyle = c.type === 'eq' ? styles.constraintEq : styles.constraintNeq
+
+        if (isHorizontal) {
+          const x = (c.c1 + 1) * cellSize - CONSTRAINT_BOX / 2
+          const y = c.r1 * cellSize + cellSize / 2 - CONSTRAINT_BOX / 2
+          return (
+            <View
+              key={`c-${i}`}
+              style={[styles.constraintBox, { left: x, top: y }]}
+              pointerEvents="none"
+            >
+              <Text style={[styles.constraintText, textStyle]}>{label}</Text>
+            </View>
+          )
+        } else {
+          const x = c.c1 * cellSize + cellSize / 2 - CONSTRAINT_BOX / 2
+          const y = (c.r1 + 1) * cellSize - CONSTRAINT_BOX / 2
+          return (
+            <View
+              key={`c-${i}`}
+              style={[styles.constraintBox, { left: x, top: y }]}
+              pointerEvents="none"
+            >
+              <Text style={[styles.constraintText, textStyle]}>{label}</Text>
+            </View>
+          )
+        }
+      })}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  board: {
-    borderWidth: 2,
-    borderColor: '#333',
+  grid: {
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: '#555',
     backgroundColor: '#fff',
   },
   row: {
     flexDirection: 'row',
   },
   cell: {
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
     borderWidth: 1,
-    borderColor: '#bbb',
+    borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fafafa',
   },
   cellFixed: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#e8eaf6',
+  },
+  cellRightBorder: {
+    borderRightWidth: 2,
+    borderRightColor: '#555',
+  },
+  cellBottomBorder: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#555',
   },
   cellText: {
     fontWeight: 'bold',
-    color: '#333',
   },
-  cellTextFixed: {
-    color: '#1565c0',
+  cellTextFixed: {},
+  cellTextA: {
+    color: '#1a237e',
   },
-  constraintH: {
+  cellTextB: {
+    color: '#b71c1c',
+  },
+  constraintBox: {
+    position: 'absolute',
+    width: CONSTRAINT_BOX,
+    height: CONSTRAINT_BOX,
+    backgroundColor: '#fff',
+    borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  constraintV: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
   },
   constraintText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 'bold',
   },
   constraintEq: {

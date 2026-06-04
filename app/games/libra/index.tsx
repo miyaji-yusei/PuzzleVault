@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { LibraBoard } from '../../../src/components/games/libra/Board'
 import { useLibraGame } from '../../../src/hooks/useLibraGame'
@@ -33,22 +33,11 @@ export default function LibraScreen() {
         </View>
       </View>
 
-      {isComplete && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>🎉 クリア！</Text>
-        </View>
-      )}
-      {isGameOver && (
-        <View style={[styles.banner, styles.bannerGameOver]}>
-          <Text style={styles.bannerText}>ゲームオーバー</Text>
-        </View>
-      )}
-
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          全マスにAかBを入力。行・列3連続禁止、均等配置。
+          全マスに🌙かつ☀️を入力。行・列3連続禁止、均等配置。
           <Text style={styles.eqText}> = 同じ</Text>
-          <Text style={styles.neqText}> × 異なる</Text>
+          <Text style={styles.neqText}> ≠ 異なる</Text>
         </Text>
       </View>
 
@@ -57,8 +46,44 @@ export default function LibraScreen() {
       </ScrollView>
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>タップ: A → B → 消去</Text>
+        <Text style={styles.legendText}>タップ: 🌙 → ☀️ → 消去（ダブルタップで即座に次へ）</Text>
       </View>
+
+      {/* Win dialog */}
+      <Modal visible={isComplete} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
+            <Text style={styles.dialogMessage}>おめでとうございます！</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonText}>戻る</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Game over dialog */}
+      <Modal visible={isGameOver} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>💔 ゲームオーバー</Text>
+            <Text style={styles.dialogMessage}>ライフがなくなりました</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.dialogButtonText}>戻る</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -103,19 +128,6 @@ const styles = StyleSheet.create({
   heartLost: {
     color: '#ccc',
   },
-  banner: {
-    backgroundColor: '#4caf50',
-    padding: 12,
-    alignItems: 'center',
-  },
-  bannerGameOver: {
-    backgroundColor: '#e53935',
-  },
-  bannerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   infoRow: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -143,7 +155,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 12,
   },
   legend: {
     padding: 12,
@@ -155,5 +167,46 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: '#888',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialog: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: 280,
+    alignItems: 'center',
+  },
+  dialogTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  dialogMessage: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+  },
+  dialogButtons: {
+    marginTop: 20,
+  },
+  dialogButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dialogButtonOk: {
+    backgroundColor: '#4285f4',
+  },
+  dialogButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
 })
