@@ -15,7 +15,7 @@ export default function LibraScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, pressCell, lives, isComplete, isGameOver, restart } = useLibraGame(difficulty)
+  const { state, pressCell, lives, isComplete, isGameOver, flashWrongCell, restart } = useLibraGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -40,18 +40,18 @@ export default function LibraScreen() {
 
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          全マスに🌙かつ☀️を入力。行・列3連続禁止、均等配置。
+          全マスに☀️かつ🌙を入力。行・列3連続禁止、均等配置。
           <Text style={styles.eqText}> = 同じ</Text>
-          <Text style={styles.neqText}> ≠ 異なる</Text>
+          <Text style={styles.neqText}> × 異なる</Text>
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
-        <LibraBoard state={state} onPressCell={pressCell} />
+        <LibraBoard state={state} onPressCell={pressCell} flashWrongCell={flashWrongCell} />
       </ScrollView>
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>タップ: 🌙 → ☀️ → 消去（ダブルタップで即座に次へ）</Text>
+        <Text style={styles.legendText}>タップ: ☀️ → 🌙 → 消去（1秒後に判定）</Text>
       </View>
 
       {/* Win dialog */}
