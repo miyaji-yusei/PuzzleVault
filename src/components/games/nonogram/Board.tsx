@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
-import { NonogramMode } from '../../../hooks/useNonogramGame'
+import { NonogramMode, HintColor } from '../../../hooks/useNonogramGame'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const MAX_BOARD = SCREEN_WIDTH - 32
@@ -10,6 +10,9 @@ const AXIS_THRESHOLD = 6
 type Props = {
   state: NonogramState
   mode: NonogramMode
+  autoCrossed: boolean[][]
+  rowClueColors: HintColor[][]
+  colClueColors: HintColor[][]
   onSetCell: (row: number, col: number) => void
   onSetCellTo: (row: number, col: number, target: CellState) => void
 }
@@ -54,7 +57,13 @@ function listPreviewCells(p: PreviewRange): { row: number; col: number }[] {
   return result
 }
 
-export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
+const HINT_COLOR: Record<HintColor, string> = {
+  default: '#333',
+  blue: '#1a7fd4',
+  red: '#d93025',
+}
+
+export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClueColors, onSetCell, onSetCellTo }: Props) {
   const { size, rowClues, colClues, current } = state
 
   const maxRowClues = Math.max(...rowClues.map(c => c.length))
@@ -179,7 +188,12 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
         {Array.from({ length: size }, (_, col) => (
           <View key={col} style={[styles.clueCell, { width: cellSize, height: clueAreaHeight }]}>
             {colClues[col]?.map((n, i) => (
-              <Text key={i} style={styles.clueText}>{n === 0 ? '' : n}</Text>
+              <Text
+                key={i}
+                style={[styles.clueText, { color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] }]}
+              >
+                {n === 0 ? '' : n}
+              </Text>
             ))}
           </View>
         ))}
@@ -192,7 +206,12 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
           {Array.from({ length: size }, (_, row) => (
             <View key={row} style={[styles.rowClueCell, { width: clueAreaWidth, height: cellSize }]}>
               {rowClues[row]?.map((n, i) => (
-                <Text key={i} style={styles.clueText}>{n === 0 ? '' : n}</Text>
+                <Text
+                  key={i}
+                  style={[styles.clueText, { color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] }]}
+                >
+                  {n === 0 ? '' : n}
+                </Text>
               ))}
             </View>
           ))}
@@ -210,6 +229,7 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
               {Array.from({ length: size }, (_, col) => {
                 const cell = current[row]?.[col] ?? 'empty'
                 const inPreview = isCellInPreview(row, col, preview)
+                const isAutoX = autoCrossed[row]?.[col] ?? false
                 const bg = inPreview
                   ? (preview!.target === 'filled' ? '#888'
                     : preview!.target === 'crossed' ? '#eee'
@@ -227,6 +247,9 @@ export function NonogramBoard({ state, mode, onSetCell, onSetCellTo }: Props) {
                   >
                     {cell === 'crossed' && !inPreview && (
                       <Text style={[styles.crossText, { fontSize: cellSize * 0.6 }]}>×</Text>
+                    )}
+                    {cell === 'empty' && isAutoX && !inPreview && (
+                      <Text style={[styles.crossText, styles.crossTextAuto, { fontSize: cellSize * 0.6 }]}>×</Text>
                     )}
                     {inPreview && preview!.target === 'crossed' && (
                       <Text style={[styles.crossText, styles.crossTextPreview, { fontSize: cellSize * 0.6 }]}>×</Text>
@@ -264,7 +287,6 @@ const styles = StyleSheet.create({
   },
   clueText: {
     fontSize: 12,
-    color: '#333',
     fontWeight: '500',
     lineHeight: 15,
   },
@@ -291,6 +313,9 @@ const styles = StyleSheet.create({
   crossText: {
     color: '#999',
     fontWeight: 'bold',
+  },
+  crossTextAuto: {
+    color: 'rgba(100, 160, 220, 0.6)',
   },
   crossTextPreview: {
     color: 'rgba(153, 153, 153, 0.5)',

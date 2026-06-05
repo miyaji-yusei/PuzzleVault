@@ -25,7 +25,7 @@ export default function NonogramScreen() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(paramDifficulty)
   const difficulty: Difficulty = selectedDifficulty ?? 'easy'
 
-  const { state, setCell, setCellTo, mode, setMode, isComplete, restart } = useNonogramGame(difficulty)
+  const { state, setCell, setCellTo, mode, setMode, isComplete, restart, autoCrossed, rowClueColors, colClueColors } = useNonogramGame(difficulty)
 
   if (!selectedDifficulty) {
     return (
@@ -67,7 +67,7 @@ export default function NonogramScreen() {
       </View>
 
       <View style={[styles.boardContainer, { flex: 1 }]}>
-        <NonogramBoard state={state} mode={mode} onSetCell={setCell} onSetCellTo={setCellTo} />
+        <NonogramBoard state={state} mode={mode} autoCrossed={autoCrossed} rowClueColors={rowClueColors} colClueColors={colClueColors} onSetCell={setCell} onSetCellTo={setCellTo} />
       </View>
 
       {/* Mode toggle */}
