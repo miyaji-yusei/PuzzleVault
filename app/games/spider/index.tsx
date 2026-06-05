@@ -81,7 +81,7 @@ export default function SpiderScreen() {
             <Text style={styles.dialogMessage}>全8セット完成！手数: {state.moves}</Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnCancel]} onPress={() => router.back()}>
-                <Text style={styles.dialogBtnTextCancel}>戻る</Text>
+                <Text style={styles.dialogBtnTextCancel}>タイトルに戻る</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnOk]} onPress={restart}>
                 <Text style={styles.dialogBtnTextOk}>もう一度</Text>
@@ -99,7 +99,7 @@ export default function SpiderScreen() {
             <Text style={styles.dialogMessage}>ライフがなくなりました</Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnCancel]} onPress={() => router.back()}>
-                <Text style={styles.dialogBtnTextCancel}>戻る</Text>
+                <Text style={styles.dialogBtnTextCancel}>タイトルに戻る</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnOk]} onPress={restart}>
                 <Text style={styles.dialogBtnTextOk}>もう一度</Text>
