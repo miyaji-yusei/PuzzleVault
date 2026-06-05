@@ -136,35 +136,48 @@ function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
 function computeAutoCompleteSteps(s: SolitaireState, drawMode: 1 | 3): SolitaireState[] {
   const steps: SolitaireState[] = []
   let current = s
+  const MAX_STEPS = 52 * 6
 
-  while (current.stock.length > 0) {
-    current = applyMove(current, { type: 'stock-draw' }, 1)
-    steps.push(current)
-  }
+  for (let iter = 0; iter < MAX_STEPS; iter++) {
+    const total = current.foundation.reduce((n, f) => n + f.length, 0)
+    if (total === 52) break
 
-  let changed = true
-  while (changed) {
-    changed = false
-    if (current.waste.length > 0) {
-      const move: SolitaireMove = { type: 'waste-to-foundation' }
+    // Try waste → foundation
+    if (current.waste.length > 0 && validate(current, { type: 'waste-to-foundation' }).correct) {
+      current = applyMove(current, { type: 'waste-to-foundation' }, drawMode)
+      steps.push(current)
+      continue
+    }
+
+    // Try tableau → foundation
+    let moved = false
+    for (let i = 0; i < current.tableau.length; i++) {
+      if (current.tableau[i].length === 0) continue
+      const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
       if (validate(current, move).correct) {
         current = applyMove(current, move, drawMode)
         steps.push(current)
-        changed = true
-        continue
+        moved = true
+        break
       }
     }
-    for (let i = 0; i < current.tableau.length; i++) {
-      if (current.tableau[i].length > 0) {
-        const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
-        if (validate(current, move).correct) {
-          current = applyMove(current, move, drawMode)
-          steps.push(current)
-          changed = true
-          break
-        }
-      }
+    if (moved) continue
+
+    // Draw next stock card one at a time
+    if (current.stock.length > 0) {
+      current = applyMove(current, { type: 'stock-draw' }, 1)
+      steps.push(current)
+      continue
     }
+
+    // Cycle waste back through stock and keep trying
+    if (current.waste.length > 0 && validate(current, { type: 'stock-reset' }).correct) {
+      current = applyMove(current, { type: 'stock-reset' }, drawMode)
+      steps.push(current)
+      continue
+    }
+
+    break
   }
   return steps
 }
