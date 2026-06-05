@@ -22,10 +22,24 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
 }
 
 const DIFFICULTY_CONFIG: Record<Difficulty, { gridSize: number; minIslands: number; maxIslands: number }> = {
-  easy:   { gridSize: 7,  minIslands: 10, maxIslands: 14 },
-  normal: { gridSize: 10, minIslands: 20, maxIslands: 28 },
-  hard:   { gridSize: 13, minIslands: 35, maxIslands: 45 },
-  expert: { gridSize: 16, minIslands: 50, maxIslands: 60 },
+  easy:   { gridSize: 6, minIslands: 8,  maxIslands: 10 },
+  normal: { gridSize: 6, minIslands: 8,  maxIslands: 12 },
+  hard:   { gridSize: 7, minIslands: 9,  maxIslands: 12 },
+  expert: { gridSize: 7, minIslands: 10, maxIslands: 12 },
+}
+
+function hasRegularGrid2Pattern(islands: Island[]): boolean {
+  const twoIslands = islands.filter(i => i.bridges === 2)
+  if (twoIslands.length < 4) return false
+  const rows = [...new Set(twoIslands.map(i => i.row))].sort((a, b) => a - b)
+  const cols = [...new Set(twoIslands.map(i => i.col))].sort((a, b) => a - b)
+  if (rows.length < 2 || cols.length < 2) return false
+  const rowGaps = rows.slice(1).map((r, i) => r - (rows[i] ?? 0))
+  const colGaps = cols.slice(1).map((c, i) => c - (cols[i] ?? 0))
+  if (!rowGaps.every(g => g === rowGaps[0]) || !colGaps.every(g => g === colGaps[0])) return false
+  const rowSet = new Set(rows)
+  const colSet = new Set(cols)
+  return twoIslands.every(i => rowSet.has(i.row) && colSet.has(i.col))
 }
 
 function placeIslands(gridSize: number, target: number, rng: () => number): Island[] {
@@ -115,6 +129,7 @@ function tryGenerate(difficulty: Difficulty, seed: number): HashiPuzzle | null {
     islandMap.get(b.to)!.bridges += b.count
   }
   if (islands.some(i => i.bridges === 0 || i.bridges > 8)) return null
+  if (hasRegularGrid2Pattern(islands)) return null
   const puzzle: HashiPuzzle = { id: `hashi-${difficulty}-${seed}`, gridSize, islands, solution, difficulty, seed }
   // Check uniqueness only for easy (affordable cost)
   if (difficulty === 'easy' && countSolutions(puzzle) !== 1) return null
