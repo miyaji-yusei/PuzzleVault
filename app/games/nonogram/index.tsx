@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { NonogramBoard } from '../../../src/components/games/nonogram/Board'
@@ -6,6 +7,13 @@ import { Difficulty } from '../../../src/types/engine'
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
 
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  easy:   '10×10',
+  normal: '15×15',
+  hard:   '20×20',
+  expert: '25×25',
+}
+
 function isDifficulty(v: unknown): v is Difficulty {
   return VALID_DIFFICULTIES.includes(v as Difficulty)
 }
@@ -13,9 +21,38 @@ function isDifficulty(v: unknown): v is Difficulty {
 export default function NonogramScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ difficulty?: string }>()
-  const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
+  const paramDifficulty: Difficulty | null = isDifficulty(params.difficulty) ? params.difficulty : null
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(paramDifficulty)
+  const difficulty: Difficulty = selectedDifficulty ?? 'easy'
 
   const { state, setCell, setCellTo, mode, setMode, isComplete, restart } = useNonogramGame(difficulty)
+
+  if (!selectedDifficulty) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backText}>← 戻る</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>イラストロジック</Text>
+          <View style={{ minWidth: 60 }} />
+        </View>
+        <View style={styles.selectScreen}>
+          <Text style={styles.selectTitle}>難易度を選択</Text>
+          {VALID_DIFFICULTIES.map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={styles.selectButton}
+              onPress={() => setSelectedDifficulty(d)}
+            >
+              <Text style={styles.selectButtonTitle}>{DIFFICULTY_LABEL[d]}</Text>
+              <Text style={styles.selectButtonDesc}>{d.charAt(0).toUpperCase() + d.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -23,7 +60,7 @@ export default function NonogramScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>イラストロジック</Text>
+        <Text style={styles.title}>イラストロジック ({DIFFICULTY_LABEL[difficulty]})</Text>
         <TouchableOpacity onPress={restart} style={styles.restartButton}>
           <Text style={styles.restartText}>↺</Text>
         </TouchableOpacity>
@@ -225,5 +262,36 @@ const styles = StyleSheet.create({
     color: '#555',
     fontWeight: '600',
     fontSize: 15,
+  },
+  selectScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  selectTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  selectButton: {
+    backgroundColor: '#4A90E2',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  selectButtonTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  selectButtonDesc: {
+    fontSize: 13,
+    color: '#d0e8ff',
   },
 })
