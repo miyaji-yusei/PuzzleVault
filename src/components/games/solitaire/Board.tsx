@@ -34,7 +34,7 @@ type Props = {
   onDoubleTapWaste: () => void
   onTapFoundation: (foundationIndex: number) => void
   onTapTableau: (colIndex: number, cardIndex?: number) => void
-  onDoubleTapCard: (colIndex: number) => void
+  onDoubleTapCard: (colIndex: number, cardIndex: number) => void
   onDirectMove: (move: SolitaireMove) => void
 }
 
@@ -306,7 +306,7 @@ export function SolitaireBoard({
         gs.tapTimer = null
         gs.pendingTap = null
         const cardObj = tableauRef.current[col]?.[card]
-        if (cardObj?.faceUp) onDoubleTapCardRef.current(col)
+        if (cardObj?.faceUp) onDoubleTapCardRef.current(col, card)
         else onTapTableauRef.current(col, card)
       } else {
         if (gs.tapTimer) clearTimeout(gs.tapTimer)
