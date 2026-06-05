@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { generate } from '../engines/nonogram'
 import { NonogramState, CellState } from '../engines/nonogram/types'
 import { Difficulty } from '../types/engine'
@@ -21,6 +21,26 @@ export function useNonogramGame(difficulty: Difficulty, seed?: number) {
   })
   const [isComplete, setIsComplete] = useState(false)
   const [mode, setMode] = useState<NonogramMode>('fill')
+
+  const prevDifficultyRef = useRef<Difficulty | null>(null)
+  useEffect(() => {
+    if (prevDifficultyRef.current !== null && prevDifficultyRef.current !== difficulty) {
+      const puzzle = generate(difficulty)
+      setState({
+        ...puzzle,
+        current: Array.from({ length: puzzle.size }, () =>
+          Array(puzzle.size).fill('empty') as CellState[]
+        ),
+        mistakes: 0,
+        hintsUsed: 0,
+        startedAt: Date.now(),
+        elapsedSeconds: 0,
+      })
+      setIsComplete(false)
+      setMode('fill')
+    }
+    prevDifficultyRef.current = difficulty
+  }, [difficulty])
 
   const checkComplete = (solution: boolean[][], current: CellState[][]): boolean =>
     solution.every((sRow, r) => sRow.every((sol, c) => sol === (current[r]?.[c] === 'filled')))
