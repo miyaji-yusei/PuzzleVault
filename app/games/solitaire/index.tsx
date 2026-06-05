@@ -27,6 +27,7 @@ export default function SolitaireScreen() {
   const [autoCompleteHandled, setAutoCompleteHandled] = useState(false)
   const [showDeadlockDialog, setShowDeadlockDialog] = useState(false)
   const [deadlockHandled, setDeadlockHandled] = useState(false)
+  const [showRestartDialog, setShowRestartDialog] = useState(false)
 
   useEffect(() => {
     if (canAutoComplete && !autoCompleteHandled) {
@@ -67,7 +68,7 @@ export default function SolitaireScreen() {
             >
               <Text style={styles.iconButtonText}>↩</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={restart} style={styles.iconButton}>
+            <TouchableOpacity onPress={() => setShowRestartDialog(true)} style={styles.iconButton}>
               <Text style={styles.iconButtonText}>↺</Text>
             </TouchableOpacity>
           </View>
@@ -91,6 +92,33 @@ export default function SolitaireScreen() {
         onDoubleTapCard={doubleTapCard}
         onDirectMove={directMove}
       />
+
+      {/* Restart confirmation dialog */}
+      <Modal visible={showRestartDialog} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>リセット確認</Text>
+            <Text style={styles.dialogMessage}>ゲームをリセットしますか？</Text>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                onPress={() => setShowRestartDialog(false)}
+              >
+                <Text style={styles.dialogButtonTextCancel}>いいえ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => {
+                  setShowRestartDialog(false)
+                  restart()
+                }}
+              >
+                <Text style={styles.dialogButtonTextOk}>はい</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Auto-complete dialog */}
       <Modal visible={showAutoCompleteDialog} transparent animationType="fade">
