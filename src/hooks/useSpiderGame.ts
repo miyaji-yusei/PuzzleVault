@@ -3,13 +3,6 @@ import { generate, dealState, validate, removeCompleteSets } from '../engines/sp
 import { SpiderState, SpiderMove, SpiderPuzzle } from '../engines/spider/types'
 import { Difficulty } from '../types/engine'
 
-const MAX_LIVES: Record<Difficulty, number | null> = {
-  easy: null,
-  normal: 5,
-  hard: 3,
-  expert: 3,
-}
-
 export type SpiderSelection = { col: number; cardIndex: number }
 
 function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
@@ -59,7 +52,6 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
   const [selected, setSelected] = useState<SpiderSelection | null>(null)
   const [isComplete, setIsComplete] = useState(false)
   const [history, setHistory] = useState<SpiderState[]>([])
-  const [lives, setLives] = useState<number | null>(MAX_LIVES[difficulty])
 
   const commitState = useCallback((ns: SpiderState) => {
     setHistory(prev => [...prev.slice(-30), state])
@@ -85,8 +77,6 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
       const result = validate(state, move)
       if (result.correct) {
         commitState(applySpiderMove(state, move))
-      } else if (result.lifeLost) {
-        setLives(prev => (prev === null ? null : Math.max(0, prev - 1)))
       }
       setSelected(null)
       return
@@ -96,6 +86,49 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
     if (!card || !card.faceUp) return
     setSelected({ col, cardIndex })
   }, [state, selected, isComplete, commitState])
+
+  const doubleTapCard = useCallback((col: number, cardIndex: number) => {
+    if (isComplete) return
+    const column = state.tableau[col]
+    if (!column) return
+    const card = column[cardIndex]
+    if (!card?.faceUp) return
+
+    // Priority 1: non-empty tableau columns
+    for (let dst = 0; dst < state.tableau.length; dst++) {
+      if (dst === col || state.tableau[dst].length === 0) continue
+      const move: SpiderMove = { type: 'move', from: { col, cardIndex }, to: { col: dst } }
+      if (validate(state, move).correct) {
+        commitState(applySpiderMove(state, move))
+        setSelected(null)
+        return
+      }
+    }
+    // Priority 2: empty columns
+    for (let dst = 0; dst < state.tableau.length; dst++) {
+      if (dst === col || state.tableau[dst].length > 0) continue
+      const move: SpiderMove = { type: 'move', from: { col, cardIndex }, to: { col: dst } }
+      if (validate(state, move).correct) {
+        commitState(applySpiderMove(state, move))
+        setSelected(null)
+        return
+      }
+    }
+  }, [state, isComplete, commitState])
+
+  const directMove = useCallback((fromCol: number, fromCardIdx: number, toCol: number) => {
+    if (isComplete) return
+    const move: SpiderMove = {
+      type: 'move',
+      from: { col: fromCol, cardIndex: fromCardIdx },
+      to: { col: toCol },
+    }
+    const r = validate(state, move)
+    if (r.correct) {
+      commitState(applySpiderMove(state, move))
+      setSelected(null)
+    }
+  }, [state, isComplete, commitState])
 
   const deal = useCallback(() => {
     if (isComplete) return
@@ -127,18 +160,17 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
     setSelected(null)
     setIsComplete(false)
     setHistory([])
-    setLives(MAX_LIVES[difficulty])
-  }, [puzzle, difficulty])
+  }, [puzzle])
 
   return {
     puzzle,
     state,
     selected,
     isComplete,
-    isGameOver: lives !== null && lives <= 0,
-    lives,
     canUndo: history.length > 0,
     tapTableau,
+    doubleTapCard,
+    directMove,
     deal,
     undo,
     restart,
