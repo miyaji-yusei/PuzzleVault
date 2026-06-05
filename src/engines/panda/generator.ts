@@ -172,6 +172,11 @@ export function generate(difficulty: Difficulty, seed?: number): PandaPuzzle {
       }
     }
 
+    // Limit zero-rows and zero-cols to at most 2 each
+    const zeroRows = rowCounts.filter(c => c === 0).length
+    const zeroCols = colCounts.filter(c => c === 0).length
+    if (zeroRows > 2 || zeroCols > 2) continue
+
     const puzzle: PandaPuzzle = {
       id: `panda-${difficulty}-${actualSeed}`,
       size,
