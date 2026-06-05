@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, PanResponder } from 'react-native'
+import React, { useRef, useState, useCallback, useMemo } from 'react'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native'
 import { SpiderState, Card, Suit } from '../../../engines/spider/types'
 import { SpiderSelection } from '../../../hooks/useSpiderGame'
 
@@ -11,10 +11,18 @@ const CARD_W = Math.floor((SW - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
 const CARD_H = Math.floor(CARD_W * 1.5)
 const FACE_DOWN_STEP = 6
 const FACE_UP_STEP = 18
+const DOUBLE_TAP_MS = 280
+const DRAG_THRESHOLD = 8
 
 const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
 const RANK_LABEL: Partial<Record<number, string>> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
+
+type DragInfo = {
+  col: number
+  cardIndex: number
+  cards: Card[]
+}
 
 function CardFace({ card, width, height, highlighted, dimmed }: {
   card: Card; width: number; height: number; highlighted?: boolean; dimmed?: boolean
@@ -39,10 +47,12 @@ type Props = {
   state: SpiderState
   selected: SpiderSelection | null
   onTapTableau: (col: number, cardIndex: number) => void
+  onDoubleTapCard: (col: number, cardIndex: number) => void
+  onDirectMove: (fromCol: number, fromCardIdx: number, toCol: number) => void
   onDeal: () => void
 }
 
-export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
+export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal }: Props) {
   const { tableau, stock, foundation } = state
 
   const boardRef = useRef<View>(null)
@@ -51,6 +61,23 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
   tableauRef.current = tableau
   const onTapTableauRef = useRef(onTapTableau)
   onTapTableauRef.current = onTapTableau
+  const onDoubleTapCardRef = useRef(onDoubleTapCard)
+  onDoubleTapCardRef.current = onDoubleTapCard
+  const onDirectMoveRef = useRef(onDirectMove)
+  onDirectMoveRef.current = onDirectMove
+
+  const overlayX = useRef(new Animated.Value(0)).current
+  const overlayY = useRef(new Animated.Value(0)).current
+  const overlayOpacity = useRef(new Animated.Value(0)).current
+  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
+
+  const overlayStyle = {
+    position: 'absolute' as const,
+    left: overlayX,
+    top: overlayY,
+    opacity: overlayOpacity,
+    zIndex: 999,
+  }
 
   const measureBoard = useCallback(() => {
     boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
@@ -73,7 +100,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
       if (i < column.length - 1) topAcc += column[i]!.faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
     }
     const lastIdx = column.length - 1
-    if (relY > offsets[lastIdx]! + CARD_H) return null
+    if (relY > offsets[lastIdx]! + CARD_H) return { col, cardIndex: lastIdx }
 
     for (let i = lastIdx; i >= 0; i--) {
       if (relY >= offsets[i]!) return { col, cardIndex: i }
@@ -81,20 +108,98 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
     return { col, cardIndex: 0 }
   }, [])
 
+  const gestureState = useRef({
+    isDragging: false,
+    tapTimer: null as ReturnType<typeof setTimeout> | null,
+    pendingTap: null as { col: number; cardIndex: number } | null,
+    activeCard: null as { col: number; cardIndex: number } | null,
+  })
+
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onMoveShouldSetPanResponder: (_, g) =>
+      Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+    onPanResponderGrant: (e) => {
       boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
         boardPosRef.current = { x: pageX, y: pageY }
       })
-    },
-    onPanResponderRelease: (e) => {
+      const gs = gestureState.current
+      gs.isDragging = false
       const relX = e.nativeEvent.pageX - boardPosRef.current.x
       const relY = e.nativeEvent.pageY - boardPosRef.current.y
-      const hit = getColAndCard(relX, relY)
-      if (hit) onTapTableauRef.current(hit.col, hit.cardIndex)
+      gs.activeCard = getColAndCard(relX, relY)
     },
-  }), [getColAndCard])
+    onPanResponderMove: (e, g) => {
+      const gs = gestureState.current
+      if (!gs.activeCard) return
+      const { col, cardIndex } = gs.activeCard
+      const cardObj = tableauRef.current[col]?.[cardIndex]
+      if (!cardObj?.faceUp) return
+
+      if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+        if (!gs.isDragging) {
+          gs.isDragging = true
+          if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
+          overlayX.setValue(e.nativeEvent.pageX - boardPosRef.current.x - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardPosRef.current.y - CARD_H / 4)
+          Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+          const column = tableauRef.current[col] ?? []
+          setDragInfo({ col, cardIndex, cards: column.slice(cardIndex) })
+        }
+        overlayX.setValue(e.nativeEvent.pageX - boardPosRef.current.x - CARD_W / 2)
+        overlayY.setValue(e.nativeEvent.pageY - boardPosRef.current.y - CARD_H / 4)
+      }
+    },
+    onPanResponderRelease: (e) => {
+      const gs = gestureState.current
+      if (gs.isDragging) {
+        gs.isDragging = false
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+        setDragInfo(null)
+        if (gs.activeCard) {
+          const relX = e.nativeEvent.pageX - boardPosRef.current.x
+          const relY = e.nativeEvent.pageY - boardPosRef.current.y
+          const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+          const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
+          if (clampedCol !== gs.activeCard.col) {
+            onDirectMoveRef.current(gs.activeCard.col, gs.activeCard.cardIndex, clampedCol)
+          }
+        }
+        gs.activeCard = null
+        return
+      }
+
+      if (!gs.activeCard) return
+      const { col, cardIndex } = gs.activeCard
+      gs.activeCard = null
+
+      const cardObj = tableauRef.current[col]?.[cardIndex]
+
+      if (gs.pendingTap && gs.pendingTap.col === col && gs.pendingTap.cardIndex === cardIndex) {
+        clearTimeout(gs.tapTimer!)
+        gs.tapTimer = null
+        gs.pendingTap = null
+        if (cardObj?.faceUp) onDoubleTapCardRef.current(col, cardIndex)
+        else onTapTableauRef.current(col, cardIndex)
+      } else {
+        if (gs.tapTimer) clearTimeout(gs.tapTimer)
+        gs.pendingTap = { col, cardIndex }
+        gs.tapTimer = setTimeout(() => {
+          gs.tapTimer = null
+          gs.pendingTap = null
+          onTapTableauRef.current(col, cardIndex)
+        }, DOUBLE_TAP_MS)
+      }
+    },
+    onPanResponderTerminate: () => {
+      const gs = gestureState.current
+      gs.isDragging = false
+      gs.activeCard = null
+      if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
+      setDragInfo(null)
+    },
+  }), [getColAndCard, overlayOpacity, overlayX, overlayY])
 
   const colData = tableau.map((col) => {
     const offsets: number[] = []
@@ -140,6 +245,10 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
                     selected !== null &&
                     selected.col === ci &&
                     cardi >= selected.cardIndex
+                  const isDragged =
+                    dragInfo !== null &&
+                    dragInfo.col === ci &&
+                    cardi >= dragInfo.cardIndex
                   return (
                     <View
                       key={cardi}
@@ -150,6 +259,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
                         width={CARD_W}
                         height={CARD_H}
                         highlighted={isInSelection}
+                        dimmed={isDragged}
                       />
                     </View>
                   )
@@ -157,6 +267,17 @@ export function SpiderBoard({ state, selected, onTapTableau, onDeal }: Props) {
               )}
             </View>
           ))}
+
+          {/* Drag overlay */}
+          {dragInfo && (
+            <Animated.View style={overlayStyle} pointerEvents="none">
+              {dragInfo.cards.map((card, i) => (
+                <View key={i} style={{ position: i === 0 ? 'relative' : 'absolute', top: i === 0 ? 0 : i * FACE_UP_STEP }}>
+                  <CardFace card={card} width={CARD_W} height={CARD_H} />
+                </View>
+              ))}
+            </Animated.View>
+          )}
         </View>
       </ScrollView>
     </View>

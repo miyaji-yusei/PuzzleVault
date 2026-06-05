@@ -23,9 +23,9 @@ export default function SpiderScreen() {
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
   const {
-    puzzle, state, selected, isComplete, isGameOver,
-    lives, canUndo,
-    tapTableau, deal, undo, restart,
+    puzzle, state, selected, isComplete,
+    canUndo,
+    tapTableau, doubleTapCard, directMove, deal, undo, restart,
   } = useSpiderGame(difficulty)
 
   return (
@@ -36,15 +36,6 @@ export default function SpiderScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Spider</Text>
         <View style={styles.headerRight}>
-          {lives === null ? (
-            <Text style={styles.livesInfinite}>∞</Text>
-          ) : (
-            <View style={styles.heartsRow}>
-              {Array.from({ length: difficulty === 'normal' ? 5 : 3 }, (_, i) => (
-                <Text key={i} style={[styles.heart, i < lives ? styles.heartOn : styles.heartOff]}>♥</Text>
-              ))}
-            </View>
-          )}
           <View style={styles.headerButtons}>
             <TouchableOpacity
               onPress={undo}
@@ -70,6 +61,8 @@ export default function SpiderScreen() {
         state={state}
         selected={selected}
         onTapTableau={tapTableau}
+        onDoubleTapCard={doubleTapCard}
+        onDirectMove={directMove}
         onDeal={deal}
       />
 
@@ -79,24 +72,6 @@ export default function SpiderScreen() {
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>🎉 クリア！</Text>
             <Text style={styles.dialogMessage}>全8セット完成！手数: {state.moves}</Text>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnCancel]} onPress={() => router.back()}>
-                <Text style={styles.dialogBtnTextCancel}>タイトルに戻る</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnOk]} onPress={restart}>
-                <Text style={styles.dialogBtnTextOk}>もう一度</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Game over dialog */}
-      <Modal visible={isGameOver && !isComplete} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>💔 ゲームオーバー</Text>
-            <Text style={styles.dialogMessage}>ライフがなくなりました</Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnCancel]} onPress={() => router.back()}>
                 <Text style={styles.dialogBtnTextCancel}>タイトルに戻る</Text>
@@ -139,11 +114,6 @@ const styles = StyleSheet.create({
   backText: { fontSize: 14, color: '#a5d6a7' },
   title: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
   headerRight: { alignItems: 'flex-end', gap: 4 },
-  livesInfinite: { fontSize: 20, color: '#a5d6a7', fontWeight: 'bold' },
-  heartsRow: { flexDirection: 'row', gap: 2 },
-  heart: { fontSize: 14 },
-  heartOn: { color: '#ef5350' },
-  heartOff: { color: '#555' },
   headerButtons: { flexDirection: 'row', gap: 8 },
   iconBtn: {
     backgroundColor: '#2e7d32',
