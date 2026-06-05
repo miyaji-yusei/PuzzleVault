@@ -39,6 +39,19 @@ function getAdjacentPairs(islands: Island[]): [number, number][] {
   return pairs
 }
 
+function findIslandAt(islands: Island[], row: number, col: number, radiusCells: number): Island | null {
+  let best: Island | null = null
+  let bestDist = Infinity
+  for (const island of islands) {
+    const dist = Math.sqrt((row - island.row) ** 2 + (col - island.col) ** 2)
+    if (dist <= radiusCells && dist < bestDist) {
+      bestDist = dist
+      best = island
+    }
+  }
+  return best
+}
+
 function findTappedBridge(
   pairs: [number, number][],
   islandMap: Map<number, Island>,
@@ -103,6 +116,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
   const gridRef = useRef<View>(null)
   const gridPosRef = useRef({ x: 0, y: 0 })
+  const dragStartIslandIdRef = useRef<number | null>(null)
 
   const measureGrid = useCallback(() => {
     gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
@@ -121,13 +135,24 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
   pairsRef.current = pairs
   const islandMapRef = useRef(islandMap)
   islandMapRef.current = islandMap
+  const islandsRef = useRef(islands)
+  islandsRef.current = islands
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onPanResponderGrant: (e) => {
       gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
         gridPosRef.current = { x: pageX, y: pageY }
       })
+      const { pageX, pageY } = e.nativeEvent
+      const relX = pageX - gridPosRef.current.x
+      const relY = pageY - gridPosRef.current.y
+      const cs = cellSizeRef.current
+      const tapCol = relX / cs
+      const tapRow = relY / cs
+      const radiusCells = Math.max(10, Math.floor(cs * 0.38)) / cs
+      const islandAt = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
+      dragStartIslandIdRef.current = islandAt ? islandAt.id : null
     },
     onPanResponderRelease: (e) => {
       const { pageX, pageY } = e.nativeEvent
@@ -137,7 +162,29 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
       const tapCol = relX / cs
       const tapRow = relY / cs
+      const radiusCells = Math.max(10, Math.floor(cs * 0.38)) / cs
 
+      const startIslandId = dragStartIslandIdRef.current
+      dragStartIslandIdRef.current = null
+
+      if (startIslandId !== null) {
+        // Drag started from an island — find target island
+        const endIsland = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
+        if (endIsland && endIsland.id !== startIslandId) {
+          // Check they are in the adjacent pairs
+          const pair = pairsRef.current.find(
+            ([a, b]) => (a === startIslandId && b === endIsland.id) ||
+                        (a === endIsland.id && b === startIslandId)
+          )
+          if (pair) {
+            onToggleBridgeRef.current(pair[0], pair[1])
+          }
+        }
+        // Single tap on island → no action
+        return
+      }
+
+      // No island at start — use existing tap-between logic
       const pair = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
       if (pair) {
         onToggleBridgeRef.current(pair[0], pair[1])
