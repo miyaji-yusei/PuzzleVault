@@ -149,9 +149,16 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
     <View
       ref={gridRef}
       onLayout={measureGrid}
-      style={{ width: gridWidth, height: gridHeight }}
+      style={{ width: gridWidth, height: gridHeight, backgroundColor: '#f8f8f8' }}
       {...panResponder.panHandlers}
     >
+      {/* Grid lines */}
+      {Array.from({ length: gridSize + 1 }, (_, i) => (
+        <View key={`hl-${i}`} style={{ position: 'absolute', left: 0, top: i * cellSize, width: gridWidth, height: StyleSheet.hairlineWidth, backgroundColor: '#ccc' }} />
+      ))}
+      {Array.from({ length: gridSize + 1 }, (_, i) => (
+        <View key={`vl-${i}`} style={{ position: 'absolute', top: 0, left: i * cellSize, height: gridHeight, width: StyleSheet.hairlineWidth, backgroundColor: '#ccc' }} />
+      ))}
       {/* Bridges */}
       {current.map(bridge => {
         const a = islandMap.get(bridge.from)

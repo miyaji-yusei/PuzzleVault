@@ -32,6 +32,14 @@ export function useHashiGame(difficulty: Difficulty, seed?: number) {
     if (isComplete || isGameOver) return
 
     setState(prev => {
+      const getIslandCurrent = (id: number) =>
+        prev.current.reduce((sum, b) => (b.from === id || b.to === id) ? sum + b.count : sum, 0)
+      const fromIsland = prev.islands.find(i => i.id === fromIslandId)
+      const toIsland = prev.islands.find(i => i.id === toIslandId)
+      const fromSatisfied = fromIsland && getIslandCurrent(fromIslandId) >= fromIsland.bridges
+      const toSatisfied = toIsland && getIslandCurrent(toIslandId) >= toIsland.bridges
+      if (fromSatisfied || toSatisfied) return prev
+
       const existing = prev.current.find(
         b => (b.from === fromIslandId && b.to === toIslandId) ||
              (b.from === toIslandId && b.to === fromIslandId)
