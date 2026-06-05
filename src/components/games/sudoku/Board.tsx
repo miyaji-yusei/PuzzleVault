@@ -5,6 +5,7 @@ import { SudokuState } from '../../../engines/sudoku/types'
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_SIZE = SCREEN_WIDTH - 32
 const CELL_SIZE = BOARD_SIZE / 9
+const NOTE_SIZE = CELL_SIZE / 3
 
 type Props = {
   state: SudokuState
@@ -14,7 +15,7 @@ type Props = {
 }
 
 export function SudokuBoard({ state, selectedCell, wrongCells, onSelectCell }: Props) {
-  const { board, current } = state
+  const { board, current, notes } = state
 
   const selectedValue = selectedCell
     ? (current[selectedCell[0]]?.[selectedCell[1]] ?? null)
@@ -65,6 +66,9 @@ export function SudokuBoard({ state, selectedCell, wrongCells, onSelectCell }: P
         <View key={row} style={styles.row}>
           {Array.from({ length: 9 }, (_, col) => {
             const value = current[row]?.[col] ?? null
+            const cellNotes = notes[row]?.[col]
+            const hasNotes = value === null && cellNotes && cellNotes.some((v, i) => i > 0 && v)
+
             return (
               <TouchableOpacity
                 key={col}
@@ -72,9 +76,21 @@ export function SudokuBoard({ state, selectedCell, wrongCells, onSelectCell }: P
                 onPress={() => onSelectCell(row, col)}
                 activeOpacity={0.7}
               >
-                {value !== null && (
+                {value !== null ? (
                   <Text style={getTextStyle(row, col)}>{value}</Text>
-                )}
+                ) : hasNotes ? (
+                  // 3×3 メモグリッド
+                  <View style={styles.notesGrid}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                      <Text
+                        key={n}
+                        style={[styles.noteNum, !(cellNotes?.[n]) && styles.noteNumHidden]}
+                      >
+                        {n}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </TouchableOpacity>
             )
           })}
@@ -143,5 +159,24 @@ const styles = StyleSheet.create({
   },
   textSameNumber: {
     fontWeight: 'bold',
+  },
+  notesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    padding: 1,
+  },
+  noteNum: {
+    width: NOTE_SIZE,
+    height: NOTE_SIZE,
+    fontSize: NOTE_SIZE * 0.65,
+    textAlign: 'center',
+    lineHeight: NOTE_SIZE,
+    color: '#5c6bc0',
+    fontWeight: '500',
+  },
+  noteNumHidden: {
+    opacity: 0,
   },
 })
