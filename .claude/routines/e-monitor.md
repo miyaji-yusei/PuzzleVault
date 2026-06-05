@@ -30,6 +30,11 @@
      gh issue edit {番号} --remove-label in-progress --add-label claude
      gh issue comment {番号} --body "[Monitor] PR未作成のまま中断されています（トークン切れの可能性）。Workerキューに再投入しました。"
      ```
+   - PRが `open` + Issueが `claude` → Workerがラベル更新漏れ → in-progressに修正:
+     ```bash
+     gh issue edit {番号} --remove-label claude --add-label in-progress
+     gh issue comment {番号} --body "[Monitor] PR #{PR番号}がオープン中ですがclaudeラベルのままでした。in-progressに修正しました。"
+     ```
    - PRが存在しない + Issueが `claude` → 正常（Workerが未処理）→ そのまま
 
 2. **キュー枯渇チェック**
