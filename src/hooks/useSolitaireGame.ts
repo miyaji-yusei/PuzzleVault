@@ -279,14 +279,60 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     }
   }, [state, puzzle.drawMode, commitState])
 
-  // Double-tap: auto-send top card to foundation
-  const doubleTapCard = useCallback((colIndex: number) => {
-    const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
-    const r = validate(state, move)
-    if (r.correct) {
-      commitState(applyMove(state, move, puzzle.drawMode))
-      setSelected(null)
-      if (r.isComplete) setIsComplete(true)
+  const doubleTapCard = useCallback((colIndex: number, cardIndex: number) => {
+    const col = state.tableau[colIndex] ?? []
+    const isTopCard = cardIndex === col.length - 1
+
+    if (isTopCard) {
+      // Priority 1: foundation
+      const foundMove: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
+      const fr = validate(state, foundMove)
+      if (fr.correct) {
+        commitState(applyMove(state, foundMove, puzzle.drawMode))
+        setSelected(null)
+        if (fr.isComplete) setIsComplete(true)
+        return
+      }
+      // Priority 2: non-empty tableau columns
+      for (let dst = 0; dst < state.tableau.length; dst++) {
+        if (dst === colIndex || state.tableau[dst].length === 0) continue
+        const move: SolitaireMove = { type: 'tableau-to-tableau', from: { pile: 'tableau', index: colIndex, cardIndex }, to: { pile: 'tableau', index: dst } }
+        if (validate(state, move).correct) {
+          commitState(applyMove(state, move, puzzle.drawMode))
+          setSelected(null)
+          return
+        }
+      }
+      // Priority 3: empty tableau columns
+      for (let dst = 0; dst < state.tableau.length; dst++) {
+        if (dst === colIndex || state.tableau[dst].length > 0) continue
+        const move: SolitaireMove = { type: 'tableau-to-tableau', from: { pile: 'tableau', index: colIndex, cardIndex }, to: { pile: 'tableau', index: dst } }
+        if (validate(state, move).correct) {
+          commitState(applyMove(state, move, puzzle.drawMode))
+          setSelected(null)
+          return
+        }
+      }
+    } else {
+      // Multiple cards: priority 1 is foundation (top card only)
+      const foundMove: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: colIndex } }
+      const fr = validate(state, foundMove)
+      if (fr.correct) {
+        commitState(applyMove(state, foundMove, puzzle.drawMode))
+        setSelected(null)
+        if (fr.isComplete) setIsComplete(true)
+        return
+      }
+      // Priority 2: move the group to another tableau column
+      for (let dst = 0; dst < state.tableau.length; dst++) {
+        if (dst === colIndex) continue
+        const move: SolitaireMove = { type: 'tableau-to-tableau', from: { pile: 'tableau', index: colIndex, cardIndex }, to: { pile: 'tableau', index: dst } }
+        if (validate(state, move).correct) {
+          commitState(applyMove(state, move, puzzle.drawMode))
+          setSelected(null)
+          return
+        }
+      }
     }
   }, [state, puzzle.drawMode, commitState])
 
