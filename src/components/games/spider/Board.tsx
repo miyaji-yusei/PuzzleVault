@@ -18,6 +18,10 @@ const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds:
 const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
 const RANK_LABEL: Partial<Record<number, string>> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
 
+const STOCK_H = 36
+const STOCK_W = Math.round(STOCK_H / 1.5)
+const STOCK_OFFSET = 4
+
 type DragInfo = {
   col: number
   cardIndex: number
@@ -233,13 +237,41 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         style={styles.statusRow}
         onLayout={(e) => { statusBarHeightRef.current = e.nativeEvent.layout.height }}
       >
-        <Text style={styles.statusText}>完成: {foundation}/8</Text>
+        {/* Foundation pips */}
+        <View style={styles.foundationArea}>
+          {Array.from({ length: 8 }, (_, i) => (
+            <View key={i} style={[styles.foundationPip, i < foundation && styles.foundationPipFilled]} />
+          ))}
+          <Text style={styles.statusText}>  {foundation}/8</Text>
+        </View>
+
+        {/* Stock pile visual */}
         <TouchableOpacity
           onPress={onDeal}
           disabled={stock.length === 0}
-          style={[styles.dealBtn, stock.length === 0 && styles.dealBtnDisabled]}
+          activeOpacity={0.7}
+          style={[styles.stockArea, stock.length === 0 && styles.stockAreaEmpty]}
         >
-          <Text style={styles.dealBtnText}>配る ({stock.length})</Text>
+          {stock.length === 0 ? (
+            <View style={styles.stockEmptySlot}>
+              <Text style={styles.stockEmptyText}>−</Text>
+            </View>
+          ) : (
+            <View style={{ width: STOCK_W + (stock.length - 1) * STOCK_OFFSET, height: STOCK_H }}>
+              {stock.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    ss.stockCard,
+                    { position: 'absolute', left: i * STOCK_OFFSET, top: 0 },
+                  ]}
+                />
+              ))}
+              <View style={ss.stockBadge}>
+                <Text style={ss.stockBadgeText}>{stock.length}</Text>
+              </View>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -341,6 +373,34 @@ const cs = StyleSheet.create({
   },
 })
 
+const ss = StyleSheet.create({
+  stockCard: {
+    width: STOCK_W,
+    height: STOCK_H,
+    backgroundColor: '#1a237e',
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#3949ab',
+  },
+  stockBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#ffd54f',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  stockBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1b5e20',
+  },
+})
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -353,24 +413,47 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: '#1b5e20',
   },
+  foundationArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  foundationPip: {
+    width: 10,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: '#2e7d32',
+    borderWidth: 1,
+    borderColor: '#4caf50',
+  },
+  foundationPipFilled: {
+    backgroundColor: '#ffd54f',
+    borderColor: '#ffb300',
+  },
   statusText: {
     color: '#c8e6c9',
     fontSize: 13,
     fontWeight: '600',
   },
-  dealBtn: {
-    backgroundColor: '#2e7d32',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
+  stockArea: {
+    paddingVertical: 4,
   },
-  dealBtnDisabled: {
+  stockAreaEmpty: {
     opacity: 0.4,
   },
-  dealBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
+  stockEmptySlot: {
+    width: STOCK_W,
+    height: STOCK_H,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stockEmptyText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 18,
   },
   tableau: {
     flexDirection: 'row',
