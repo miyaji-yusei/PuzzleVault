@@ -101,7 +101,7 @@ export default function NonogramScreen() {
             <View style={styles.dialogButtons}>
               <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={restart}
+                onPress={() => setSelectedDifficulty(null)}
               >
                 <Text style={styles.dialogButtonText}>もう一度プレイ</Text>
               </TouchableOpacity>
@@ -237,9 +237,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dialogButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
     marginTop: 20,
+    width: '100%',
   },
   dialogButton: {
     paddingHorizontal: 20,
