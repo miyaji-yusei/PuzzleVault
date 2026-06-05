@@ -14,7 +14,9 @@ function isDifficulty(v: unknown): v is Difficulty {
 export default function SolitaireScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ difficulty?: string }>()
-  const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
+  const paramDifficulty: Difficulty | null = isDifficulty(params.difficulty) ? params.difficulty : null
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(paramDifficulty)
+  const difficulty: Difficulty = selectedDifficulty ?? 'easy'
 
   const {
     state, puzzle, selected, isComplete, maxResets,
@@ -49,6 +51,37 @@ export default function SolitaireScreen() {
   }, [isDeadlocked, deadlockHandled])
 
   const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
+
+  if (!selectedDifficulty) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backText}>← 戻る</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>ソリティア</Text>
+          <View style={{ width: 60 }} />
+        </View>
+        <View style={styles.selectScreen}>
+          <Text style={styles.selectTitle}>難易度を選択</Text>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setSelectedDifficulty('easy')}
+          >
+            <Text style={styles.selectButtonTitle}>初級</Text>
+            <Text style={styles.selectButtonDesc}>山札を1枚ずつめくる</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setSelectedDifficulty('hard')}
+          >
+            <Text style={styles.selectButtonTitle}>上級</Text>
+            <Text style={styles.selectButtonDesc}>山札を3枚ずつめくる</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -300,5 +333,36 @@ const styles = StyleSheet.create({
   dialogButtonTextOk: {
     color: '#fff',
     fontWeight: '600',
+  },
+  selectScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    gap: 16,
+  },
+  selectTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  selectButton: {
+    backgroundColor: '#2e7d32',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  selectButtonTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  selectButtonDesc: {
+    fontSize: 14,
+    color: '#c8e6c9',
   },
 })
