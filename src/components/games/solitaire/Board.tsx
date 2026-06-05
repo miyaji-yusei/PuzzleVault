@@ -123,13 +123,11 @@ export function SolitaireBoard({
   const getCardAt = useCallback((relX: number, relY: number) => {
     const col = Math.floor((relX - PAD) / (CARD_W + GAP))
     if (col < 0 || col >= NUM_COLS) return null
-    // X bounds check: reject touches in the gap between columns
-    const colLeft = PAD + col * (CARD_W + GAP)
-    if (relX < colLeft || relX >= colLeft + CARD_W) return null
+    // Accept any X that falls within the column's allocated space (card + gap)
+    // Math.floor already assigns gap pixels to the left column, so no further check needed
     const column = tableauRef.current[col] ?? []
     if (column.length === 0) {
-      // Empty slot is only CARD_H tall; ignore touches below it
-      return relY < CARD_H ? { col, card: -1 } : null
+      return relY < CARD_H * 2 ? { col, card: -1 } : null
     }
 
     let topAcc = 0
@@ -140,8 +138,8 @@ export function SolitaireBoard({
     }
 
     const lastIdx = column.length - 1
-    // Ignore touches below the last card
-    if (relY >= offsets[lastIdx] + CARD_H) return null
+    // Allow dragging from empty space below the last card — treat as the last card
+    if (relY >= offsets[lastIdx] + CARD_H) return { col, card: lastIdx }
 
     let cardIdx = 0
     for (let i = lastIdx; i >= 0; i--) {
