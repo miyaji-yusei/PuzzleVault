@@ -87,10 +87,12 @@ function tryGenerate(difficulty: Difficulty, seed: number): HashiPuzzle | null {
   const target = minIslands + Math.floor(rng() * (maxIslands - minIslands + 1))
   const islands = placeIslands(gridSize, target, rng)
   if (islands.length < minIslands) return null
+  if (islands.length <= 2) return null
   const islandMap = new Map(islands.map(i => [i.id, i]))
   const edges = findPotentialEdges(islands)
   const solution = buildSpanningTree(islands, edges, islandMap, rng)
   if (!solution) return null
+  if (solution.length < 3) return null
   // Add extra edges for density
   const usedKeys = new Set(solution.map(b => `${Math.min(b.from,b.to)}-${Math.max(b.from,b.to)}`))
   const extras = shuffle(
@@ -125,16 +127,24 @@ export function generate(difficulty: Difficulty, seed?: number): HashiPuzzle {
     const puzzle = tryGenerate(difficulty, (base + attempt) >>> 0)
     if (puzzle) return puzzle
   }
-  // Minimal fallback
+  // Fallback: 4-island square layout
   const { gridSize } = DIFFICULTY_CONFIG[difficulty]
+  const r1 = 1, c1 = 1, r2 = gridSize - 2, c2 = gridSize - 2
   return {
     id: `hashi-${difficulty}-${base}`,
     gridSize,
     islands: [
-      { id: 0, row: 1, col: 1, bridges: 1 },
-      { id: 1, row: 1, col: gridSize - 2, bridges: 1 },
+      { id: 0, row: r1, col: c1, bridges: 2 },
+      { id: 1, row: r1, col: c2, bridges: 2 },
+      { id: 2, row: r2, col: c1, bridges: 2 },
+      { id: 3, row: r2, col: c2, bridges: 2 },
     ],
-    solution: [{ from: 0, to: 1, count: 1 }],
+    solution: [
+      { from: 0, to: 1, count: 1 },
+      { from: 0, to: 2, count: 1 },
+      { from: 1, to: 3, count: 1 },
+      { from: 2, to: 3, count: 1 },
+    ],
     difficulty,
     seed: base,
   }
