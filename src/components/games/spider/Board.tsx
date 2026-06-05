@@ -55,8 +55,17 @@ type Props = {
 export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal }: Props) {
   const { tableau, stock, foundation } = state
 
-  const boardRef = useRef<View>(null)
-  const boardPosRef = useRef({ x: 0, y: 0 })
+  // Container (full component) position for overlay absolute positioning
+  const containerRef = useRef<View>(null)
+  const containerLeftRef = useRef(0)
+  const containerTopRef = useRef(0)
+
+  // Status bar height measured via onLayout
+  const statusBarHeightRef = useRef(0)
+
+  // Current scroll offset
+  const scrollYRef = useRef(0)
+
   const tableauRef = useRef(tableau)
   tableauRef.current = tableau
   const onTapTableauRef = useRef(onTapTableau)
@@ -79,9 +88,10 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
     zIndex: 999,
   }
 
-  const measureBoard = useCallback(() => {
-    boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      boardPosRef.current = { x: pageX, y: pageY }
+  const measureContainer = useCallback(() => {
+    containerRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      containerLeftRef.current = pageX
+      containerTopRef.current = pageY
     })
   }, [])
 
@@ -120,13 +130,16 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
     onPanResponderGrant: (e) => {
-      boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-        boardPosRef.current = { x: pageX, y: pageY }
-      })
       const gs = gestureState.current
       gs.isDragging = false
-      const relX = e.nativeEvent.pageX - boardPosRef.current.x
-      const relY = e.nativeEvent.pageY - boardPosRef.current.y
+
+      const pageX = e.nativeEvent.pageX
+      const pageY = e.nativeEvent.pageY
+
+      // relX/relY in tableau content coordinates, accounting for scroll offset
+      const relX = pageX - containerLeftRef.current
+      const relY = pageY - containerTopRef.current - statusBarHeightRef.current + scrollYRef.current
+
       gs.activeCard = getColAndCard(relX, relY)
     },
     onPanResponderMove: (e, g) => {
@@ -140,14 +153,15 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         if (!gs.isDragging) {
           gs.isDragging = true
           if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
-          overlayX.setValue(e.nativeEvent.pageX - boardPosRef.current.x - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - boardPosRef.current.y - CARD_H / 4)
+          // Overlay positioned relative to container (outside ScrollView)
+          overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - CARD_H / 4)
           Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
           const column = tableauRef.current[col] ?? []
           setDragInfo({ col, cardIndex, cards: column.slice(cardIndex) })
         }
-        overlayX.setValue(e.nativeEvent.pageX - boardPosRef.current.x - CARD_W / 2)
-        overlayY.setValue(e.nativeEvent.pageY - boardPosRef.current.y - CARD_H / 4)
+        overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - CARD_W / 2)
+        overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - CARD_H / 4)
       }
     },
     onPanResponderRelease: (e) => {
@@ -157,8 +171,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
         setDragInfo(null)
         if (gs.activeCard) {
-          const relX = e.nativeEvent.pageX - boardPosRef.current.x
-          const relY = e.nativeEvent.pageY - boardPosRef.current.y
+          const relX = e.nativeEvent.pageX - containerLeftRef.current
           const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
           const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
           if (clampedCol !== gs.activeCard.col) {
@@ -214,9 +227,12 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   const maxColH = Math.max(...colData.map(d => d.totalH), CARD_H)
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={containerRef} onLayout={measureContainer}>
       {/* Status bar */}
-      <View style={styles.statusRow}>
+      <View
+        style={styles.statusRow}
+        onLayout={(e) => { statusBarHeightRef.current = e.nativeEvent.layout.height }}
+      >
         <Text style={styles.statusText}>完成: {foundation}/8</Text>
         <TouchableOpacity
           onPress={onDeal}
@@ -228,10 +244,13 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
       </View>
 
       {/* Tableau */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        scrollEventThrottle={16}
+        onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
+      >
         <View
-          ref={boardRef}
-          onLayout={measureBoard}
           style={[styles.tableau, { height: maxColH }]}
           {...panResponder.panHandlers}
         >
@@ -267,19 +286,19 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
               )}
             </View>
           ))}
-
-          {/* Drag overlay */}
-          {dragInfo && (
-            <Animated.View style={overlayStyle} pointerEvents="none">
-              {dragInfo.cards.map((card, i) => (
-                <View key={i} style={{ position: i === 0 ? 'relative' : 'absolute', top: i === 0 ? 0 : i * FACE_UP_STEP }}>
-                  <CardFace card={card} width={CARD_W} height={CARD_H} />
-                </View>
-              ))}
-            </Animated.View>
-          )}
         </View>
       </ScrollView>
+
+      {/* Drag overlay - outside ScrollView, positioned relative to container */}
+      {dragInfo && (
+        <Animated.View style={overlayStyle} pointerEvents="none">
+          {dragInfo.cards.map((card, i) => (
+            <View key={i} style={{ position: i === 0 ? 'relative' : 'absolute', top: i === 0 ? 0 : i * FACE_UP_STEP }}>
+              <CardFace card={card} width={CARD_W} height={CARD_H} />
+            </View>
+          ))}
+        </Animated.View>
+      )}
     </View>
   )
 }
