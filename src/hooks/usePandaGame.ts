@@ -119,6 +119,21 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
     })
   }, [isComplete, isGameOver, errorCell])
 
+  const dragRemoveCross = useCallback((row: number, col: number) => {
+    if (isComplete || isGameOver || errorCell) return
+    const s = stateRef.current
+    if (s.fixed[row]?.[col] === 'A') return
+    if (confirmedRef.current.has(`${row},${col}`)) return
+    if (s.current[row]?.[col] !== 'crossed') return
+
+    setState(prev => {
+      if (prev.current[row]?.[col] !== 'crossed') return prev
+      const nc = prev.current.map(r => [...r]) as CellContent[][]
+      nc[row][col] = 'empty'
+      return { ...prev, current: nc }
+    })
+  }, [isComplete, isGameOver, errorCell])
+
   const restart = useCallback(() => {
     if (pendingRef.current) {
       clearTimeout(pendingRef.current.timer)
@@ -135,5 +150,5 @@ export function usePandaGame(difficulty: Difficulty, seed?: number) {
     setConfirmedCells(new Set())
   }, [difficulty])
 
-  return { state, tapCell, dragCross, fixError, confirmedCells, errorCell, lives, isComplete, isGameOver, restart }
+  return { state, tapCell, dragCross, dragRemoveCross, fixError, confirmedCells, errorCell, lives, isComplete, isGameOver, restart }
 }

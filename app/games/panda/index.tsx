@@ -15,7 +15,7 @@ export default function PandaScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, tapCell, dragCross, fixError, confirmedCells, errorCell, lives, isComplete, isGameOver, restart } =
+  const { state, tapCell, dragCross, dragRemoveCross, fixError, confirmedCells, errorCell, lives, isComplete, isGameOver, restart } =
     usePandaGame(difficulty)
 
   return (
@@ -52,6 +52,7 @@ export default function PandaScreen() {
           errorCell={errorCell}
           onPressCell={tapCell}
           onDragCross={dragCross}
+          onDragRemoveCross={dragRemoveCross}
         />
       </View>
 

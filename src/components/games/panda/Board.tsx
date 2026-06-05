@@ -13,9 +13,10 @@ type Props = {
   errorCell: { row: number; col: number } | null
   onPressCell: (row: number, col: number) => void
   onDragCross: (row: number, col: number) => void
+  onDragRemoveCross: (row: number, col: number) => void
 }
 
-export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDragCross }: Props) {
+export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDragCross, onDragRemoveCross }: Props) {
   const { size, current, fixed, rowCounts, colCounts } = state
   const availableWidth = SCREEN_WIDTH - BOARD_PADDING - HINT_SIZE
   const cellSize = Math.floor(availableWidth / size)
@@ -24,8 +25,12 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
   const boardPosRef = useRef({ x: 0, y: 0 })
   const onPressCellRef = useRef(onPressCell)
   const onDragCrossRef = useRef(onDragCross)
+  const onDragRemoveCrossRef = useRef(onDragRemoveCross)
+  const stateRef = useRef(state)
   onPressCellRef.current = onPressCell
   onDragCrossRef.current = onDragCross
+  onDragRemoveCrossRef.current = onDragRemoveCross
+  stateRef.current = state
 
   const lastDragCellRef = useRef<string | null>(null)
 
@@ -46,6 +51,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
 
   const panResponder = useMemo(() => {
     let isDragging = false
+    let dragMode: 'add' | 'remove' = 'add'
 
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -54,6 +60,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
       onPanResponderGrant: () => {
         gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { boardPosRef.current = { x: pageX, y: pageY } })
         isDragging = false
+        dragMode = 'add'
         lastDragCellRef.current = null
       },
       onPanResponderMove: (e) => {
@@ -61,9 +68,18 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
         const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
         if (!cell) return
         const key = `${cell.row},${cell.col}`
+        // Detect drag mode from the first cell encountered
+        if (lastDragCellRef.current === null) {
+          const content = stateRef.current.current[cell.row]?.[cell.col]
+          dragMode = content === 'crossed' ? 'remove' : 'add'
+        }
         if (key === lastDragCellRef.current) return
         lastDragCellRef.current = key
-        onDragCrossRef.current(cell.row, cell.col)
+        if (dragMode === 'remove') {
+          onDragRemoveCrossRef.current(cell.row, cell.col)
+        } else {
+          onDragCrossRef.current(cell.row, cell.col)
+        }
       },
       onPanResponderRelease: (e) => {
         if (!isDragging) {
@@ -71,10 +87,12 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
           if (cell) onPressCellRef.current(cell.row, cell.col)
         }
         isDragging = false
+        dragMode = 'add'
         lastDragCellRef.current = null
       },
       onPanResponderTerminate: () => {
         isDragging = false
+        dragMode = 'add'
         lastDragCellRef.current = null
       },
     })
