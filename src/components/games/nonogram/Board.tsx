@@ -1,11 +1,13 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
 import { NonogramMode, HintColor } from '../../../hooks/useNonogramGame'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const MAX_BOARD = SCREEN_WIDTH - 32
 const AXIS_THRESHOLD = 6
+const MIN_SCALE = 1
+const MAX_SCALE = 4
 
 type Props = {
   state: NonogramState
@@ -63,6 +65,10 @@ const HINT_COLOR: Record<HintColor, string> = {
   red: '#d93025',
 }
 
+function touchDist(t1: { pageX: number; pageY: number }, t2: { pageX: number; pageY: number }) {
+  return Math.sqrt((t1.pageX - t2.pageX) ** 2 + (t1.pageY - t2.pageY) ** 2)
+}
+
 export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClueColors, onSetCell, onSetCellTo }: Props) {
   const { size, rowClues, colClues, current } = state
 
@@ -72,17 +78,37 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const clueAreaWidth = maxRowClues * 18
   const clueAreaHeight = maxColClues * 16
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
+  const gridWidth = cellSize * size
+  const gridHeight = cellSize * size
 
-  const gridRef = useRef<View>(null)
-  const gridPosRef = useRef({ x: 0, y: 0 })
+  // Touch area ref (outer fixed-position view)
+  const touchAreaRef = useRef<View>(null)
+  const touchAreaPosRef = useRef({ x: 0, y: 0 })
 
-  const measureGrid = useCallback(() => {
-    gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      gridPosRef.current = { x: pageX, y: pageY }
+  const measureTouchArea = useCallback(() => {
+    touchAreaRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      touchAreaPosRef.current = { x: pageX, y: pageY }
     })
   }, [])
 
-  useEffect(() => { measureGrid() }, [measureGrid])
+  useEffect(() => { measureTouchArea() }, [measureTouchArea])
+
+  // Scale and pan state
+  const scaleRef = useRef(1)
+  const panXRef = useRef(0)
+  const panYRef = useRef(0)
+  const scaleAnim = useRef(new Animated.Value(1)).current
+  const panXAnim = useRef(new Animated.Value(0)).current
+  const panYAnim = useRef(new Animated.Value(0)).current
+
+  // 2-finger tracking
+  const isTwoFingerRef = useRef(false)
+  const pinchInitDistRef = useRef(0)
+  const pinchInitScaleRef = useRef(1)
+  const pinchInitPanXRef = useRef(0)
+  const pinchInitPanYRef = useRef(0)
+  const pinchInitMidXRef = useRef(0)
+  const pinchInitMidYRef = useRef(0)
 
   const onSetCellRef = useRef(onSetCell)
   const onSetCellToRef = useRef(onSetCellTo)
@@ -95,6 +121,8 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   modeRef.current = mode
   const sizeRef = useRef(size)
   sizeRef.current = size
+  const cellSizeRef = useRef(cellSize)
+  cellSizeRef.current = cellSize
 
   const paintTargetRef = useRef<CellState>('filled')
   const dragAxisRef = useRef<'h' | 'v' | null>(null)
@@ -104,35 +132,128 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const previewRef = useRef<PreviewRange>(null)
   previewRef.current = preview
 
+  // Compute grid cell from screen touch position, accounting for scale/pan transforms
+  // transform is: [scale(s), translateX(tx), translateY(ty)]
+  // visX = W/2*(1-s) + tx + gx*s => gx = (relX - W/2*(1-s) - tx) / s
+  const getCellFromTouch = useCallback((pageX: number, pageY: number): { row: number; col: number } | null => {
+    const areaX = touchAreaPosRef.current.x
+    const areaY = touchAreaPosRef.current.y
+    const W = cellSizeRef.current * sizeRef.current
+    const H = cellSizeRef.current * sizeRef.current
+    const s = scaleRef.current
+    const tx = panXRef.current
+    const ty = panYRef.current
+
+    const relX = pageX - areaX
+    const relY = pageY - areaY
+
+    const gx = (relX - W / 2 * (1 - s) - tx) / s
+    const gy = (relY - H / 2 * (1 - s) - ty) / s
+
+    const col = Math.floor(gx / cellSizeRef.current)
+    const row = Math.floor(gy / cellSizeRef.current)
+    const sz = sizeRef.current
+
+    if (row < 0 || row >= sz || col < 0 || col >= sz) return null
+    return { row, col }
+  }, [])
+
+  const clampPan = useCallback((tx: number, ty: number, s: number) => {
+    const W = cellSizeRef.current * sizeRef.current
+    const H = cellSizeRef.current * sizeRef.current
+    const maxX = W * (s - 1) / 2
+    const maxY = H * (s - 1) / 2
+    return {
+      x: Math.max(-maxX, Math.min(maxX, tx)),
+      y: Math.max(-maxY, Math.min(maxY, ty)),
+    }
+  }, [])
+
+  const initTwoFinger = useCallback((touches: { pageX: number; pageY: number }[]) => {
+    const t1 = touches[0]!
+    const t2 = touches[1]!
+    pinchInitDistRef.current = touchDist(t1, t2)
+    pinchInitScaleRef.current = scaleRef.current
+    pinchInitPanXRef.current = panXRef.current
+    pinchInitPanYRef.current = panYRef.current
+    pinchInitMidXRef.current = (t1.pageX + t2.pageX) / 2
+    pinchInitMidYRef.current = (t1.pageY + t2.pageY) / 2
+  }, [])
+
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+
     onPanResponderGrant: (e) => {
-      gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { gridPosRef.current = { x: pageX, y: pageY } })
+      touchAreaRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+        touchAreaPosRef.current = { x: pageX, y: pageY }
+      })
+      const touches = e.nativeEvent.touches
+
+      if (touches.length >= 2) {
+        isTwoFingerRef.current = true
+        initTwoFinger(Array.from(touches) as { pageX: number; pageY: number }[])
+        return
+      }
+
+      isTwoFingerRef.current = false
       dragAxisRef.current = null
 
       const { pageX, pageY } = e.nativeEvent
-      const startCol = Math.floor((pageX - gridPosRef.current.x) / cellSize)
-      const startRow = Math.floor((pageY - gridPosRef.current.y) / cellSize)
-      const sz = sizeRef.current
+      const cell = getCellFromTouch(pageX, pageY)
 
-      if (startRow < 0 || startRow >= sz || startCol < 0 || startCol >= sz) {
+      if (!cell) {
         previewRef.current = null
         setPreview(null)
         return
       }
 
-      dragStartRef.current = { row: startRow, col: startCol }
-
-      const currentCellState = currentRef.current[startRow]?.[startCol] ?? 'empty'
+      dragStartRef.current = { row: cell.row, col: cell.col }
+      const currentCellState = currentRef.current[cell.row]?.[cell.col] ?? 'empty'
       const targetFill: CellState = modeRef.current === 'fill' ? 'filled' : 'crossed'
       paintTargetRef.current = currentCellState === targetFill ? 'empty' : targetFill
 
-      const p: PreviewRange = { axis: null, startRow, startCol, endRow: startRow, endCol: startCol, target: paintTargetRef.current }
+      const p: PreviewRange = { axis: null, startRow: cell.row, startCol: cell.col, endRow: cell.row, endCol: cell.col, target: paintTargetRef.current }
       previewRef.current = p
       setPreview(p)
     },
+
     onPanResponderMove: (e, g) => {
+      const touches = e.nativeEvent.touches
+
+      if (touches.length >= 2) {
+        if (!isTwoFingerRef.current) {
+          // Second finger just added - switch to zoom mode, cancel paint
+          isTwoFingerRef.current = true
+          previewRef.current = null
+          setPreview(null)
+          initTwoFinger(Array.from(touches) as { pageX: number; pageY: number }[])
+          return
+        }
+
+        const t1 = touches[0]!
+        const t2 = touches[1]!
+        const currentDist = touchDist(t1, t2)
+        const rawScale = pinchInitScaleRef.current * (currentDist / pinchInitDistRef.current)
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rawScale))
+
+        const midX = (t1.pageX + t2.pageX) / 2
+        const midY = (t1.pageY + t2.pageY) / 2
+        const rawPanX = pinchInitPanXRef.current + (midX - pinchInitMidXRef.current)
+        const rawPanY = pinchInitPanYRef.current + (midY - pinchInitMidYRef.current)
+        const { x: newPanX, y: newPanY } = clampPan(rawPanX, rawPanY, newScale)
+
+        scaleRef.current = newScale
+        panXRef.current = newPanX
+        panYRef.current = newPanY
+        scaleAnim.setValue(newScale)
+        panXAnim.setValue(newPanX)
+        panYAnim.setValue(newPanY)
+        return
+      }
+
+      if (isTwoFingerRef.current) return
+
       if (!previewRef.current) return
 
       if (dragAxisRef.current === null) {
@@ -146,39 +267,45 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
       const start = dragStartRef.current
       const sz = sizeRef.current
       let p: PreviewRange
+
       if (dragAxisRef.current === 'h') {
-        const col = Math.max(0, Math.min(sz - 1, Math.floor((e.nativeEvent.pageX - gridPosRef.current.x) / cellSize)))
+        const cellFromTouch = getCellFromTouch(e.nativeEvent.pageX, e.nativeEvent.pageY)
+        const col = cellFromTouch ? Math.max(0, Math.min(sz - 1, cellFromTouch.col)) : start.col
         p = { axis: 'h', startRow: start.row, startCol: start.col, endRow: start.row, endCol: col, target: paintTargetRef.current }
       } else {
-        const row = Math.max(0, Math.min(sz - 1, Math.floor((e.nativeEvent.pageY - gridPosRef.current.y) / cellSize)))
+        const cellFromTouch = getCellFromTouch(e.nativeEvent.pageX, e.nativeEvent.pageY)
+        const row = cellFromTouch ? Math.max(0, Math.min(sz - 1, cellFromTouch.row)) : start.row
         p = { axis: 'v', startRow: start.row, startCol: start.col, endRow: row, endCol: start.col, target: paintTargetRef.current }
       }
       previewRef.current = p
       setPreview(p)
     },
-    onPanResponderRelease: () => {
-      const p = previewRef.current
-      if (p) {
-        const sz = sizeRef.current
-        listPreviewCells(p).forEach(({ row, col }) => {
-          if (row >= 0 && row < sz && col >= 0 && col < sz) {
-            onSetCellToRef.current(row, col, p.target)
-          }
-        })
-      }
-      previewRef.current = null
-      setPreview(null)
-      dragAxisRef.current = null
-    },
-    onPanResponderTerminate: () => {
-      previewRef.current = null
-      setPreview(null)
-      dragAxisRef.current = null
-    },
-  }), [cellSize])
 
-  const gridWidth = cellSize * size
-  const gridHeight = cellSize * size
+    onPanResponderRelease: () => {
+      if (!isTwoFingerRef.current) {
+        const p = previewRef.current
+        if (p) {
+          const sz = sizeRef.current
+          listPreviewCells(p).forEach(({ row, col }) => {
+            if (row >= 0 && row < sz && col >= 0 && col < sz) {
+              onSetCellToRef.current(row, col, p.target)
+            }
+          })
+        }
+      }
+      isTwoFingerRef.current = false
+      previewRef.current = null
+      setPreview(null)
+      dragAxisRef.current = null
+    },
+
+    onPanResponderTerminate: () => {
+      isTwoFingerRef.current = false
+      previewRef.current = null
+      setPreview(null)
+      dragAxisRef.current = null
+    },
+  }), [cellSize, getCellFromTouch, clampPan, initTwoFinger])
 
   return (
     <View>
@@ -217,48 +344,60 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
           ))}
         </View>
 
-        {/* Cell grid with PanResponder */}
+        {/* Touch area + scaled grid */}
         <View
-          ref={gridRef}
-          onLayout={measureGrid}
-          style={{ width: gridWidth, height: gridHeight }}
+          ref={touchAreaRef}
+          onLayout={measureTouchArea}
+          style={{ width: gridWidth, height: gridHeight, overflow: 'hidden' }}
           {...panResponder.panHandlers}
         >
-          {Array.from({ length: size }, (_, row) => (
-            <View key={row} style={[styles.row, { height: cellSize }]}>
-              {Array.from({ length: size }, (_, col) => {
-                const cell = current[row]?.[col] ?? 'empty'
-                const inPreview = isCellInPreview(row, col, preview)
-                const isAutoX = autoCrossed[row]?.[col] ?? false
-                const bg = inPreview
-                  ? (preview!.target === 'filled' ? '#888'
-                    : preview!.target === 'crossed' ? '#eee'
-                    : cell === 'filled' ? '#bbb' : '#f5f5f5')
-                  : (cell === 'filled' ? '#333' : '#fff')
-                return (
-                  <View
-                    key={col}
-                    style={[
-                      styles.cell,
-                      { width: cellSize, height: cellSize, backgroundColor: bg },
-                      col % 5 === 4 && col !== size - 1 && styles.cellBorderRightThick,
-                      row % 5 === 4 && row !== size - 1 && styles.cellBorderBottomThick,
-                    ]}
-                  >
-                    {cell === 'crossed' && !inPreview && (
-                      <Text style={[styles.crossText, { fontSize: cellSize * 0.6 }]}>×</Text>
-                    )}
-                    {cell === 'empty' && isAutoX && !inPreview && (
-                      <Text style={[styles.crossText, styles.crossTextAuto, { fontSize: cellSize * 0.6 }]}>×</Text>
-                    )}
-                    {inPreview && preview!.target === 'crossed' && (
-                      <Text style={[styles.crossText, styles.crossTextPreview, { fontSize: cellSize * 0.6 }]}>×</Text>
-                    )}
-                  </View>
-                )
-              })}
-            </View>
-          ))}
+          <Animated.View
+            style={{
+              width: gridWidth,
+              height: gridHeight,
+              transform: [
+                { scale: scaleAnim },
+                { translateX: panXAnim },
+                { translateY: panYAnim },
+              ],
+            }}
+          >
+            {Array.from({ length: size }, (_, row) => (
+              <View key={row} style={[styles.row, { height: cellSize }]}>
+                {Array.from({ length: size }, (_, col) => {
+                  const cell = current[row]?.[col] ?? 'empty'
+                  const inPreview = isCellInPreview(row, col, preview)
+                  const isAutoX = autoCrossed[row]?.[col] ?? false
+                  const bg = inPreview
+                    ? (preview!.target === 'filled' ? '#888'
+                      : preview!.target === 'crossed' ? '#eee'
+                      : cell === 'filled' ? '#bbb' : '#f5f5f5')
+                    : (cell === 'filled' ? '#333' : '#fff')
+                  return (
+                    <View
+                      key={col}
+                      style={[
+                        styles.cell,
+                        { width: cellSize, height: cellSize, backgroundColor: bg },
+                        col % 5 === 4 && col !== size - 1 && styles.cellBorderRightThick,
+                        row % 5 === 4 && row !== size - 1 && styles.cellBorderBottomThick,
+                      ]}
+                    >
+                      {cell === 'crossed' && !inPreview && (
+                        <Text style={[styles.crossText, { fontSize: cellSize * 0.6 }]}>×</Text>
+                      )}
+                      {cell === 'empty' && isAutoX && !inPreview && (
+                        <Text style={[styles.crossText, styles.crossTextAuto, { fontSize: cellSize * 0.6 }]}>×</Text>
+                      )}
+                      {inPreview && preview!.target === 'crossed' && (
+                        <Text style={[styles.crossText, styles.crossTextPreview, { fontSize: cellSize * 0.6 }]}>×</Text>
+                      )}
+                    </View>
+                  )
+                })}
+              </View>
+            ))}
+          </Animated.View>
         </View>
       </View>
     </View>
