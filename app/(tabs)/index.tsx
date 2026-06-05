@@ -61,7 +61,7 @@ const GAMES: GameInfo[] = [
     id: 'sums',
     name: 'Sums',
     description: '数字の合計を埋めるカカロパズル',
-    implemented: false,
+    implemented: true,
   },
 ]
 
