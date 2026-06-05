@@ -25,15 +25,8 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
   const [isComplete, setIsComplete] = useState(false)
 
   const selectCell = useCallback((row: number, col: number) => {
-    setState(prev => {
-      if (prev.board[row]?.[col] !== null) return prev
-      return prev
-    })
-    setSelectedCell(prev => {
-      if (state.board[row]?.[col] !== null) return prev
-      return [row, col]
-    })
-  }, [state.board])
+    setSelectedCell([row, col])
+  }, [])
 
   const enterNumber = useCallback((value: number | null) => {
     if (!selectedCell || isComplete) return
