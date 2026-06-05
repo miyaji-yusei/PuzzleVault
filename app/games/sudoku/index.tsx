@@ -15,8 +15,10 @@ export default function SudokuScreen() {
   const params = useLocalSearchParams<{ difficulty?: string }>()
   const difficulty: Difficulty = isDifficulty(params.difficulty) ? params.difficulty : 'normal'
 
-  const { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete, restart } =
-    useSudokuGame(difficulty)
+  const {
+    state, selectedCell, selectCell, enterNumber,
+    wrongCells, isComplete, noteMode, toggleNoteMode, restart,
+  } = useSudokuGame(difficulty)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -56,6 +58,19 @@ export default function SudokuScreen() {
           activeOpacity={0.7}
         >
           <Text style={styles.numText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* メモトグル */}
+      <View style={styles.toolbar}>
+        <TouchableOpacity
+          style={[styles.memoButton, noteMode && styles.memoButtonActive]}
+          onPress={toggleNoteMode}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.memoText, noteMode && styles.memoTextActive]}>
+            ✏️ メモ {noteMode ? 'ON' : 'OFF'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -156,6 +171,35 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  memoButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  memoButtonActive: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#1565c0',
+  },
+  memoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  memoTextActive: {
+    color: '#1565c0',
   },
   overlay: {
     flex: 1,
