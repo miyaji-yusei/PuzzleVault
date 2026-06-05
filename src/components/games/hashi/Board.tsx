@@ -140,10 +140,9 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
-      gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-        gridPosRef.current = { x: pageX, y: pageY }
-      })
+      // Use cached gridPos (updated by onLayout) — no async measure here
       const { pageX, pageY } = e.nativeEvent
       const relX = pageX - gridPosRef.current.x
       const relY = pageY - gridPosRef.current.y
@@ -154,37 +153,38 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       const islandAt = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
       dragStartIslandIdRef.current = islandAt ? islandAt.id : null
     },
-    onPanResponderRelease: (e) => {
+    onPanResponderRelease: (e, g) => {
       const { pageX, pageY } = e.nativeEvent
       const relX = pageX - gridPosRef.current.x
       const relY = pageY - gridPosRef.current.y
       const cs = cellSizeRef.current
-
       const tapCol = relX / cs
       const tapRow = relY / cs
       const radiusCells = Math.max(10, Math.floor(cs * 0.38)) / cs
+      const isDrag = Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8
 
       const startIslandId = dragStartIslandIdRef.current
       dragStartIslandIdRef.current = null
 
       if (startIslandId !== null) {
-        // Drag started from an island — find target island
-        const endIsland = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
-        if (endIsland && endIsland.id !== startIslandId) {
-          // Check they are in the adjacent pairs
-          const pair = pairsRef.current.find(
-            ([a, b]) => (a === startIslandId && b === endIsland.id) ||
-                        (a === endIsland.id && b === startIslandId)
-          )
-          if (pair) {
-            onToggleBridgeRef.current(pair[0], pair[1])
+        if (isDrag) {
+          // Drag from island — find target island
+          const endIsland = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
+          if (endIsland && endIsland.id !== startIslandId) {
+            const pair = pairsRef.current.find(
+              ([a, b]) => (a === startIslandId && b === endIsland.id) ||
+                          (a === endIsland.id && b === startIslandId)
+            )
+            if (pair) {
+              onToggleBridgeRef.current(pair[0], pair[1])
+            }
           }
         }
         // Single tap on island → no action
         return
       }
 
-      // No island at start — use existing tap-between logic
+      // Tap on empty space between islands only
       const pair = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
       if (pair) {
         onToggleBridgeRef.current(pair[0], pair[1])
