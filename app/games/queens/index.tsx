@@ -24,7 +24,7 @@ export default function QueensScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>クイーンズマスター</Text>
+        <Text style={styles.title}>クイーンパズル</Text>
         <View style={styles.headerRight}>
           <View style={styles.lives}>
             {Array.from({ length: 3 }, (_, i) => (

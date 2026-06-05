@@ -29,7 +29,7 @@ const GAMES: GameInfo[] = [
   },
   {
     id: 'queens',
-    name: 'クイーンズマスター',
+    name: 'クイーンパズル',
     description: 'すべての色にクイーンを1つずつ置こう',
     implemented: true,
   },
