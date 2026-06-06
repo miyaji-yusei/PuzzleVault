@@ -1,14 +1,11 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SpiderState, Card, Suit } from '../../../engines/spider/types'
 import { SpiderSelection } from '../../../hooks/useSpiderGame'
 
-const { width: SW } = Dimensions.get('window')
 const PAD = 4
 const GAP = 2
 const NUM_COLS = 10
-const CARD_W = Math.floor((SW - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
-const CARD_H = Math.floor(CARD_W * 1.5)
 const FACE_DOWN_STEP = 6
 const FACE_UP_STEP = 18
 const DOUBLE_TAP_MS = 280
@@ -39,10 +36,12 @@ function CardFace({ card, width, height, highlighted, dimmed }: {
   const rank = RANK_LABEL[card.rank] ?? String(card.rank)
   const isRed = RED_SUITS.has(card.suit)
   const color = isRed ? '#c62828' : '#212121'
+  const rankFontSize = Math.max(7, Math.floor(width * 0.3))
+  const suitFontSize = Math.max(6, Math.floor(width * 0.25))
   return (
     <View style={[cs.base, { width, height }, highlighted && cs.highlight, dimmed && cs.dimmed]}>
-      <Text style={[cs.rankText, { color }]} numberOfLines={1}>{rank}</Text>
-      <Text style={[cs.suitText, { color }]} numberOfLines={1}>{SUIT_SYM[card.suit]}</Text>
+      <Text style={[cs.rankText, { color, fontSize: rankFontSize, lineHeight: Math.max(9, Math.floor(width * 0.35)) }]} numberOfLines={1}>{rank}</Text>
+      <Text style={[cs.suitText, { color, fontSize: suitFontSize, lineHeight: Math.max(8, Math.floor(width * 0.28)) }]} numberOfLines={1}>{SUIT_SYM[card.suit]}</Text>
     </View>
   )
 }
@@ -58,6 +57,16 @@ type Props = {
 
 export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal }: Props) {
   const { tableau, stock, foundation, completedSuits } = state
+
+  const { width: windowWidth } = useWindowDimensions()
+  const CARD_W = Math.floor((windowWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
+  const CARD_H = Math.floor(CARD_W * 1.5)
+
+  // Refs so panResponder can use latest card dimensions without recreating
+  const cardWRef = useRef(CARD_W)
+  cardWRef.current = CARD_W
+  const cardHRef = useRef(CARD_H)
+  cardHRef.current = CARD_H
 
   // Container (full component) position for overlay absolute positioning
   const containerRef = useRef<View>(null)
@@ -100,7 +109,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   }, [])
 
   const getColAndCard = useCallback((relX: number, relY: number): { col: number; cardIndex: number } | null => {
-    const col = Math.floor((relX - PAD) / (CARD_W + GAP))
+    const col = Math.floor((relX - PAD) / (cardWRef.current + GAP))
     if (col < 0 || col >= NUM_COLS) return null
     const column = tableauRef.current[col]
     if (!column) return null
@@ -114,7 +123,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
       if (i < column.length - 1) topAcc += column[i]!.faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
     }
     const lastIdx = column.length - 1
-    if (relY > offsets[lastIdx]! + CARD_H) return { col, cardIndex: lastIdx }
+    if (relY > offsets[lastIdx]! + cardHRef.current) return { col, cardIndex: lastIdx }
 
     for (let i = lastIdx; i >= 0; i--) {
       if (relY >= offsets[i]!) return { col, cardIndex: i }
@@ -158,14 +167,14 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
           gs.isDragging = true
           if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
           // Overlay positioned relative to container (outside ScrollView)
-          overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - CARD_H / 4)
+          overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - cardWRef.current / 2)
+          overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - cardHRef.current / 4)
           Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
           const column = tableauRef.current[col] ?? []
           setDragInfo({ col, cardIndex, cards: column.slice(cardIndex) })
         }
-        overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - CARD_W / 2)
-        overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - CARD_H / 4)
+        overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - cardWRef.current / 2)
+        overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - cardHRef.current / 4)
       }
     },
     onPanResponderRelease: (e) => {
@@ -176,7 +185,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         setDragInfo(null)
         if (gs.activeCard) {
           const relX = e.nativeEvent.pageX - containerLeftRef.current
-          const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+          const toCol = Math.round((relX - PAD) / (cardWRef.current + GAP))
           const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
           if (clampedCol !== gs.activeCard.col) {
             onDirectMoveRef.current(gs.activeCard.col, gs.activeCard.cardIndex, clampedCol)
@@ -362,14 +371,9 @@ const cs = StyleSheet.create({
     backgroundColor: '#1a237e',
   },
   rankText: {
-    fontSize: Math.max(7, Math.floor(CARD_W * 0.3)),
     fontWeight: 'bold',
-    lineHeight: Math.max(9, Math.floor(CARD_W * 0.35)),
   },
-  suitText: {
-    fontSize: Math.max(6, Math.floor(CARD_W * 0.25)),
-    lineHeight: Math.max(8, Math.floor(CARD_W * 0.28)),
-  },
+  suitText: {},
   highlight: {
     borderColor: '#FFD700',
     borderWidth: 2,
