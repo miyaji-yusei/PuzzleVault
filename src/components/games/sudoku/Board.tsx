@@ -4,8 +4,8 @@ import { SudokuState } from '../../../engines/sudoku/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_SIZE = SCREEN_WIDTH - 32
-const CELL_SIZE = BOARD_SIZE / 9
-const NOTE_SIZE = CELL_SIZE / 3
+const CELL_SIZE = Math.floor(BOARD_SIZE / 9)
+const NOTE_SIZE = Math.floor(CELL_SIZE / 3)
 
 type Props = {
   state: SudokuState
@@ -163,9 +163,8 @@ const styles = StyleSheet.create({
   notesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    padding: 1,
+    width: NOTE_SIZE * 3,
+    height: NOTE_SIZE * 3,
   },
   noteNum: {
     width: NOTE_SIZE,
