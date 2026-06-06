@@ -60,7 +60,8 @@ export function solve(puzzle: SumsPuzzle): SumsPuzzle | null {
   return puzzle
 }
 
-export function countSolutions(puzzle: SumsPuzzle): number {
+// maxOps: 操作上限。超えた場合は-1を返す（budget切れ）
+export function countSolutions(puzzle: SumsPuzzle, maxOps = 1000000): number {
   const { grid, size } = puzzle
   const runs = identifyRuns(grid, size)
 
@@ -81,9 +82,10 @@ export function countSolutions(puzzle: SumsPuzzle): number {
 
   const cur: (number | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
   let found = 0
+  let ops = 0
 
   function bt(idx: number): void {
-    if (found >= 2) return
+    if (found >= 2 || ops++ >= maxOps) return
     if (idx === whiteCells.length) { found++; return }
     const [r, c] = whiteCells[idx]!
     const key = `${r},${c}`
@@ -110,10 +112,12 @@ export function countSolutions(puzzle: SumsPuzzle): number {
       cur[r]![c] = val
       bt(idx + 1)
       cur[r]![c] = null
-      if (found >= 2) return
+      if (found >= 2 || ops >= maxOps) return
     }
   }
 
   bt(0)
+  // budget切れの場合は -1（一意解不明）
+  if (ops >= maxOps && found < 2) return -1
   return found
 }

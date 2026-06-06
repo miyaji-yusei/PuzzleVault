@@ -1,5 +1,6 @@
 import { Difficulty } from '../../types/engine'
 import { GridCell, BlackCell, CellValue, SumsPuzzle } from './types'
+import { countSolutions } from './solver'
 
 function createRng(seed: number): () => number {
   let s = seed >>> 0
@@ -11,9 +12,19 @@ function createRng(seed: number): () => number {
   }
 }
 
-const SIZE: Record<Difficulty, number> = { easy: 8, normal: 10, hard: 13, expert: 16 }
-const DENSITY: Record<Difficulty, number> = { easy: 0.22, normal: 0.28, hard: 0.32, expert: 0.35 }
-const FILL_BUDGET: Record<Difficulty, number> = { easy: 50000, normal: 100000, hard: 200000, expert: 500000 }
+// easy=4×4, normal=5×5, hard=6×6, expert=8×8
+const SIZE: Record<Difficulty, number> = { easy: 4, normal: 5, hard: 6, expert: 8 }
+// 密度が低いほど白セルが多く長いラン → 難しい
+const DENSITY: Record<Difficulty, number> = { easy: 0.30, normal: 0.25, hard: 0.20, expert: 0.22 }
+const FILL_BUDGET: Record<Difficulty, number> = { easy: 5000, normal: 20000, hard: 50000, expert: 200000 }
+const MIN_WHITE: Record<Difficulty, number> = { easy: 4, normal: 5, hard: 6, expert: 10 }
+// 一意解チェックのオペレーション上限 (null = スキップ。hard/expert は計算コストが高いため省略)
+const UNIQUE_MAX_OPS: Record<Difficulty, number | null> = {
+  easy: 100000,
+  normal: 500000,
+  hard: null,
+  expert: null,
+}
 
 function makeIsBlack(size: number, rng: () => number, density: number): boolean[][] {
   return Array.from({ length: size }, (_, r) =>
@@ -138,7 +149,7 @@ function tryGenerate(difficulty: Difficulty, seed: number): SumsPuzzle | null {
   for (let r = 0; r < size; r++)
     for (let c = 0; c < size; c++)
       if (!b[r]![c]!) wCells.push([r, c])
-  if (wCells.length < 10) return null
+  if (wCells.length < MIN_WHITE[difficulty]) return null
 
   const { hOf, vOf } = buildRunMaps(b, size)
   if (!wCells.every(([r, c]) => hOf.has(`${r},${c}`) && vOf.has(`${r},${c}`))) return null
@@ -148,26 +159,36 @@ function tryGenerate(difficulty: Difficulty, seed: number): SumsPuzzle | null {
 
   const grid = buildGrid(b, size, sol, hOf, vOf)
   const solution = sol as (CellValue | null)[][]
+  const puzzle: SumsPuzzle = { id: `sums-${difficulty}-${seed}`, size, grid, solution, difficulty, seed }
 
-  return { id: `sums-${difficulty}-${seed}`, size, grid, solution, difficulty, seed }
+  // 一意解保証 (easy/normal/hard のみ。expert はスキップ)
+  const maxOps = UNIQUE_MAX_OPS[difficulty]
+  if (maxOps !== null) {
+    const count = countSolutions(puzzle, maxOps)
+    if (count !== 1) return null
+  }
+
+  return puzzle
 }
 
 export function generate(difficulty: Difficulty, seed?: number): SumsPuzzle {
   const base = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
-  const maxAttempts = difficulty === 'easy' ? 200 : 100
-  const deadline = Date.now() + 2000
-  for (let i = 0; i < maxAttempts; i++) {
+  const deadline = Date.now() + 3000
+  for (let i = 0; i < 500; i++) {
     if (Date.now() > deadline) break
     const p = tryGenerate(difficulty, (base + i) >>> 0)
     if (p) return p
   }
-  // フォールバック: 最小限の有効なパズル
+  // フォールバック: 最小限の 2×2 Kakuro パズル
   const size = SIZE[difficulty]
   const grid: GridCell[][] = Array.from({ length: size }, (_, r) =>
     Array.from({ length: size }, (_, c): GridCell => {
-      if (r === 0 && c === 0) return { type: 'black', sumRight: 3, sumDown: 3 } as BlackCell
+      if (r === 0 && c === 1) return { type: 'black', sumDown: 3 } as BlackCell
+      if (r === 0 && c === 2) return { type: 'black', sumDown: 3 } as BlackCell
+      if (r === 1 && c === 0) return { type: 'black', sumRight: 3 } as BlackCell
+      if (r === 2 && c === 0) return { type: 'black', sumRight: 3 } as BlackCell
       if (r === 0 || c === 0) return { type: 'black' }
-      if (r <= 2 && c >= 1 && c <= 3) return { type: 'white', value: null }
+      if (r <= 2 && c <= 2) return { type: 'white', value: null }
       return { type: 'black' }
     })
   )
