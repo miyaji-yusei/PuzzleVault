@@ -9,19 +9,28 @@ interface GameRecord {
   moves?: number
 }
 
+export interface SolitaireStats {
+  totalPlayed: number
+  totalCleared: number
+}
+
 interface ProgressState {
   records: GameRecord[]
   consecutiveDays: number
   lastPlayedDate: string | null
+  solitaireStats: SolitaireStats
   recordClear: (record: GameRecord) => void
   getStatsByGame: (gameId: string) => GameRecord[]
   getStatsByDifficulty: (gameId: string, difficulty: Difficulty) => GameRecord[]
+  recordSolitairePlay: () => void
+  recordSolitaireClear: () => void
 }
 
 export const useProgressStore = create<ProgressState>((set, get) => ({
   records: [],
   consecutiveDays: 0,
   lastPlayedDate: null,
+  solitaireStats: { totalPlayed: 0, totalCleared: 0 },
   recordClear: (record) => {
     const today = new Date().toISOString().substring(0, 10)
     const yesterday = new Date(Date.now() - 86400000).toISOString().substring(0, 10)
@@ -44,4 +53,18 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     get().records.filter(
       (r) => r.gameId === gameId && r.difficulty === difficulty
     ),
+  recordSolitairePlay: () =>
+    set((state) => ({
+      solitaireStats: {
+        ...state.solitaireStats,
+        totalPlayed: state.solitaireStats.totalPlayed + 1,
+      },
+    })),
+  recordSolitaireClear: () =>
+    set((state) => ({
+      solitaireStats: {
+        ...state.solitaireStats,
+        totalCleared: state.solitaireStats.totalCleared + 1,
+      },
+    })),
 }))
