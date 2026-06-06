@@ -17,7 +17,7 @@ export default function SudokuScreen() {
 
   const {
     state, selectedCell, selectCell, enterNumber,
-    wrongCells, isComplete, noteMode, toggleNoteMode, restart,
+    wrongCells, isComplete, noteMode, toggleNoteMode, autoMemo, restart,
   } = useSudokuGame(difficulty)
 
   return (
@@ -61,7 +61,7 @@ export default function SudokuScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* メモトグル */}
+      {/* メモトグル・オートメモ */}
       <View style={styles.toolbar}>
         <TouchableOpacity
           style={[styles.memoButton, noteMode && styles.memoButtonActive]}
@@ -72,6 +72,15 @@ export default function SudokuScreen() {
             ✏️ メモ {noteMode ? 'ON' : 'OFF'}
           </Text>
         </TouchableOpacity>
+        {noteMode && (
+          <TouchableOpacity
+            style={styles.autoMemoButton}
+            onPress={autoMemo}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.autoMemoText}>オートメモ</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Win dialog */}
@@ -200,6 +209,20 @@ const styles = StyleSheet.create({
   },
   memoTextActive: {
     color: '#1565c0',
+  },
+  autoMemoButton: {
+    marginLeft: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#2e7d32',
+  },
+  autoMemoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2e7d32',
   },
   overlay: {
     flex: 1,
