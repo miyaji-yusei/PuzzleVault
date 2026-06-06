@@ -20,6 +20,7 @@ export interface SpiderState {
   tableau: Card[][]    // 10列
   stock: Card[][]      // 最大5回分のディール（各10枚）
   foundation: number   // 完成セット数（0〜8）
+  completedSuits: Suit[]  // 完成したスートの順序付きリスト
   moves: number
   startedAt: number
   elapsedSeconds: number

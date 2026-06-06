@@ -58,7 +58,7 @@ export function dealState(seed: number, suitCount: 1 | 2 | 4): SpiderState {
     }
     stock.push(dealCards)
   }
-  return { tableau, stock, foundation: 0, moves: 0, startedAt: 0, elapsedSeconds: 0 }
+  return { tableau, stock, foundation: 0, completedSuits: [], moves: 0, startedAt: 0, elapsedSeconds: 0 }
 }
 
 export function cloneState(s: SpiderState): SpiderState {
@@ -66,6 +66,7 @@ export function cloneState(s: SpiderState): SpiderState {
     tableau: s.tableau.map(col => col.slice()),
     stock: s.stock.map(d => d.slice()),
     foundation: s.foundation,
+    completedSuits: [...s.completedSuits],
     moves: s.moves,
     startedAt: s.startedAt,
     elapsedSeconds: s.elapsedSeconds,
@@ -98,6 +99,7 @@ export function removeCompleteSets(s: SpiderState): void {
       if (valid) {
         column.splice(startIdx, 13)
         s.foundation++
+        s.completedSuits = [...s.completedSuits, suit]
         if (column.length > 0 && !column[column.length - 1]!.faceUp) {
           column[column.length - 1] = { ...column[column.length - 1]!, faceUp: true }
         }
