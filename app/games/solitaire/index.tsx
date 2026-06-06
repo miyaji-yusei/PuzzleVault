@@ -1,9 +1,26 @@
-import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Animated, Dimensions } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
 import { Difficulty } from '../../../src/types/engine'
+import { useProgressStore } from '../../../src/stores/progressStore'
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
+const SUITS = ['♠', '♥', '♦', '♣']
+const CARD_COLORS = ['#1b5e20', '#b71c1c', '#b71c1c', '#1b5e20']
+
+const SCATTER_COUNT = 8
+
+function makeScatterCards() {
+  return Array.from({ length: SCATTER_COUNT }, (_, i) => ({
+    suit: SUITS[i % 4] as string,
+    color: CARD_COLORS[i % 4] as string,
+    tx: (Math.random() - 0.5) * SCREEN_W * 1.6,
+    ty: (Math.random() - 0.5) * SCREEN_H * 1.6,
+    rotate: (Math.random() - 0.5) * 720,
+  }))
+}
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
 
@@ -18,12 +35,71 @@ export default function SolitaireScreen() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(paramDifficulty)
   const difficulty: Difficulty = selectedDifficulty ?? 'easy'
 
+  const { solitaireStats, recordSolitairePlay, recordSolitaireClear } = useProgressStore()
+
   const {
     state, puzzle, selected, isComplete, maxResets,
     canAutoComplete, canUndo, isDeadlocked,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
   } = useSolitaireGame(difficulty)
+
+  // カード散布アニメーション用
+  const scatterAnims = useRef(
+    Array.from({ length: SCATTER_COUNT }, () => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      rotate: new Animated.Value(0),
+    }))
+  ).current
+  const scatterCards = useRef(makeScatterCards()).current
+  const [showScatter, setShowScatter] = useState(false)
+  const [showWinDialog, setShowWinDialog] = useState(false)
+  const prevComplete = useRef(false)
+
+  // ゲーム開始時に統計記録
+  useEffect(() => {
+    if (selectedDifficulty) recordSolitairePlay()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDifficulty])
+
+  // クリア時にアニメーション再生
+  useEffect(() => {
+    if (isComplete && !prevComplete.current) {
+      prevComplete.current = true
+      recordSolitaireClear()
+      setShowScatter(true)
+      scatterAnims.forEach((anim, i) => {
+        anim.x.setValue(0)
+        anim.y.setValue(0)
+        anim.opacity.setValue(0)
+        anim.rotate.setValue(0)
+        Animated.parallel([
+          Animated.timing(anim.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.timing(anim.x, { toValue: scatterCards[i]!.tx, duration: 1200, useNativeDriver: true }),
+          Animated.timing(anim.y, { toValue: scatterCards[i]!.ty, duration: 1200, useNativeDriver: true }),
+          Animated.timing(anim.rotate, { toValue: scatterCards[i]!.rotate, duration: 1200, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.delay(900),
+            Animated.timing(anim.opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+          ]),
+        ]).start()
+      })
+      setTimeout(() => {
+        setShowScatter(false)
+        setShowWinDialog(true)
+      }, 1500)
+    }
+    if (!isComplete) {
+      prevComplete.current = false
+      setShowWinDialog(false)
+    }
+  }, [isComplete, scatterAnims, scatterCards, recordSolitaireClear])
+
+  const winRate = solitaireStats.totalPlayed > 0
+    ? Math.round((solitaireStats.totalCleared / solitaireStats.totalPlayed) * 100)
+    : 0
 
   const [showAutoCompleteDialog, setShowAutoCompleteDialog] = useState(false)
   const [autoCompleteHandled, setAutoCompleteHandled] = useState(false)
@@ -221,13 +297,45 @@ export default function SolitaireScreen() {
         </View>
       </Modal>
 
+      {/* カード散布アニメーション */}
+      {showScatter && (
+        <View style={styles.scatterOverlay} pointerEvents="none">
+          {scatterAnims.map((anim, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.scatterCard,
+                {
+                  opacity: anim.opacity,
+                  transform: [
+                    { translateX: anim.x },
+                    { translateY: anim.y },
+                    { rotate: anim.rotate.interpolate({ inputRange: [-720, 720], outputRange: ['-720deg', '720deg'] }) },
+                  ],
+                },
+              ]}
+            >
+              <Text style={[styles.scatterSuit, { color: scatterCards[i]!.color }]}>
+                {scatterCards[i]!.suit}
+              </Text>
+            </Animated.View>
+          ))}
+        </View>
+      )}
+
       {/* Win dialog */}
-      <Modal visible={isComplete} transparent animationType="fade">
+      <Modal visible={showWinDialog} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>🎉 クリア！</Text>
             <Text style={styles.dialogMessage}>スコア: {state.score}点</Text>
             <Text style={styles.dialogMessage}>手数: {state.moves}手</Text>
+            <View style={styles.statsBox}>
+              <Text style={styles.statsTitle}>通算成績</Text>
+              <Text style={styles.statsText}>プレイ: {solitaireStats.totalPlayed}回</Text>
+              <Text style={styles.statsText}>クリア: {solitaireStats.totalCleared}回</Text>
+              <Text style={styles.statsText}>勝率: {winRate}%</Text>
+            </View>
             <View style={styles.dialogButtons}>
               <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonCancel]}
@@ -237,7 +345,7 @@ export default function SolitaireScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={restart}
+                onPress={() => { setShowWinDialog(false); restart() }}
               >
                 <Text style={styles.dialogButtonTextOk}>もう一度プレイ</Text>
               </TouchableOpacity>
@@ -361,6 +469,55 @@ const styles = StyleSheet.create({
   dialogButtonTextOk: {
     color: '#fff',
     fontWeight: '600',
+  },
+  scatterOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  scatterCard: {
+    position: 'absolute',
+    width: 44,
+    height: 60,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  scatterSuit: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  statsBox: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  statsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555',
+    marginBottom: 4,
+  },
+  statsText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 20,
   },
   selectScreen: {
     flex: 1,
