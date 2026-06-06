@@ -20,7 +20,7 @@ const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
 const RANK_LABEL: Partial<Record<number, string>> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
 
 type DragInfo = {
-  fromPile: 'tableau' | 'waste'
+  fromPile: 'tableau' | 'waste' | 'foundation'
   colIndex: number
   cardIndex: number
   cards: Card[]
@@ -119,6 +119,10 @@ export function SolitaireBoard({
   const wasteRef = useRef(waste)
   wasteRef.current = waste
   const wasteGestureState = useRef({ isDragging: false })
+  const onTapFoundationRef = useRef(onTapFoundation)
+  onTapFoundationRef.current = onTapFoundation
+  const foundationRef = useRef(foundation)
+  foundationRef.current = foundation
 
   const getCardAt = useCallback((relX: number, relY: number) => {
     const col = Math.floor((relX - PAD) / (CARD_W + GAP))
@@ -237,6 +241,69 @@ export function SolitaireBoard({
     })
   }, [overlayOpacity, overlayX, overlayY])
 
+  const foundationPanResponder = useMemo(() => {
+    const gs = { isDragging: false, activeFi: null as number | null }
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+      onPanResponderGrant: (e) => {
+        gs.isDragging = false
+        const relX = e.nativeEvent.pageX - boardLeftRef.current - PAD
+        const fi = Math.floor(relX / (CARD_W + GAP))
+        const pile = foundationRef.current[fi]
+        gs.activeFi = (fi >= 0 && fi < 4 && pile && pile.length > 0) ? fi : null
+      },
+      onPanResponderMove: (e, g) => {
+        if (gs.activeFi === null) return
+        const pile = foundationRef.current[gs.activeFi]
+        if (!pile || pile.length === 0) return
+        if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+          if (!gs.isDragging) {
+            gs.isDragging = true
+            const card = pile[pile.length - 1]!
+            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+            Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
+            setDragInfo({ fromPile: 'foundation', colIndex: gs.activeFi, cardIndex: 0, cards: [card] })
+          }
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+        }
+      },
+      onPanResponderRelease: (e) => {
+        if (gs.isDragging) {
+          gs.isDragging = false
+          Animated.timing(overlayOpacity, { toValue: 0, duration: 120, useNativeDriver: false }).start()
+          setDragInfo(null)
+          if (gs.activeFi !== null) {
+            const relY = e.nativeEvent.pageY - boardTopRef.current
+            const relX = e.nativeEvent.pageX - boardLeftRef.current
+            if (relY >= TOP_ROW_H) {
+              const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+              const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
+              onDirectMoveRef.current({
+                type: 'foundation-to-tableau',
+                from: { pile: 'foundation', index: gs.activeFi },
+                to: { pile: 'tableau', index: clampedCol },
+              })
+            }
+            gs.activeFi = null
+          }
+        } else if (gs.activeFi !== null) {
+          onTapFoundationRef.current(gs.activeFi)
+          gs.activeFi = null
+        }
+      },
+      onPanResponderTerminate: () => {
+        gs.isDragging = false
+        gs.activeFi = null
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
+        setDragInfo(null)
+      },
+    })
+  }, [overlayOpacity, overlayX, overlayY])
+
   const gestureState = useRef({
     isDragging: false,
     tapTimer: null as ReturnType<typeof setTimeout> | null,
@@ -330,22 +397,18 @@ export function SolitaireBoard({
     <View style={{ flex: 1 }} ref={boardRef} onLayout={measureBoard}>
       {/* Top row: foundation + stock/waste */}
       <View style={styles.topRow}>
-        <View style={styles.foundationRow}>
+        <View style={styles.foundationRow} {...foundationPanResponder.panHandlers}>
           {foundation.map((pile, fi) => {
             const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
+            const isDraggedFromFoundation = dragInfo?.fromPile === 'foundation' && dragInfo.colIndex === fi
             return (
-              <TouchableOpacity
-                key={`f-${fi}`}
-                onPress={() => onTapFoundation(fi)}
-                style={{ marginRight: fi < 3 ? GAP : 0 }}
-                activeOpacity={0.7}
-              >
+              <View key={`f-${fi}`} style={{ marginRight: fi < 3 ? GAP : 0 }}>
                 {pile.length > 0 ? (
-                  <CardView card={pile[pile.length - 1]} width={CARD_W} height={CARD_H} highlighted={isFoundationSelected} />
+                  <CardView card={pile[pile.length - 1]} width={CARD_W} height={CARD_H} highlighted={isFoundationSelected} dimmed={isDraggedFromFoundation} />
                 ) : (
                   <EmptySlot width={CARD_W} height={CARD_H} label={foundationLabels[fi]} />
                 )}
-              </TouchableOpacity>
+              </View>
             )
           })}
         </View>
