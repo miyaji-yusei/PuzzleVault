@@ -119,6 +119,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
   const gridPosRef = useRef({ x: 0, y: 0 })
   const dragStartIslandIdRef = useRef<number | null>(null)
   const dragStartSatisfiedRef = useRef(false)
+  const tapStartBridgeRef = useRef<[number, number] | null>(null)
 
   const measureGrid = useCallback(() => {
     requestAnimationFrame(() => {
@@ -161,9 +162,12 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
         const bridgeCount = getIslandCurrentBridges(islandAt.id, currentRef.current)
         dragStartSatisfiedRef.current = bridgeCount >= islandAt.bridges
         dragStartIslandIdRef.current = islandAt.id
+        tapStartBridgeRef.current = null
       } else {
         dragStartSatisfiedRef.current = false
         dragStartIslandIdRef.current = null
+        // Record which bridge the touch started on (for accurate tap detection)
+        tapStartBridgeRef.current = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
       }
     },
     onPanResponderRelease: (e, g) => {
@@ -178,8 +182,10 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
       const startIslandId = dragStartIslandIdRef.current
       const startSatisfied = dragStartSatisfiedRef.current
+      const startBridge = tapStartBridgeRef.current
       dragStartIslandIdRef.current = null
       dragStartSatisfiedRef.current = false
+      tapStartBridgeRef.current = null
 
       if (startIslandId !== null) {
         if (!startSatisfied && isDrag) {
@@ -199,10 +205,12 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
         return
       }
 
-      // Tap on empty space between islands only
-      const pair = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
-      if (pair) {
-        onToggleBridgeRef.current(pair[0], pair[1])
+      // Only toggle bridge if touch both started AND ended near the same bridge line
+      if (!isDrag && startBridge) {
+        const endBridge = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
+        if (endBridge && endBridge[0] === startBridge[0] && endBridge[1] === startBridge[1]) {
+          onToggleBridgeRef.current(startBridge[0], startBridge[1])
+        }
       }
     },
   }), [])
