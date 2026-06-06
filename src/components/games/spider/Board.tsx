@@ -248,8 +248,9 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         {/* Stock pile visual */}
         <TouchableOpacity
           onPress={onDeal}
-          disabled={stock.length === 0}
+          disabled={stock.length === 0 || tableau.some(col => col.length === 0)}
           activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={[styles.stockArea, stock.length === 0 && styles.stockAreaEmpty]}
         >
           {stock.length === 0 ? (
@@ -257,7 +258,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
               <Text style={styles.stockEmptyText}>−</Text>
             </View>
           ) : (
-            <View style={{ width: STOCK_W + (stock.length - 1) * STOCK_OFFSET, height: STOCK_H }}>
+            <View style={{ width: Math.max(STOCK_W + (stock.length - 1) * STOCK_OFFSET, STOCK_W * 2), height: STOCK_H }}>
               {stock.map((_, i) => (
                 <View
                   key={i}
