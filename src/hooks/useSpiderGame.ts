@@ -10,6 +10,7 @@ function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
     tableau: state.tableau.map(col => col.map(c => ({ ...c }))),
     stock: state.stock.map(d => d.map(c => ({ ...c }))),
     foundation: state.foundation,
+    completedSuits: [...state.completedSuits],
     moves: state.moves + 1,
     startedAt: state.startedAt,
     elapsedSeconds: state.elapsedSeconds,

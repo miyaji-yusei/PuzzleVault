@@ -57,7 +57,7 @@ type Props = {
 }
 
 export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal }: Props) {
-  const { tableau, stock, foundation } = state
+  const { tableau, stock, foundation, completedSuits } = state
 
   // Container (full component) position for overlay absolute positioning
   const containerRef = useRef<View>(null)
@@ -238,11 +238,21 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         style={styles.statusRow}
         onLayout={(e) => { statusBarHeightRef.current = e.nativeEvent.layout.height }}
       >
-        {/* Foundation pips */}
+        {/* Foundation pips with suit icons */}
         <View style={styles.foundationArea}>
-          {Array.from({ length: 8 }, (_, i) => (
-            <View key={i} style={[styles.foundationPip, i < foundation && styles.foundationPipFilled]} />
-          ))}
+          {Array.from({ length: 8 }, (_, i) => {
+            const suit = completedSuits[i]
+            const isCompleted = i < foundation
+            return (
+              <View key={i} style={[styles.foundationPip, isCompleted && styles.foundationPipFilled]}>
+                {suit && (
+                  <Text style={[styles.foundationSuitText, RED_SUITS.has(suit) && styles.foundationSuitRed]}>
+                    {SUIT_SYM[suit]}
+                  </Text>
+                )}
+              </View>
+            )
+          })}
           <Text style={styles.statusText}>  {foundation}/8</Text>
         </View>
 
@@ -422,16 +432,26 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   foundationPip: {
-    width: 10,
-    height: 14,
+    width: 14,
+    height: 18,
     borderRadius: 2,
     backgroundColor: '#2e7d32',
     borderWidth: 1,
     borderColor: '#4caf50',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   foundationPipFilled: {
     backgroundColor: '#ffd54f',
     borderColor: '#ffb300',
+  },
+  foundationSuitText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#212121',
+  },
+  foundationSuitRed: {
+    color: '#c62828',
   },
   statusText: {
     color: '#c8e6c9',
