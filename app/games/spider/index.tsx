@@ -67,8 +67,6 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
     tapTableau, doubleTapCard, directMove, deal, undo, restart,
   } = useSpiderGame(difficulty)
 
-  const foundation = state.foundation
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -76,26 +74,17 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Spider</Text>
-        <View style={styles.headerRight}>
-          {/* 完成スーツ数 */}
-          <Text style={styles.foundationLabel}>完成: {foundation}/8</Text>
-          <View style={styles.foundationPips}>
-            {Array.from({ length: 8 }, (_, i) => (
-              <View key={i} style={[styles.pip, i < foundation && styles.pipFilled]} />
-            ))}
-          </View>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              onPress={undo}
-              disabled={!canUndo}
-              style={[styles.iconBtn, !canUndo && styles.iconBtnDisabled]}
-            >
-              <Text style={styles.iconBtnText}>↩</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={restart} style={styles.iconBtn}>
-              <Text style={styles.iconBtnText}>↺</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={undo}
+            disabled={!canUndo}
+            style={[styles.iconBtn, !canUndo && styles.iconBtnDisabled]}
+          >
+            <Text style={styles.iconBtnText}>↩</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={restart} style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}>↺</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -200,15 +189,6 @@ const styles = StyleSheet.create({
   backButton: { padding: 4 },
   backText: { fontSize: 14, color: '#a5d6a7' },
   title: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  headerRight: { alignItems: 'flex-end', gap: 4 },
-  foundationLabel: { fontSize: 13, color: '#a5d6a7', fontWeight: '600' },
-  foundationPips: { flexDirection: 'row', gap: 3 },
-  pip: {
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#2e7d32',
-    borderWidth: 1, borderColor: '#4caf50',
-  },
-  pipFilled: { backgroundColor: '#ffd54f', borderColor: '#ffb300' },
   headerButtons: { flexDirection: 'row', gap: 8 },
   iconBtn: {
     backgroundColor: '#2e7d32',
