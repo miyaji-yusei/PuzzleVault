@@ -4,6 +4,7 @@ import { Island, Bridge, HashiState } from '../../../engines/hashi/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const GRID_PADDING = 16
+const BRIDGE_TAP_THRESHOLD = 0.45
 
 type Props = {
   state: HashiState
@@ -71,7 +72,7 @@ function findTappedBridge(
       const maxCol = Math.max(a.col, b.col)
       if (tapCol > minCol && tapCol < maxCol) {
         const dist = Math.abs(tapRow - a.row)
-        if (dist < bestDist) {
+        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestDist) {
           bestDist = dist
           bestPair = [aId, bId]
         }
@@ -81,7 +82,7 @@ function findTappedBridge(
       const maxRow = Math.max(a.row, b.row)
       if (tapRow > minRow && tapRow < maxRow) {
         const dist = Math.abs(tapCol - a.col)
-        if (dist < bestDist) {
+        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestDist) {
           bestDist = dist
           bestPair = [aId, bId]
         }
@@ -117,6 +118,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
   const gridRef = useRef<View>(null)
   const gridPosRef = useRef({ x: 0, y: 0 })
   const dragStartIslandIdRef = useRef<number | null>(null)
+  const dragStartSatisfiedRef = useRef(false)
 
   const measureGrid = useCallback(() => {
     requestAnimationFrame(() => {
@@ -139,6 +141,8 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
   islandMapRef.current = islandMap
   const islandsRef = useRef(islands)
   islandsRef.current = islands
+  const currentRef = useRef(current)
+  currentRef.current = current
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -153,7 +157,14 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       const tapRow = relY / cs
       const radiusCells = Math.max(10, Math.floor(cs * 0.38)) / cs
       const islandAt = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
-      dragStartIslandIdRef.current = islandAt ? islandAt.id : null
+      if (islandAt) {
+        const bridgeCount = getIslandCurrentBridges(islandAt.id, currentRef.current)
+        dragStartSatisfiedRef.current = bridgeCount >= islandAt.bridges
+        dragStartIslandIdRef.current = islandAt.id
+      } else {
+        dragStartSatisfiedRef.current = false
+        dragStartIslandIdRef.current = null
+      }
     },
     onPanResponderRelease: (e, g) => {
       const { pageX, pageY } = e.nativeEvent
@@ -166,11 +177,13 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       const isDrag = Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8
 
       const startIslandId = dragStartIslandIdRef.current
+      const startSatisfied = dragStartSatisfiedRef.current
       dragStartIslandIdRef.current = null
+      dragStartSatisfiedRef.current = false
 
       if (startIslandId !== null) {
-        if (isDrag) {
-          // Drag from island — find target island
+        if (!startSatisfied && isDrag) {
+          // Drag from non-satisfied island — find target island
           const endIsland = findIslandAt(islandsRef.current, tapRow, tapCol, radiusCells + 0.1)
           if (endIsland && endIsland.id !== startIslandId) {
             const pair = pairsRef.current.find(
@@ -182,7 +195,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
             }
           }
         }
-        // Single tap on island → no action
+        // Single tap on island or drag from satisfied island → no action
         return
       }
 
