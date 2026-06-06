@@ -119,8 +119,10 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
   const dragStartIslandIdRef = useRef<number | null>(null)
 
   const measureGrid = useCallback(() => {
-    gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      gridPosRef.current = { x: pageX, y: pageY }
+    requestAnimationFrame(() => {
+      gridRef.current?.measureInWindow((x, y) => {
+        gridPosRef.current = { x, y }
+      })
     })
   }, [])
 

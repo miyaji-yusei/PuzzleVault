@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { HashiBoard } from '../../../src/components/games/hashi/Board'
 import { useHashiGame } from '../../../src/hooks/useHashiGame'
@@ -50,9 +50,9 @@ export default function HashiScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.boardContainer}>
+      <View style={styles.boardContainer}>
         <HashiBoard state={state} onToggleBridge={toggleBridge} />
-      </ScrollView>
+      </View>
 
       {/* Win dialog */}
       <Modal visible={isComplete} transparent animationType="fade">
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   boardContainer: {
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
