@@ -92,6 +92,35 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
     }
   }, [selectedCell, state, isComplete, noteMode])
 
+  // 全空白マスに入力可能な候補数字を一括入力（既存メモと統合）
+  const autoMemo = useCallback(() => {
+    if (isComplete) return
+    setState(prev => {
+      const newNotes = prev.notes.map(r => r.map(c => [...c]))
+      for (let row = 0; row < 9; row++) {
+        for (let col = 0; col < 9; col++) {
+          if (prev.board[row]?.[col] !== null) continue
+          if (prev.current[row]?.[col] !== null) continue
+          const used = new Set<number>()
+          const boxR = Math.floor(row / 3) * 3
+          const boxC = Math.floor(col / 3) * 3
+          for (let i = 0; i < 9; i++) {
+            const rv = prev.current[row]?.[i]; if (rv != null) used.add(rv)
+            const cv = prev.current[i]?.[col]; if (cv != null) used.add(cv)
+          }
+          for (let r = boxR; r < boxR + 3; r++)
+            for (let c = boxC; c < boxC + 3; c++) {
+              const bv = prev.current[r]?.[c]; if (bv != null) used.add(bv)
+            }
+          for (let n = 1; n <= 9; n++) {
+            if (!used.has(n)) newNotes[row]![col]![n] = true
+          }
+        }
+      }
+      return { ...prev, notes: newNotes }
+    })
+  }, [isComplete])
+
   const restart = useCallback(() => {
     const puzzle = generate(difficulty)
     setState({
@@ -109,5 +138,5 @@ export function useSudokuGame(difficulty: Difficulty, seed?: number) {
     setNoteMode(false)
   }, [difficulty])
 
-  return { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete, noteMode, toggleNoteMode, restart }
+  return { state, selectedCell, selectCell, enterNumber, wrongCells, isComplete, noteMode, toggleNoteMode, autoMemo, restart }
 }
