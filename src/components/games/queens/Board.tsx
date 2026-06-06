@@ -121,10 +121,12 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
         } else {
           if (tapTimer) { clearTimeout(tapTimer) }
           pendingTapCell = key
+          // Call immediately so cross appears without delay
+          onPlaceCrossRef.current(cell.row, cell.col)
+          // Timer only clears pendingTap state after double-tap window
           tapTimer = setTimeout(() => {
             tapTimer = null
             pendingTapCell = null
-            onPlaceCrossRef.current(cell.row, cell.col)
           }, DOUBLE_TAP_MS)
         }
       },
