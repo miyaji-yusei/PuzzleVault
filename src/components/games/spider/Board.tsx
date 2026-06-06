@@ -208,6 +208,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         }, DOUBLE_TAP_MS)
       }
     },
+    onPanResponderTerminationRequest: () => !gestureState.current.isDragging,
     onPanResponderTerminate: () => {
       const gs = gestureState.current
       gs.isDragging = false
@@ -281,6 +282,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 16 }}
         scrollEventThrottle={16}
+        scrollEnabled={!dragInfo}
         onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
       >
         <View
