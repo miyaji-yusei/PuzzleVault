@@ -59,8 +59,10 @@ function findTappedBridge(
   tapRow: number,
   tapCol: number
 ): [number, number] | null {
-  let bestPair: [number, number] | null = null
-  let bestDist = Infinity
+  let bestHorizPair: [number, number] | null = null
+  let bestHorizDist = Infinity
+  let bestVertPair: [number, number] | null = null
+  let bestVertDist = Infinity
 
   for (const [aId, bId] of pairs) {
     const a = islandMap.get(aId)
@@ -72,9 +74,9 @@ function findTappedBridge(
       const maxCol = Math.max(a.col, b.col)
       if (tapCol > minCol && tapCol < maxCol) {
         const dist = Math.abs(tapRow - a.row)
-        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestDist) {
-          bestDist = dist
-          bestPair = [aId, bId]
+        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestHorizDist) {
+          bestHorizDist = dist
+          bestHorizPair = [aId, bId]
         }
       }
     } else if (a.col === b.col) {
@@ -82,15 +84,18 @@ function findTappedBridge(
       const maxRow = Math.max(a.row, b.row)
       if (tapRow > minRow && tapRow < maxRow) {
         const dist = Math.abs(tapCol - a.col)
-        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestDist) {
-          bestDist = dist
-          bestPair = [aId, bId]
+        if (dist < BRIDGE_TAP_THRESHOLD && dist < bestVertDist) {
+          bestVertDist = dist
+          bestVertPair = [aId, bId]
         }
       }
     }
   }
 
-  return bestPair
+  // Ambiguous: tap is near both a horizontal and a vertical bridge → no action
+  if (bestHorizPair && bestVertPair) return null
+
+  return bestHorizPair ?? bestVertPair
 }
 
 function getIslandCurrentBridges(islandId: number, current: Bridge[]): number {
