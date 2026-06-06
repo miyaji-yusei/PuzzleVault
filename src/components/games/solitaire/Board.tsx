@@ -220,10 +220,12 @@ export function SolitaireBoard({
             onDoubleTapWasteRef.current()
           } else {
             wastePendingTap = true
+            // Call immediately so highlight appears without delay
+            onTapWasteRef.current()
+            // Timer only clears pendingTap state after double-tap window
             wasteTapTimer = setTimeout(() => {
               wasteTapTimer = null
               wastePendingTap = false
-              onTapWasteRef.current()
             }, DOUBLE_TAP_MS)
           }
         }
@@ -309,10 +311,12 @@ export function SolitaireBoard({
       } else {
         if (gs.tapTimer) clearTimeout(gs.tapTimer)
         gs.pendingTap = { col, card }
+        // Call immediately so highlight appears without delay
+        onTapTableauRef.current(col, card)
+        // Timer only clears pendingTap state after double-tap window
         gs.tapTimer = setTimeout(() => {
           gs.tapTimer = null
           gs.pendingTap = null
-          onTapTableauRef.current(col, card)
         }, DOUBLE_TAP_MS)
       }
     },
