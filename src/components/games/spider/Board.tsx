@@ -193,6 +193,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
       const cardObj = tableauRef.current[col]?.[cardIndex]
 
       if (gs.pendingTap && gs.pendingTap.col === col && gs.pendingTap.cardIndex === cardIndex) {
+        // Double tap: cancel pending timer, execute double-tap action
         clearTimeout(gs.tapTimer!)
         gs.tapTimer = null
         gs.pendingTap = null
@@ -201,10 +202,12 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
       } else {
         if (gs.tapTimer) clearTimeout(gs.tapTimer)
         gs.pendingTap = { col, cardIndex }
+        // Call immediately so highlight appears without delay
+        onTapTableauRef.current(col, cardIndex)
+        // Timer only clears pendingTap state after double-tap window
         gs.tapTimer = setTimeout(() => {
           gs.tapTimer = null
           gs.pendingTap = null
-          onTapTableauRef.current(col, cardIndex)
         }, DOUBLE_TAP_MS)
       }
     },
