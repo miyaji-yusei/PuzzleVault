@@ -1,6 +1,10 @@
 import { Difficulty } from '../../types/engine'
-import { GridCell, BlackCell, CellValue, SumsPuzzle } from './types'
+import { CellMark, ColorGroup, SumsPuzzle } from './types'
 import { countSolutions } from './solver'
+
+const SIZE = 5
+const NUM_GROUPS: Record<Difficulty, number> = { easy: 3, normal: 4, hard: 5, expert: 5 }
+const MAX_VAL: Record<Difficulty, number> = { easy: 5, normal: 6, hard: 7, expert: 8 }
 
 function createRng(seed: number): () => number {
   let s = seed >>> 0
@@ -12,188 +16,192 @@ function createRng(seed: number): () => number {
   }
 }
 
-// easy=4×4, normal=5×5, hard=6×6, expert=8×8
-const SIZE: Record<Difficulty, number> = { easy: 4, normal: 5, hard: 6, expert: 8 }
-// 密度が低いほど白セルが多く長いラン → 難しい
-const DENSITY: Record<Difficulty, number> = { easy: 0.30, normal: 0.25, hard: 0.20, expert: 0.22 }
-const FILL_BUDGET: Record<Difficulty, number> = { easy: 5000, normal: 20000, hard: 50000, expert: 200000 }
-const MIN_WHITE: Record<Difficulty, number> = { easy: 4, normal: 5, hard: 6, expert: 10 }
-// 一意解チェックのオペレーション上限 (null = スキップ。hard/expert は計算コストが高いため省略)
-const UNIQUE_MAX_OPS: Record<Difficulty, number | null> = {
-  easy: 100000,
-  normal: 500000,
-  hard: null,
-  expert: null,
-}
-
-function makeIsBlack(size: number, rng: () => number, density: number): boolean[][] {
-  return Array.from({ length: size }, (_, r) =>
-    Array.from({ length: size }, (_, c) => r === 0 || c === 0 || rng() < density)
-  )
-}
-
-function fixLayout(b: boolean[][], size: number): void {
-  let changed = true
-  while (changed) {
-    changed = false
-    for (let r = 1; r < size; r++) {
-      for (let c = 1; c < size; c++) {
-        if (b[r]![c]!) continue
-        const lB = c === 0 || !!b[r]![c - 1]
-        const rB = c === size - 1 || !!b[r]![c + 1]
-        const tB = r === 0 || !!b[r - 1]![c]
-        const bB = r === size - 1 || !!b[r + 1]![c]
-        if ((lB && rB) || (tB && bB)) { b[r]![c] = true; changed = true }
-      }
-    }
-  }
-}
-
-function buildRunMaps(
-  b: boolean[][], size: number
-): { hOf: Map<string, [number, number][]>; vOf: Map<string, [number, number][]> } {
-  const hOf = new Map<string, [number, number][]>()
-  const vOf = new Map<string, [number, number][]>()
-
-  for (let r = 0; r < size; r++) {
-    let c = 0
-    while (c < size) {
-      if (b[r]![c]!) { c++; continue }
-      const cells: [number, number][] = []
-      while (c < size && !b[r]![c]!) { cells.push([r, c]); c++ }
-      if (cells.length >= 2) for (const cell of cells) hOf.set(`${cell[0]},${cell[1]}`, cells)
-    }
-  }
-
-  for (let c = 0; c < size; c++) {
-    let r = 0
-    while (r < size) {
-      if (b[r]![c]!) { r++; continue }
-      const cells: [number, number][] = []
-      while (r < size && !b[r]![c]!) { cells.push([r, c]); r++ }
-      if (cells.length >= 2) for (const cell of cells) vOf.set(`${cell[0]},${cell[1]}`, cells)
-    }
-  }
-
-  return { hOf, vOf }
-}
-
-function fillValues(
-  wCells: [number, number][],
-  hOf: Map<string, [number, number][]>,
-  vOf: Map<string, [number, number][]>,
-  sol: (number | null)[][],
-  idx: number,
-  rng: () => number,
-  budget: { n: number }
-): boolean {
-  if (budget.n-- <= 0) return false
-  if (idx === wCells.length) return true
-  const [r, c] = wCells[idx]!
-  const key = `${r},${c}`
-  const hCells = hOf.get(key) ?? []
-  const vCells = vOf.get(key) ?? []
-
-  const used = new Set<number>()
-  for (const [hr, hc] of hCells) { const v = sol[hr]?.[hc]; if (v != null) used.add(v) }
-  for (const [vr, vc] of vCells) { const v = sol[vr]?.[vc]; if (v != null) used.add(v) }
-
-  const vals = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  for (let i = vals.length - 1; i > 0; i--) {
+function shuffle<T>(arr: T[], rng: () => number): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1))
-    const tmp = vals[i] as number; vals[i] = vals[j] as number; vals[j] = tmp
+    ;[a[i], a[j]] = [a[j]!, a[i]!]
   }
-
-  for (const val of vals) {
-    if (used.has(val)) continue
-    sol[r]![c] = val
-    if (fillValues(wCells, hOf, vOf, sol, idx + 1, rng, budget)) return true
-    sol[r]![c] = null
-  }
-  return false
+  return a
 }
 
-function buildGrid(
-  b: boolean[][], size: number,
-  sol: (number | null)[][],
-  hOf: Map<string, [number, number][]>,
-  vOf: Map<string, [number, number][]>
-): GridCell[][] {
-  return Array.from({ length: size }, (_, r) =>
-    Array.from({ length: size }, (_, c) => {
-      if (!b[r]![c]!) return { type: 'white', value: null } as GridCell
-      const cell: BlackCell = { type: 'black' }
-      if (c + 1 < size && !b[r]![c + 1]!) {
-        const run = hOf.get(`${r},${c + 1}`)
-        if (run && run[0]![1] === c + 1)
-          cell.sumRight = run.reduce((s, [hr, hc]) => s + (sol[hr]?.[hc] ?? 0), 0)
-      }
-      if (r + 1 < size && !b[r + 1]![c]!) {
-        const run = vOf.get(`${r + 1},${c}`)
-        if (run && run[0]![0] === r + 1)
-          cell.sumDown = run.reduce((s, [vr, vc]) => s + (sol[vr]?.[vc] ?? 0), 0)
-      }
-      return cell
-    })
+function createColorGroups(numGroups: number, rng: () => number): ColorGroup[] {
+  const assignment = Array.from({ length: SIZE }, () => Array<number>(SIZE).fill(-1))
+  const groups: ColorGroup[] = Array.from({ length: numGroups }, (_, i) => ({
+    id: i,
+    colorIndex: i,
+    cells: [] as [number, number][],
+    targetSum: 0,
+  }))
+
+  // Pick seeds as far apart as possible using shuffled cells
+  const allCells = shuffle(
+    Array.from({ length: SIZE * SIZE }, (_, i): [number, number] => [Math.floor(i / SIZE), i % SIZE]),
+    rng
   )
+  const seeds = allCells.slice(0, numGroups)
+  for (let i = 0; i < numGroups; i++) {
+    const [r, c] = seeds[i]!
+    assignment[r]![c] = i
+    groups[i]!.cells.push([r, c])
+  }
+
+  // BFS Voronoi expansion with random queue order
+  const queue = seeds.map(([r, c], i) => ({ r, c, group: i }))
+  while (queue.length > 0) {
+    const idx = Math.floor(rng() * queue.length)
+    const item = queue.splice(idx, 1)[0]!
+    const { r, c, group } = item
+    const neighbors: [number, number][] = [
+      [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1],
+    ].filter(([nr, nc]) =>
+      nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && assignment[nr]![nc] === -1
+    ) as [number, number][]
+    for (const [nr, nc] of neighbors) {
+      assignment[nr]![nc] = group
+      groups[group]!.cells.push([nr, nc])
+      queue.push({ r: nr, c: nc, group })
+    }
+  }
+
+  // Fallback: assign any remaining unassigned cells
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (assignment[r]![c] !== -1) continue
+      const dirs: [number, number][] = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]
+      for (const [nr, nc] of dirs) {
+        const g = assignment[nr as number]?.[nc as number]
+        if (g !== undefined && g !== -1) {
+          assignment[r]![c] = g
+          groups[g]!.cells.push([r, c])
+          break
+        }
+      }
+    }
+  }
+
+  return groups
 }
 
 function tryGenerate(difficulty: Difficulty, seed: number): SumsPuzzle | null {
-  const size = SIZE[difficulty]
   const rng = createRng(seed)
+  const maxVal = MAX_VAL[difficulty]
+  const numGroups = NUM_GROUPS[difficulty]
 
-  const b = makeIsBlack(size, rng, DENSITY[difficulty])
-  fixLayout(b, size)
+  // 1. Generate grid values
+  const grid = Array.from({ length: SIZE }, () =>
+    Array.from({ length: SIZE }, () => Math.floor(rng() * maxVal) + 1)
+  )
 
-  const wCells: [number, number][] = []
-  for (let r = 0; r < size; r++)
-    for (let c = 0; c < size; c++)
-      if (!b[r]![c]!) wCells.push([r, c])
-  if (wCells.length < MIN_WHITE[difficulty]) return null
+  // 2. Create color groups
+  const colorGroups = createColorGroups(numGroups, rng)
 
-  const { hOf, vOf } = buildRunMaps(b, size)
-  if (!wCells.every(([r, c]) => hOf.has(`${r},${c}`) && vOf.has(`${r},${c}`))) return null
+  // 3. Generate solution (each cell is circle or cross)
+  // Ensure at least 30% circles and 30% crosses for interesting puzzles
+  const solution: CellMark[][] = Array.from({ length: SIZE }, () =>
+    Array.from({ length: SIZE }, (): CellMark => rng() < 0.5 ? 'circle' : 'cross')
+  )
 
-  const sol: (number | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
-  if (!fillValues(wCells, hOf, vOf, sol, 0, rng, { n: FILL_BUDGET[difficulty] })) return null
+  // Ensure minimum distribution
+  let circles = solution.flat().filter(m => m === 'circle').length
+  let crosses = solution.flat().filter(m => m === 'cross').length
+  if (circles < 8 || crosses < 8) return null
 
-  const grid = buildGrid(b, size, sol, hOf, vOf)
-  const solution = sol as (CellValue | null)[][]
-  const puzzle: SumsPuzzle = { id: `sums-${difficulty}-${seed}`, size, grid, solution, difficulty, seed }
+  // 4. Calculate constraints
+  const rowSums = Array.from({ length: SIZE }, (_, i) =>
+    solution[i]!.reduce((s, mark, j) => s + (mark === 'circle' ? grid[i]![j]! : 0), 0)
+  )
+  const colSums = Array.from({ length: SIZE }, (_, j) =>
+    solution.reduce((s, row, i) => s + (row[j] === 'circle' ? grid[i]![j]! : 0), 0)
+  )
 
-  // 一意解保証 (easy/normal/hard のみ。expert はスキップ)
-  const maxOps = UNIQUE_MAX_OPS[difficulty]
-  if (maxOps !== null) {
-    const count = countSolutions(puzzle, maxOps)
-    if (count !== 1) return null
+  for (const group of colorGroups) {
+    group.targetSum = group.cells.reduce(
+      (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0),
+      0
+    )
+    // Each group must have at least one circle for a meaningful constraint
+    const hasCircle = group.cells.some(([r, c]) => solution[r]![c] === 'circle')
+    if (!hasCircle) return null
   }
+
+  // Reject trivial constraints (all zeros or all sums equal total)
+  const total = grid.flat().reduce((a, b) => a + b, 0)
+  if (rowSums.some(s => s === 0) || rowSums.some(s => s === total)) return null
+
+  const puzzle: SumsPuzzle = {
+    id: `sums-${difficulty}-${seed}`,
+    grid,
+    solution,
+    rowSums,
+    colSums,
+    colorGroups,
+    difficulty,
+    seed,
+  }
+
+  // 5. Verify unique solution
+  if (countSolutions(puzzle, 200000) !== 1) return null
 
   return puzzle
 }
 
 export function generate(difficulty: Difficulty, seed?: number): SumsPuzzle {
   const base = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
-  const deadline = Date.now() + 3000
-  for (let i = 0; i < 500; i++) {
+  const deadline = Date.now() + 4000
+  for (let i = 0; i < 1000; i++) {
     if (Date.now() > deadline) break
     const p = tryGenerate(difficulty, (base + i) >>> 0)
     if (p) return p
   }
-  // フォールバック: 最小限の 2×2 Kakuro パズル
-  const size = SIZE[difficulty]
-  const grid: GridCell[][] = Array.from({ length: size }, (_, r) =>
-    Array.from({ length: size }, (_, c): GridCell => {
-      if (r === 0 && c === 1) return { type: 'black', sumDown: 3 } as BlackCell
-      if (r === 0 && c === 2) return { type: 'black', sumDown: 3 } as BlackCell
-      if (r === 1 && c === 0) return { type: 'black', sumRight: 3 } as BlackCell
-      if (r === 2 && c === 0) return { type: 'black', sumRight: 3 } as BlackCell
-      if (r === 0 || c === 0) return { type: 'black' }
-      if (r <= 2 && c <= 2) return { type: 'white', value: null }
-      return { type: 'black' }
-    })
+
+  // Fallback: construct a simple valid puzzle
+  return buildFallback(difficulty, base)
+}
+
+function buildFallback(difficulty: Difficulty, seed: number): SumsPuzzle {
+  const grid = [
+    [3, 1, 4, 2, 5],
+    [2, 4, 1, 5, 3],
+    [5, 2, 3, 1, 4],
+    [1, 5, 2, 4, 3],
+    [4, 3, 5, 3, 1],
+  ]
+  const solution: CellMark[][] = [
+    ['circle', 'cross', 'circle', 'cross', 'circle'],
+    ['cross', 'circle', 'cross', 'circle', 'cross'],
+    ['circle', 'cross', 'circle', 'cross', 'circle'],
+    ['cross', 'circle', 'cross', 'circle', 'cross'],
+    ['circle', 'cross', 'circle', 'cross', 'circle'],
+  ]
+  const colorGroups: ColorGroup[] = [
+    { id: 0, colorIndex: 0, cells: [[0,0],[0,1],[1,0],[1,1],[2,0]], targetSum: 3 + 1 + 5 + 3 },
+    { id: 1, colorIndex: 1, cells: [[0,2],[0,3],[0,4],[1,2],[1,3]], targetSum: 4 + 5 },
+    { id: 2, colorIndex: 2, cells: [[1,4],[2,1],[2,2],[2,3],[2,4]], targetSum: 3 + 4 },
+    { id: 3, colorIndex: 3, cells: [[3,0],[3,1],[3,2],[4,0],[4,1]], targetSum: 1 + 4 },
+    { id: 4, colorIndex: 4, cells: [[3,3],[3,4],[4,2],[4,3],[4,4]], targetSum: 4 + 5 + 1 },
+  ]
+  // Recalculate sums
+  colorGroups[0]!.targetSum = colorGroups[0]!.cells.reduce(
+    (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
   )
-  const solution: (CellValue | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
-  solution[1]![1] = 1; solution[1]![2] = 2
-  solution[2]![1] = 2; solution[2]![2] = 1
-  return { id: `sums-${difficulty}-${base}`, size, grid, solution, difficulty, seed: base }
+  colorGroups[1]!.targetSum = colorGroups[1]!.cells.reduce(
+    (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
+  )
+  colorGroups[2]!.targetSum = colorGroups[2]!.cells.reduce(
+    (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
+  )
+  colorGroups[3]!.targetSum = colorGroups[3]!.cells.reduce(
+    (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
+  )
+  colorGroups[4]!.targetSum = colorGroups[4]!.cells.reduce(
+    (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
+  )
+  const rowSums = Array.from({ length: SIZE }, (_, i) =>
+    solution[i]!.reduce((s, mark, j) => s + (mark === 'circle' ? grid[i]![j]! : 0), 0)
+  )
+  const colSums = Array.from({ length: SIZE }, (_, j) =>
+    solution.reduce((s, row, i) => s + (row[j] === 'circle' ? grid[i]![j]! : 0), 0)
+  )
+  return { id: `sums-${difficulty}-${seed}`, grid, solution, rowSums, colSums, colorGroups, difficulty, seed }
 }

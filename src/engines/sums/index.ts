@@ -1,4 +1,4 @@
 export { generate } from './generator'
-export { solve, countSolutions, identifyRuns } from './solver'
+export { solve, countSolutions } from './solver'
 export { validate } from './validator'
-export type { CellValue, BlackCell, WhiteCell, GridCell, SumsPuzzle, SumsState, SumsMove } from './types'
+export type { CellMark, ColorGroup, SumsPuzzle, SumsState, SumsMove } from './types'

@@ -3,7 +3,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SumsBoard } from '../../../src/components/games/sums/Board'
 import { useSumsGame } from '../../../src/hooks/useSumsGame'
 import { Difficulty } from '../../../src/types/engine'
-import { CellValue } from '../../../src/engines/sums/types'
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
 function isDifficulty(v: unknown): v is Difficulty {
@@ -18,13 +17,11 @@ export default function SumsScreen() {
   const {
     state,
     isLoading,
-    selectedCell,
-    wrongCells,
+    flashCells,
     isComplete,
     isGameOver,
     lives,
-    selectCell,
-    enterNumber,
+    tapCell,
     restart,
   } = useSumsGame(difficulty)
 
@@ -44,6 +41,10 @@ export default function SumsScreen() {
         </View>
       </View>
 
+      <View style={styles.hint}>
+        <Text style={styles.hintText}>タップで ×→○→空 を切り替え</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.boardContainer}>
         {isLoading || !state ? (
           <View style={styles.loadingContainer}>
@@ -53,32 +54,11 @@ export default function SumsScreen() {
         ) : (
           <SumsBoard
             state={state}
-            selectedCell={selectedCell}
-            wrongCells={wrongCells}
-            onSelectCell={selectCell}
+            flashCells={flashCells}
+            onTapCell={tapCell}
           />
         )}
       </ScrollView>
-
-      <View style={styles.numPad}>
-        {([1, 2, 3, 4, 5, 6, 7, 8, 9] as CellValue[]).map(num => (
-          <TouchableOpacity
-            key={String(num)}
-            style={styles.numButton}
-            onPress={() => enterNumber(num)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.numText}>{num}</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity
-          style={[styles.numButton, styles.clearButton]}
-          onPress={() => enterNumber(null)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.numText}>✕</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* クリアダイアログ */}
       <Modal visible={isComplete} transparent animationType="fade">
@@ -135,6 +115,12 @@ const styles = StyleSheet.create({
   headerRight: { minWidth: 60, alignItems: 'flex-end' },
   livesInfinite: { fontSize: 20, color: '#a5d6a7', fontWeight: 'bold' },
   livesText: { fontSize: 16, color: '#fff' },
+  hint: {
+    alignItems: 'center',
+    paddingVertical: 6,
+    backgroundColor: '#e8eaf6',
+  },
+  hintText: { fontSize: 12, color: '#5c6bc0' },
   boardContainer: {
     flexGrow: 1,
     alignItems: 'center',
@@ -152,28 +138,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  numPad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    padding: 12,
-    gap: 6,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  numButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#e3f2fd',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#90caf9',
-  },
-  clearButton: { backgroundColor: '#fce4e4', borderColor: '#f8b8b8' },
-  numText: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

@@ -1,172 +1,239 @@
 import React, { useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native'
-import { GridCell, BlackCell, SumsState } from '../../../engines/sums/types'
+import { SumsState, CellMark, ColorGroup } from '../../../engines/sums/types'
 
 const SW = Dimensions.get('window').width
+const GROUP_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFB347', '#A29BFE', '#6C5CE7', '#FD79A8', '#00B894']
+const GROUP_COLORS_LIGHT = ['#FFE5E5', '#E0F8F5', '#E0F4FF', '#FFF4E0', '#EEE8FF', '#E8E4FF', '#FFE5F2', '#E0FFF5']
 
-function getRunCells(grid: GridCell[][], row: number, col: number): Set<string> {
-  const result = new Set<string>()
-  const numRows = grid.length
-  const numCols = grid[0]?.length ?? 0
+function getGroupForCell(colorGroups: ColorGroup[], r: number, c: number): ColorGroup | undefined {
+  return colorGroups.find(g => g.cells.some(([gr, gc]) => gr === r && gc === c))
+}
 
-  // 横ラン
-  let startC = col
-  while (startC > 0 && grid[row]?.[startC - 1]?.type === 'white') startC--
-  let c = startC
-  while (c < numCols && grid[row]?.[c]?.type === 'white') { result.add(`${row},${c}`); c++ }
+function isRowComplete(state: SumsState, row: number): boolean {
+  return state.current[row]!.every(m => m !== null) &&
+    state.current[row]!.reduce((s, m, j) =>
+      s + (m === 'circle' ? state.grid[row]![j]! : 0), 0
+    ) === state.rowSums[row]
+}
 
-  // 縦ラン
-  let startR = row
-  while (startR > 0 && grid[startR - 1]?.[col]?.type === 'white') startR--
-  let r = startR
-  while (r < numRows && grid[r]?.[col]?.type === 'white') { result.add(`${r},${col}`); r++ }
+function isColComplete(state: SumsState, col: number): boolean {
+  return state.current.every(r => r[col] !== null) &&
+    state.current.reduce((s, row, i) =>
+      s + (row[col] === 'circle' ? state.grid[i]![col]! : 0), 0
+    ) === state.colSums[col]
+}
 
-  return result
+function isGroupComplete(state: SumsState, group: ColorGroup): boolean {
+  return group.cells.every(([r, c]) => state.current[r]?.[c] !== null) &&
+    group.cells.reduce((s, [r, c]) =>
+      s + (state.current[r]?.[c] === 'circle' ? state.grid[r]![c]! : 0), 0
+    ) === group.targetSum
 }
 
 type Props = {
   state: SumsState
-  selectedCell: [number, number] | null
-  wrongCells: Set<string>
-  onSelectCell: (row: number, col: number) => void
+  flashCells: Set<string>
+  onTapCell: (row: number, col: number) => void
 }
 
-export function SumsBoard({ state, selectedCell, wrongCells, onSelectCell }: Props) {
-  const { grid, current, size } = state
-  const cellSize = Math.floor((SW - 16) / size)
-  const clueFontSize = Math.max(7, Math.floor(cellSize * 0.3))
-  const valueFontSize = Math.max(10, Math.floor(cellSize * 0.48))
+export function SumsBoard({ state, flashCells, onTapCell }: Props) {
+  const { grid, current, rowSums, colSums, colorGroups } = state
+  const headerSize = 32
+  const cellSize = Math.floor((SW - 16 - headerSize) / 5)
 
-  const runCells = useMemo(() => {
-    if (!selectedCell) return new Set<string>()
-    return getRunCells(grid, selectedCell[0], selectedCell[1])
-  }, [grid, selectedCell])
+  const rowComplete = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => isRowComplete(state, i)),
+    [state]
+  )
+  const colComplete = useMemo(
+    () => Array.from({ length: 5 }, (_, j) => isColComplete(state, j)),
+    [state]
+  )
+  const groupComplete = useMemo(
+    () => colorGroups.map(g => isGroupComplete(state, g)),
+    [state, colorGroups]
+  )
 
   return (
-    <View style={[styles.grid, { width: cellSize * size, height: cellSize * size }]}>
-      {grid.map((row, ri) => (
-        <View key={ri} style={styles.row}>
-          {row.map((cell, ci) => {
-            if (cell.type === 'black') {
-              const bc = cell as BlackCell
-              return (
-                <View
-                  key={ci}
-                  style={[styles.blackCell, { width: cellSize, height: cellSize }]}
-                >
-                  {/* 斜め分割線 */}
-                  <View style={[styles.diagonal, {
-                    width: cellSize * 1.42,
-                    top: cellSize / 2 - 0.5,
-                    left: -(cellSize * 0.21),
-                  }]} />
-                  {/* 右ラン合計（右上） */}
-                  {bc.sumRight !== undefined && (
-                    <Text
-                      style={[styles.clueText, { fontSize: clueFontSize, position: 'absolute', top: 1, right: 2 }]}
-                      numberOfLines={1}
-                    >
-                      {bc.sumRight}
-                    </Text>
-                  )}
-                  {/* 下ラン合計（左下） */}
-                  {bc.sumDown !== undefined && (
-                    <Text
-                      style={[styles.clueText, { fontSize: clueFontSize, position: 'absolute', bottom: 1, left: 2 }]}
-                      numberOfLines={1}
-                    >
-                      {bc.sumDown}
-                    </Text>
-                  )}
-                </View>
-              )
-            }
+    <View>
+      {/* Column sum headers */}
+      <View style={styles.headerRow}>
+        <View style={{ width: headerSize }} />
+        {Array.from({ length: 5 }, (_, j) => (
+          <View key={j} style={[styles.sumHeader, { width: cellSize, height: headerSize }]}>
+            <Text style={[styles.sumText, colComplete[j] && styles.sumDone]}>
+              {colSums[j]}
+            </Text>
+          </View>
+        ))}
+      </View>
 
-            const cellKey = `${ri}-${ci}`
-            const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci
-            const isInRun = runCells.has(`${ri},${ci}`) && !isSelected
-            const isWrong = wrongCells.has(cellKey)
-            const value = current[ri]?.[ci] ?? null
+      {/* Grid rows */}
+      {grid.map((row, ri) => (
+        <View key={ri} style={styles.gridRow}>
+          {/* Row sum header */}
+          <View style={[styles.sumHeader, { width: headerSize, height: cellSize }]}>
+            <Text style={[styles.sumText, rowComplete[ri] && styles.sumDone]}>
+              {rowSums[ri]}
+            </Text>
+          </View>
+
+          {row.map((val, ci) => {
+            const group = getGroupForCell(colorGroups, ri, ci)
+            const gIdx = group?.colorIndex ?? 0
+            const gDone = group ? groupComplete[group.id] ?? false : false
+            const mark: CellMark = current[ri]?.[ci] ?? null
+            const isFlash = flashCells.has(`${ri},${ci}`)
+
+            const rowDone = rowComplete[ri] ?? false
+            const colDone = colComplete[ci] ?? false
+            const showDim = gDone && mark === 'cross'
 
             return (
               <TouchableOpacity
                 key={ci}
                 style={[
-                  styles.whiteCell,
+                  styles.cell,
                   { width: cellSize, height: cellSize },
-                  isSelected && styles.cellSelected,
-                  isInRun && styles.cellHighlight,
-                  isWrong && styles.cellWrong,
+                  { backgroundColor: gDone ? '#fff' : GROUP_COLORS_LIGHT[gIdx % GROUP_COLORS_LIGHT.length] },
+                  { borderColor: GROUP_COLORS[gIdx % GROUP_COLORS.length] },
+                  isFlash && styles.cellFlash,
                 ]}
-                onPress={() => onSelectCell(ri, ci)}
+                onPress={() => onTapCell(ri, ci)}
                 activeOpacity={0.7}
               >
-                {value !== null && (
+                {/* Number (hidden if cross in complete group) */}
+                {!showDim && (
                   <Text style={[
-                    styles.valueText,
-                    { fontSize: valueFontSize },
-                    isWrong && styles.valueWrong,
+                    styles.cellNum,
+                    { fontSize: Math.max(10, Math.floor(cellSize * 0.38)) },
+                    (rowDone && colDone) && styles.cellNumDone,
                   ]}>
-                    {value}
+                    {val}
                   </Text>
+                )}
+
+                {/* Mark overlay */}
+                {mark === 'cross' && !gDone && (
+                  <View style={[StyleSheet.absoluteFillObject, styles.markOverlay]}>
+                    <Text style={[styles.markText, { fontSize: Math.max(10, Math.floor(cellSize * 0.5)) }]}>×</Text>
+                  </View>
+                )}
+                {mark === 'circle' && (
+                  <View style={[StyleSheet.absoluteFillObject, styles.markOverlayCircle]}>
+                    <Text style={[styles.markTextCircle, { fontSize: Math.max(10, Math.floor(cellSize * 0.5)) }]}>○</Text>
+                  </View>
+                )}
+                {gDone && mark === 'circle' && (
+                  <View style={[StyleSheet.absoluteFillObject, styles.markOverlayCircle]}>
+                    <Text style={{ fontSize: Math.max(10, Math.floor(cellSize * 0.5)) }}>☆</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             )
           })}
         </View>
       ))}
+
+      {/* Color group legend */}
+      <View style={styles.legend}>
+        {colorGroups.map(group => (
+          <View key={group.id} style={styles.legendItem}>
+            <View style={[styles.legendColor, {
+              backgroundColor: groupComplete[group.id]
+                ? '#ccc'
+                : GROUP_COLORS_LIGHT[group.colorIndex % GROUP_COLORS_LIGHT.length],
+              borderColor: groupComplete[group.id]
+                ? '#aaa'
+                : GROUP_COLORS[group.colorIndex % GROUP_COLORS.length],
+            }]} />
+            <Text style={[styles.legendText, groupComplete[group.id] && styles.sumDone]}>
+              {group.targetSum}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: '#555',
-  },
-  row: {
+  headerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
-  blackCell: {
-    backgroundColor: '#2c2c2c',
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#555',
-    overflow: 'hidden',
+  gridRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  diagonal: {
-    position: 'absolute',
-    height: 1,
-    backgroundColor: '#888',
-    transform: [{ rotate: '45deg' }],
-  },
-  clueText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  whiteCell: {
-    backgroundColor: '#fff',
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#aaa',
+  sumHeader: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellSelected: {
-    backgroundColor: '#ffd54f',
+  sumText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1a237e',
   },
-  cellHighlight: {
-    backgroundColor: '#fff9c4',
+  sumDone: {
+    color: '#bbb',
   },
-  cellWrong: {
-    backgroundColor: '#ffebee',
+  cell: {
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  valueText: {
+  cellFlash: {
+    backgroundColor: '#FFCDD2',
+  },
+  cellNum: {
     fontWeight: '600',
-    color: '#1565c0',
+    color: '#333',
   },
-  valueWrong: {
+  cellNumDone: {
+    color: '#bbb',
+  },
+  markOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(200,0,0,0.08)',
+  },
+  markOverlayCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,120,0,0.08)',
+  },
+  markText: {
     color: '#c62828',
+    fontWeight: 'bold',
+  },
+  markTextCircle: {
+    color: '#2e7d32',
+    fontWeight: 'bold',
+  },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendColor: {
+    width: 16,
+    height: 16,
+    borderWidth: 1.5,
+    borderRadius: 3,
+  },
+  legendText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
   },
 })
