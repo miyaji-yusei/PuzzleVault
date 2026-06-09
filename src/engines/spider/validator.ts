@@ -14,6 +14,13 @@ function isSameSuit(cards: Card[]): boolean {
   return cards.every(c => c.suit === suit)
 }
 
+export function isValidMoveUnit(cards: Card[]): boolean {
+  if (cards.length === 0) return false
+  if (!cards[0]!.faceUp) return false
+  if (cards.length === 1) return true
+  return isDescendingSequence(cards) && isSameSuit(cards)
+}
+
 export function validate(state: SpiderState, move: SpiderMove): ValidationResult {
   switch (move.type) {
     case 'deal': {

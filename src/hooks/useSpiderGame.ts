@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { generate, dealState, validate, removeCompleteSets } from '../engines/spider'
+import { generate, dealState, validate, isValidMoveUnit, removeCompleteSets } from '../engines/spider'
 import { SpiderState, SpiderMove, SpiderPuzzle } from '../engines/spider/types'
 import { Difficulty } from '../types/engine'
 
@@ -85,6 +85,8 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
 
     const card = column[cardIndex]
     if (!card || !card.faceUp) return
+    const seq = column.slice(cardIndex)
+    if (!isValidMoveUnit(seq)) return
     setSelected({ col, cardIndex })
   }, [state, selected, isComplete, commitState])
 
