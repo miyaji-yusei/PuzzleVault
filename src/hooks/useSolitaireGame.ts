@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { generate, validate, dealState } from '../engines/solitaire'
 import { SolitaireState, SolitaireMove, Suit } from '../engines/solitaire/types'
 import { Difficulty } from '../types/engine'
@@ -192,6 +192,18 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   const [isComplete, setIsComplete] = useState(false)
   const [history, setHistory] = useState<SolitaireState[]>([])
   const maxResets = MAX_RESETS[difficulty]
+
+  const prevDifficultyRef = useRef(difficulty)
+  useEffect(() => {
+    if (prevDifficultyRef.current === difficulty) return
+    prevDifficultyRef.current = difficulty
+    const freshPuzzle = generate(difficulty, Date.now())
+    setPuzzle(freshPuzzle)
+    setState({ ...dealState(freshPuzzle.seed, freshPuzzle.drawMode), startedAt: Date.now() })
+    setSelected(null)
+    setIsComplete(false)
+    setHistory([])
+  }, [difficulty])
 
   const canAutoComplete =
     !isComplete &&
