@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SumsBoard } from '../../../src/components/games/sums/Board'
 import { useSumsGame } from '../../../src/hooks/useSumsGame'
@@ -17,6 +17,7 @@ export default function SumsScreen() {
 
   const {
     state,
+    isLoading,
     selectedCell,
     wrongCells,
     isComplete,
@@ -44,12 +45,19 @@ export default function SumsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.boardContainer}>
-        <SumsBoard
-          state={state}
-          selectedCell={selectedCell}
-          wrongCells={wrongCells}
-          onSelectCell={selectCell}
-        />
+        {isLoading || !state ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1a237e" />
+            <Text style={styles.loadingText}>問題を生成中...</Text>
+          </View>
+        ) : (
+          <SumsBoard
+            state={state}
+            selectedCell={selectedCell}
+            wrongCells={wrongCells}
+            onSelectCell={selectCell}
+          />
+        )}
       </ScrollView>
 
       <View style={styles.numPad}>
@@ -132,6 +140,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
   },
   numPad: {
     flexDirection: 'row',
