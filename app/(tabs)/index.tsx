@@ -1,5 +1,6 @@
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useRef } from 'react'
 
 type GameInfo = {
   id: string
@@ -89,6 +90,7 @@ function GameCard({ game, onPress }: GameCardProps) {
 
 export default function HomeScreen() {
   const router = useRouter()
+  const navigatingRef = useRef(false)
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -97,7 +99,12 @@ export default function HomeScreen() {
         <GameCard
           key={game.id}
           game={game}
-          onPress={() => router.push(`/games/${game.id}`)}
+          onPress={() => {
+            if (navigatingRef.current) return
+            navigatingRef.current = true
+            router.push(`/games/${game.id}`)
+            setTimeout(() => { navigatingRef.current = false }, 1000)
+          }}
         />
       ))}
     </ScrollView>
