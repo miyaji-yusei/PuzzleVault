@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Switch } from 'react-native'
+import { useState } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
@@ -60,12 +61,13 @@ function DifficultySelect() {
 
 function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   const router = useRouter()
+  const [dealWithEmpty, setDealWithEmpty] = useState(false)
 
   const {
     puzzle, state, selected, isComplete,
     canUndo,
     tapTableau, doubleTapCard, directMove, deal, undo, restart,
-  } = useSpiderGame(difficulty)
+  } = useSpiderGame(difficulty, undefined, { dealWithEmpty })
 
   return (
     <SafeAreaView style={styles.container}>
@@ -92,6 +94,16 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         <Text style={styles.infoText}>
           {difficulty === 'easy' ? '1スート' : difficulty === 'normal' ? '2スート' : '4スート'} ・ 手数: {state.moves} ・ 同スートのK→Aを完成させよう
         </Text>
+      </View>
+
+      <View style={styles.settingsRow}>
+        <Text style={styles.settingsLabel}>空列があっても山札を配る</Text>
+        <Switch
+          value={dealWithEmpty}
+          onValueChange={setDealWithEmpty}
+          trackColor={{ false: '#555', true: '#66bb6a' }}
+          thumbColor={dealWithEmpty ? '#fff' : '#ccc'}
+        />
       </View>
 
       <SpiderBoard
@@ -121,11 +133,11 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         </View>
       </Modal>
 
-      {/* Deal unavailable hint */}
-      {puzzle.suitCount !== undefined && state.stock.length > 0 &&
+      {/* Deal unavailable hint (strict mode only) */}
+      {!dealWithEmpty && state.stock.length > 0 &&
         state.tableau.some(col => col.length === 0) && (
         <View style={styles.hintBar}>
-          <Text style={styles.hintText}>空列があると配れません</Text>
+          <Text style={styles.hintText}>山札を配るには、すべての列にカードが必要です</Text>
         </View>
       )}
     </SafeAreaView>
@@ -200,6 +212,17 @@ const styles = StyleSheet.create({
   iconBtnText: { color: '#fff', fontSize: 16 },
   infoRow: { paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#2e7d32' },
   infoText: { fontSize: 11, color: '#c8e6c9', textAlign: 'center' },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#1b5e20',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2e7d32',
+  },
+  settingsLabel: { fontSize: 11, color: '#c8e6c9' },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
