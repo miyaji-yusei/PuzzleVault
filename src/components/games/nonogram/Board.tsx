@@ -109,6 +109,9 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const pinchInitPanYRef = useRef(0)
   const pinchInitMidXRef = useRef(0)
   const pinchInitMidYRef = useRef(0)
+  // ピンチ終了後100ms間は塗り操作を無効化
+  const lastPinchEndTimeRef = useRef(0)
+  const PINCH_PAINT_BLOCK_MS = 100
 
   const onSetCellRef = useRef(onSetCell)
   const onSetCellToRef = useRef(onSetCellTo)
@@ -193,6 +196,11 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
       if (touches.length >= 2) {
         isTwoFingerRef.current = true
         initTwoFinger(Array.from(touches) as { pageX: number; pageY: number }[])
+        return
+      }
+
+      // ピンチ操作直後は塗り操作を無効化
+      if (Date.now() - lastPinchEndTimeRef.current < PINCH_PAINT_BLOCK_MS) {
         return
       }
 
@@ -292,6 +300,8 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
             }
           })
         }
+      } else {
+        lastPinchEndTimeRef.current = Date.now()
       }
       isTwoFingerRef.current = false
       previewRef.current = null
@@ -300,6 +310,9 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
     },
 
     onPanResponderTerminate: () => {
+      if (isTwoFingerRef.current) {
+        lastPinchEndTimeRef.current = Date.now()
+      }
       isTwoFingerRef.current = false
       previewRef.current = null
       setPreview(null)
