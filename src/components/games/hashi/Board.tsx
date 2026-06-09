@@ -5,7 +5,7 @@ import { Island, Bridge, HashiState } from '../../../engines/hashi/types'
 const SCREEN_WIDTH = Dimensions.get('window').width
 const GRID_PADDING = 16
 const BRIDGE_TAP_THRESHOLD = 0.45
-const DRAG_CONFIRM_THRESHOLD = 0.9
+const DRAG_CONFIRM_THRESHOLD = 0.7
 
 type Props = {
   state: HashiState
@@ -51,7 +51,7 @@ function findIslandAt(islands: Island[], row: number, col: number, radiusCells: 
   let best: Island | null = null
   let bestDist = Infinity
   for (const island of islands) {
-    const dist = Math.sqrt((row - island.row) ** 2 + (col - island.col) ** 2)
+    const dist = Math.sqrt((row - (island.row + 0.5)) ** 2 + (col - (island.col + 0.5)) ** 2)
     if (dist <= radiusCells && dist < bestDist) {
       bestDist = dist
       best = island
@@ -64,7 +64,8 @@ function findTappedBridge(
   pairs: [number, number][],
   islandMap: Map<number, Island>,
   tapRow: number,
-  tapCol: number
+  tapCol: number,
+  current: Bridge[]
 ): [number, number] | null {
   let bestHorizPair: [number, number] | null = null
   let bestHorizDist = Infinity
@@ -80,7 +81,7 @@ function findTappedBridge(
       const minCol = Math.min(a.col, b.col)
       const maxCol = Math.max(a.col, b.col)
       if (tapCol > minCol && tapCol < maxCol) {
-        const dist = Math.abs(tapRow - a.row)
+        const dist = Math.abs(tapRow - (a.row + 0.5))
         if (dist < BRIDGE_TAP_THRESHOLD && dist < bestHorizDist) {
           bestHorizDist = dist
           bestHorizPair = [aId, bId]
@@ -90,7 +91,7 @@ function findTappedBridge(
       const minRow = Math.min(a.row, b.row)
       const maxRow = Math.max(a.row, b.row)
       if (tapRow > minRow && tapRow < maxRow) {
-        const dist = Math.abs(tapCol - a.col)
+        const dist = Math.abs(tapCol - (a.col + 0.5))
         if (dist < BRIDGE_TAP_THRESHOLD && dist < bestVertDist) {
           bestVertDist = dist
           bestVertPair = [aId, bId]
@@ -99,8 +100,21 @@ function findTappedBridge(
     }
   }
 
-  // Ambiguous: tap is near both a horizontal and a vertical bridge → no action
-  if (bestHorizPair && bestVertPair) return null
+  // Ambiguous: tap is near both a horizontal and a vertical bridge
+  // Prefer the direction that already has a drawn bridge (allows removal)
+  if (bestHorizPair && bestVertPair) {
+    const horizDrawn = current.some(
+      b => (b.from === bestHorizPair![0] && b.to === bestHorizPair![1]) ||
+           (b.from === bestHorizPair![1] && b.to === bestHorizPair![0])
+    )
+    const vertDrawn = current.some(
+      b => (b.from === bestVertPair![0] && b.to === bestVertPair![1]) ||
+           (b.from === bestVertPair![1] && b.to === bestVertPair![0])
+    )
+    if (horizDrawn && !vertDrawn) return bestHorizPair
+    if (vertDrawn && !horizDrawn) return bestVertPair
+    return null
+  }
 
   return bestHorizPair ?? bestVertPair
 }
@@ -120,8 +134,8 @@ function computeDragToTarget(
   fingerCol: number,
   cs: number
 ): { pair: [number, number]; progress: number; line: DragLine } | null {
-  const dRow = fingerRow - startIsland.row
-  const dCol = fingerCol - startIsland.col
+  const dRow = fingerRow - (startIsland.row + 0.5)
+  const dCol = fingerCol - (startIsland.col + 0.5)
   const horizontal = Math.abs(dCol) >= Math.abs(dRow)
 
   let bestPair: [number, number] | null = null
@@ -257,7 +271,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       } else {
         dragStartSatisfiedRef.current = false
         dragStartIslandIdRef.current = null
-        tapStartBridgeRef.current = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
+        tapStartBridgeRef.current = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol, currentRef.current)
       }
     },
     onPanResponderMove: (e) => {
@@ -314,7 +328,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
       // Only toggle bridge if touch both started AND ended near the same bridge line
       if (!isDrag && startBridge) {
-        const endBridge = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol)
+        const endBridge = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol, currentRef.current)
         if (endBridge && endBridge[0] === startBridge[0] && endBridge[1] === startBridge[1]) {
           onToggleBridgeRef.current(startBridge[0], startBridge[1])
         }
