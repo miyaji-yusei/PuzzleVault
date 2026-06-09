@@ -1,123 +1,131 @@
-import { SumsPuzzle, GridCell } from './types'
-
-export interface RunInfo {
-  cells: [number, number][]
-  sum: number
-  direction: 'h' | 'v'
-}
-
-export function identifyRuns(grid: GridCell[][], size: number): RunInfo[] {
-  const runs: RunInfo[] = []
-
-  for (let r = 0; r < size; r++) {
-    let c = 0
-    while (c < size) {
-      if (grid[r]![c]!.type === 'black') { c++; continue }
-      const startC = c
-      const cells: [number, number][] = []
-      while (c < size && grid[r]![c]!.type === 'white') { cells.push([r, c]); c++ }
-      if (cells.length >= 2 && startC > 0) {
-        const header = grid[r]![startC - 1]!
-        if (header.type === 'black' && header.sumRight !== undefined) {
-          runs.push({ cells, sum: header.sumRight, direction: 'h' })
-        }
-      }
-    }
-  }
-
-  for (let c = 0; c < size; c++) {
-    let r = 0
-    while (r < size) {
-      if (grid[r]![c]!.type === 'black') { r++; continue }
-      const startR = r
-      const cells: [number, number][] = []
-      while (r < size && grid[r]![c]!.type === 'white') { cells.push([r, c]); r++ }
-      if (cells.length >= 2 && startR > 0) {
-        const header = grid[startR - 1]![c]!
-        if (header.type === 'black' && header.sumDown !== undefined) {
-          runs.push({ cells, sum: header.sumDown, direction: 'v' })
-        }
-      }
-    }
-  }
-
-  return runs
-}
+import { SumsPuzzle, CellMark } from './types'
 
 export function solve(puzzle: SumsPuzzle): SumsPuzzle | null {
-  const { grid, solution, size } = puzzle
-  const runs = identifyRuns(grid, size)
-  for (const run of runs) {
-    const vals: number[] = []
-    for (const [r, c] of run.cells) {
-      const v = solution[r]?.[c]
-      if (v == null) return null
-      vals.push(v)
-    }
-    if (vals.reduce((a, b) => a + b, 0) !== run.sum) return null
-    if (new Set(vals).size !== vals.length) return null
+  const { grid, solution, rowSums, colSums, colorGroups } = puzzle
+  const size = grid.length
+
+  // Verify that the stored solution satisfies all constraints
+  for (let i = 0; i < size; i++) {
+    const rSum = solution[i]!.reduce((s, m, j) => s + (m === 'circle' ? grid[i]![j]! : 0), 0)
+    if (rSum !== rowSums[i]) return null
   }
+  for (let j = 0; j < size; j++) {
+    const cSum = solution.reduce((s, row, i) => s + (row[j] === 'circle' ? grid[i]![j]! : 0), 0)
+    if (cSum !== colSums[j]) return null
+  }
+  for (const group of colorGroups) {
+    const gSum = group.cells.reduce(
+      (s, [r, c]) => s + (solution[r]![c] === 'circle' ? grid[r]![c]! : 0), 0
+    )
+    if (gSum !== group.targetSum) return null
+  }
+
   return puzzle
 }
 
-// maxOps: 操作上限。超えた場合は-1を返す（budget切れ）
 export function countSolutions(puzzle: SumsPuzzle, maxOps = 1000000): number {
-  const { grid, size } = puzzle
-  const runs = identifyRuns(grid, size)
+  const { grid, rowSums, colSums, colorGroups } = puzzle
+  const SIZE = grid.length
 
-  const hRunOf = new Map<string, RunInfo>()
-  const vRunOf = new Map<string, RunInfo>()
-  for (const run of runs) {
-    for (const [r, c] of run.cells) {
-      const key = `${r},${c}`
-      if (run.direction === 'h') hRunOf.set(key, run)
-      else vRunOf.set(key, run)
-    }
-  }
+  // Build cell order (row-major)
+  const cells: [number, number][] = []
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      cells.push([r, c])
 
-  const whiteCells: [number, number][] = []
-  for (let r = 0; r < size; r++)
-    for (let c = 0; c < size; c++)
-      if (grid[r]![c]!.type === 'white') whiteCells.push([r, c])
+  // Build group membership map
+  const groupOf = new Map<string, number>()
+  for (const group of colorGroups)
+    for (const [r, c] of group.cells)
+      groupOf.set(`${r},${c}`, group.id)
 
-  const cur: (number | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
+  const current: CellMark[][] = Array.from({ length: SIZE }, () => Array(SIZE).fill(null))
+  // Partial sums for pruning
+  const rowPartial = Array(SIZE).fill(0)
+  const colPartial = Array(SIZE).fill(0)
+  const groupPartial = Array(colorGroups.length).fill(0)
+  // Remaining cells per row/col/group
+  const rowRem = Array(SIZE).fill(SIZE)
+  const colRem = Array(SIZE).fill(SIZE)
+  const groupRem = colorGroups.map(g => g.cells.length)
+
   let found = 0
   let ops = 0
 
+  function canSatisfy(target: number, partial: number, remaining: number, vals: number[]): boolean {
+    // min achievable = partial + sum of 0s (all cross)
+    // max achievable = partial + sum of all remaining values
+    const maxAdd = vals.reduce((s, v) => s + v, 0)
+    return partial <= target && partial + maxAdd >= target
+  }
+
+  // Precompute remaining values for each row/col/group at each step - too complex
+  // Use simpler bound: just check partial <= target and remaining > 0 for possibility
+
   function bt(idx: number): void {
     if (found >= 2 || ops++ >= maxOps) return
-    if (idx === whiteCells.length) { found++; return }
-    const [r, c] = whiteCells[idx]!
-    const key = `${r},${c}`
-    const hr = hRunOf.get(key)
-    const vr = vRunOf.get(key)
-
-    for (let val = 1; val <= 9; val++) {
-      if (hr) {
-        const usedH = hr.cells.map(([ar, ac]) => cur[ar]?.[ac]).filter((v): v is number => v != null)
-        if (usedH.includes(val)) continue
-        const psum = usedH.reduce((a, b) => a + b, 0) + val
-        if (psum > hr.sum) continue
-        const rem = hr.cells.length - usedH.length - 1
-        if (rem === 0 && psum !== hr.sum) continue
-      }
-      if (vr) {
-        const usedV = vr.cells.map(([ar, ac]) => cur[ar]?.[ac]).filter((v): v is number => v != null)
-        if (usedV.includes(val)) continue
-        const psum = usedV.reduce((a, b) => a + b, 0) + val
-        if (psum > vr.sum) continue
-        const rem = vr.cells.length - usedV.length - 1
-        if (rem === 0 && psum !== vr.sum) continue
-      }
-      cur[r]![c] = val
-      bt(idx + 1)
-      cur[r]![c] = null
-      if (found >= 2 || ops >= maxOps) return
+    if (idx === cells.length) {
+      // Verify all constraints exactly
+      for (let i = 0; i < SIZE; i++)
+        if (rowPartial[i] !== rowSums[i]) return
+      for (let j = 0; j < SIZE; j++)
+        if (colPartial[j] !== colSums[j]) return
+      for (let k = 0; k < colorGroups.length; k++)
+        if (groupPartial[k] !== colorGroups[k]!.targetSum) return
+      found++
+      return
     }
+
+    const [r, c] = cells[idx]!
+    const val = grid[r]![c]!
+    const gid = groupOf.get(`${r},${c}`)!
+
+    rowRem[r]--
+    colRem[c]--
+    groupRem[gid]--
+
+    // Try circle
+    rowPartial[r] += val
+    colPartial[c] += val
+    groupPartial[gid] += val
+
+    const rOk = rowPartial[r] <= rowSums[r]!
+    const cOk = colPartial[c] <= colSums[c]!
+    const gOk = groupPartial[gid] <= colorGroups[gid]!.targetSum
+
+    if (rOk && cOk && gOk) {
+      current[r]![c] = 'circle'
+      bt(idx + 1)
+    }
+
+    rowPartial[r] -= val
+    colPartial[c] -= val
+    groupPartial[gid] -= val
+
+    // Try cross
+    // Check if remaining cells can still satisfy constraints
+    const rMin = rowPartial[r]
+    const cMin = colPartial[c]
+    const gMin = groupPartial[gid]
+
+    if (
+      rMin <= rowSums[r]! &&
+      cMin <= colSums[c]! &&
+      gMin <= colorGroups[gid]!.targetSum &&
+      found < 2 && ops < maxOps
+    ) {
+      current[r]![c] = 'cross'
+      bt(idx + 1)
+    }
+
+    current[r]![c] = null
+    rowRem[r]++
+    colRem[c]++
+    groupRem[gid]++
   }
 
   bt(0)
-  // budget切れの場合は -1（一意解不明）
+
   if (ops >= maxOps && found < 2) return -1
   return found
 }

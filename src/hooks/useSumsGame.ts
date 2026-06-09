@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
-import { generate, validate } from '../engines/sums'
-import { SumsState, SumsMove, CellValue } from '../engines/sums/types'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { generate } from '../engines/sums'
+import { SumsState, CellMark } from '../engines/sums/types'
 import { Difficulty } from '../types/engine'
 
 const MAX_LIVES: Record<Difficulty, number | null> = {
@@ -14,10 +14,8 @@ function buildState(difficulty: Difficulty, seed?: number): SumsState {
   const puzzle = generate(difficulty, seed)
   return {
     ...puzzle,
-    current: puzzle.grid.map(row => row.map((): CellValue => null)),
-    notes: puzzle.grid.map(row => row.map(() => new Set<number>())),
+    current: Array.from({ length: 5 }, () => Array<CellMark>(5).fill(null)),
     mistakes: 0,
-    hintsUsed: 0,
     startedAt: Date.now(),
     elapsedSeconds: 0,
   }
@@ -26,82 +24,109 @@ function buildState(difficulty: Difficulty, seed?: number): SumsState {
 export function useSumsGame(difficulty: Difficulty, seed?: number) {
   const [state, setState] = useState<SumsState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null)
-  const [wrongCells, setWrongCells] = useState<Set<string>>(new Set())
+  const [flashCells, setFlashCells] = useState<Set<string>>(new Set())
   const [isComplete, setIsComplete] = useState(false)
   const [lives, setLives] = useState<number | null>(MAX_LIVES[difficulty])
+
+  const stateRef = useRef<SumsState | null>(null)
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingCellsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     setIsLoading(true)
     setIsComplete(false)
-    setSelectedCell(null)
-    setWrongCells(new Set())
+    setFlashCells(new Set())
     setLives(MAX_LIVES[difficulty])
+    pendingCellsRef.current.clear()
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current)
     const id = setTimeout(() => {
-      setState(buildState(difficulty, seed))
+      const s = buildState(difficulty, seed)
+      setState(s)
+      stateRef.current = s
       setIsLoading(false)
     }, 0)
     return () => clearTimeout(id)
-  // seed intentionally excluded to avoid re-generating when seed is stable
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [difficulty])
 
-  const selectCell = useCallback((row: number, col: number) => {
-    if (!state) return
-    const cell = state.grid[row]?.[col]
-    if (!cell || cell.type !== 'white') return
-    setSelectedCell([row, col])
-  }, [state])
+  const validatePending = useCallback(() => {
+    const s = stateRef.current
+    if (!s) return
 
-  const enterNumber = useCallback((value: CellValue) => {
-    if (!state || !selectedCell || isComplete) return
-    const [row, col] = selectedCell
-
-    if (value === null) {
-      setState(prev => {
-        if (!prev) return prev
-        const newCurrent = prev.current.map(r => [...r])
-        newCurrent[row]![col] = null
-        return { ...prev, current: newCurrent }
-      })
-      setWrongCells(prev => {
-        const n = new Set(prev)
-        n.delete(`${row}-${col}`)
-        return n
-      })
-      return
+    const wrongKeys: string[] = []
+    for (const key of pendingCellsRef.current) {
+      const [r, c] = key.split(',').map(Number) as [number, number]
+      const current = s.current[r]?.[c]
+      const expected = s.solution[r]?.[c]
+      if (current !== null && current !== expected) {
+        wrongKeys.push(key)
+      }
     }
+    pendingCellsRef.current.clear()
 
-    const move: SumsMove = { row, col, value, isNote: false }
-    const result = validate(state, move)
-
-    if (result.correct) {
+    if (wrongKeys.length > 0) {
+      setFlashCells(new Set(wrongKeys))
       setState(prev => {
         if (!prev) return prev
         const newCurrent = prev.current.map(r => [...r])
-        newCurrent[row]![col] = value
-        return { ...prev, current: newCurrent }
+        for (const key of wrongKeys) {
+          const [r, c] = key.split(',').map(Number) as [number, number]
+          newCurrent[r]![c] = null
+        }
+        const updated = { ...prev, current: newCurrent, mistakes: prev.mistakes + 1 }
+        stateRef.current = updated
+        return updated
       })
-      setWrongCells(prev => {
-        const n = new Set(prev)
-        n.delete(`${row}-${col}`)
-        return n
-      })
-      if (result.isComplete) setIsComplete(true)
-    } else {
-      setWrongCells(prev => new Set(prev).add(`${row}-${col}`))
       setLives(prev => (prev === null ? null : Math.max(0, prev - 1)))
+      setTimeout(() => setFlashCells(new Set()), 800)
     }
-  }, [selectedCell, state, isComplete])
+  }, [])
+
+  const tapCell = useCallback((row: number, col: number) => {
+    if (isComplete) return
+    setState(prev => {
+      if (!prev) return prev
+      const currentMark = prev.current[row]?.[col] ?? null
+      const nextMark: CellMark =
+        currentMark === null ? 'cross' : currentMark === 'cross' ? 'circle' : null
+
+      const newCurrent = prev.current.map(r => [...r])
+      newCurrent[row]![col] = nextMark
+
+      // Check completion
+      const done = prev.solution.every((sRow, r) =>
+        sRow.every((expectedMark, c) => newCurrent[r]?.[c] === expectedMark)
+      )
+
+      const updated = { ...prev, current: newCurrent }
+      stateRef.current = updated
+      if (done) setIsComplete(true)
+      return updated
+    })
+
+    // Track cell for delayed validation
+    const key = `${row},${col}`
+    pendingCellsRef.current.add(key)
+
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current)
+    pendingTimerRef.current = setTimeout(validatePending, 1000)
+  }, [isComplete, validatePending])
 
   const restart = useCallback(() => {
     setIsLoading(true)
     setIsComplete(false)
-    setSelectedCell(null)
-    setWrongCells(new Set())
+    setFlashCells(new Set())
     setLives(MAX_LIVES[difficulty])
+    pendingCellsRef.current.clear()
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current)
     setTimeout(() => {
-      setState(buildState(difficulty))
+      const s = buildState(difficulty)
+      setState(s)
+      stateRef.current = s
       setIsLoading(false)
     }, 0)
   }, [difficulty])
@@ -109,13 +134,11 @@ export function useSumsGame(difficulty: Difficulty, seed?: number) {
   return {
     state,
     isLoading,
-    selectedCell,
-    wrongCells,
+    flashCells,
     isComplete,
     lives,
     isGameOver: lives !== null && lives <= 0,
-    selectCell,
-    enterNumber,
+    tapCell,
     restart,
   }
 }

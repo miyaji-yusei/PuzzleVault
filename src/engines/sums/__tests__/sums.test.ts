@@ -1,18 +1,33 @@
 import { generate, solve, countSolutions, validate } from '../index'
 import { Difficulty } from '../../../types/engine'
-import { SumsState } from '../types'
+import { SumsState, CellMark } from '../types'
+
+function makeState(diff: Difficulty, seed: number): SumsState {
+  const puzzle = generate(diff, seed)
+  return {
+    ...puzzle,
+    current: Array.from({ length: 5 }, () => Array<CellMark>(5).fill(null)),
+    mistakes: 0,
+    startedAt: 0,
+    elapsedSeconds: 0,
+  }
+}
 
 describe('Sums Engine', () => {
   describe('generate - all difficulties', () => {
     const difficulties: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
     difficulties.forEach(diff => {
-      it(`generates 10 solvable puzzles for ${diff}`, () => {
+      it(`generates 10 valid puzzles for ${diff}`, () => {
         for (let i = 0; i < 10; i++) {
           const puzzle = generate(diff, i * 1000 + 1)
           expect(puzzle.difficulty).toBe(diff)
-          expect(puzzle.size).toBeGreaterThan(0)
-          expect(puzzle.grid.length).toBe(puzzle.size)
-          expect(puzzle.solution.length).toBe(puzzle.size)
+          expect(puzzle.grid.length).toBe(5)
+          expect(puzzle.grid[0]!.length).toBe(5)
+          expect(puzzle.solution.length).toBe(5)
+          expect(puzzle.rowSums.length).toBe(5)
+          expect(puzzle.colSums.length).toBe(5)
+          expect(puzzle.colorGroups.length).toBeGreaterThanOrEqual(3)
+          // Verify solution satisfies constraints
           const result = solve(puzzle)
           expect(result).not.toBeNull()
         }
@@ -20,26 +35,15 @@ describe('Sums Engine', () => {
     })
   })
 
-  describe('grid sizes by difficulty', () => {
-    it('easy generates 4×4 grid', () => {
-      const p = generate('easy', 1)
-      expect(p.size).toBe(4)
-    }, 30000)
-
-    it('normal generates 5×5 grid', () => {
-      const p = generate('normal', 1)
-      expect(p.size).toBe(5)
-    }, 30000)
-
-    it('hard generates 6×6 grid', () => {
-      const p = generate('hard', 1)
-      expect(p.size).toBe(6)
-    }, 30000)
-
-    it('expert generates 8×8 grid', () => {
-      const p = generate('expert', 1)
-      expect(p.size).toBe(8)
-    }, 120000)
+  describe('grid is always 5×5', () => {
+    const difficulties: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
+    difficulties.forEach(diff => {
+      it(`${diff} generates 5×5 grid`, () => {
+        const p = generate(diff, 1)
+        expect(p.grid.length).toBe(5)
+        expect(p.grid[0]!.length).toBe(5)
+      }, 30000)
+    })
   })
 
   describe('seed reproduction', () => {
@@ -54,19 +58,23 @@ describe('Sums Engine', () => {
     it('different seeds produce different puzzles', () => {
       const p1 = generate('normal', 1)
       const p2 = generate('normal', 99999)
-      expect(p1.grid).not.toEqual(p2.grid)
+      const same = JSON.stringify(p1.grid) === JSON.stringify(p2.grid) &&
+        JSON.stringify(p1.solution) === JSON.stringify(p2.solution)
+      expect(same).toBe(false)
     }, 60000)
   })
 
   describe('countSolutions (uniqueness check)', () => {
     it('easy puzzle has exactly 1 solution', () => {
       const puzzle = generate('easy', 42)
-      expect(countSolutions(puzzle)).toBe(1)
+      const count = countSolutions(puzzle)
+      expect(count).toBe(1)
     }, 30000)
 
     it('normal puzzle has exactly 1 solution', () => {
       const puzzle = generate('normal', 42)
-      expect(countSolutions(puzzle)).toBe(1)
+      const count = countSolutions(puzzle)
+      expect(count).toBe(1)
     }, 60000)
 
     it('hard puzzle has at least 1 solution', () => {
@@ -74,6 +82,28 @@ describe('Sums Engine', () => {
       const count = countSolutions(puzzle)
       expect(count).toBeGreaterThanOrEqual(1)
     }, 60000)
+  })
+
+  describe('color groups', () => {
+    it('all cells assigned to exactly one group', () => {
+      const puzzle = generate('normal', 1)
+      const seen = new Set<string>()
+      for (const group of puzzle.colorGroups) {
+        for (const [r, c] of group.cells) {
+          const key = `${r},${c}`
+          expect(seen.has(key)).toBe(false)
+          seen.add(key)
+        }
+      }
+      expect(seen.size).toBe(25)
+    }, 30000)
+
+    it('each group has a positive targetSum', () => {
+      const puzzle = generate('easy', 1)
+      for (const group of puzzle.colorGroups) {
+        expect(group.targetSum).toBeGreaterThan(0)
+      }
+    }, 30000)
   })
 
   describe('timing', () => {
@@ -85,66 +115,91 @@ describe('Sums Engine', () => {
   })
 
   describe('validate', () => {
-    function makeState(diff: Difficulty, seed: number): SumsState {
-      const puzzle = generate(diff, seed)
-      return {
-        ...puzzle,
-        current: Array.from({ length: puzzle.size }, () => Array(puzzle.size).fill(null)),
-        notes: Array.from({ length: puzzle.size }, () =>
-          Array.from({ length: puzzle.size }, () => new Set<number>())
-        ),
-        mistakes: 0,
-        hintsUsed: 0,
-        startedAt: 0,
-        elapsedSeconds: 0,
-      }
-    }
-
-    it('accepts correct answer', () => {
+    it('accepts correct circle mark', () => {
       const state = makeState('easy', 1)
-      let foundRow = -1, foundCol = -1, foundVal = 0
-      outer: for (let r = 0; r < state.size; r++) {
-        for (let c = 0; c < state.size; c++) {
-          if (state.grid[r]?.[c]?.type === 'white') {
-            const v = state.solution[r]?.[c]
-            if (v != null) { foundRow = r; foundCol = c; foundVal = v; break outer }
+      let foundRow = -1, foundCol = -1
+      outer: for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (state.solution[r]?.[c] === 'circle') {
+            foundRow = r; foundCol = c; break outer
           }
         }
       }
       if (foundRow !== -1) {
-        const result = validate(state, { row: foundRow, col: foundCol, value: foundVal as (1|2|3|4|5|6|7|8|9), isNote: false })
+        const result = validate(state, { row: foundRow, col: foundCol, mark: 'circle' })
         expect(result.correct).toBe(true)
         expect(result.lifeLost).toBe(false)
       }
     }, 30000)
 
-    it('rejects wrong answer (lifeLost)', () => {
+    it('accepts correct cross mark', () => {
       const state = makeState('easy', 1)
-      let foundRow = -1, foundCol = -1, wrongVal = 1
-      outer: for (let r = 0; r < state.size; r++) {
-        for (let c = 0; c < state.size; c++) {
-          if (state.grid[r]?.[c]?.type === 'white') {
-            const v = state.solution[r]?.[c]
-            if (v != null) {
-              foundRow = r; foundCol = c
-              wrongVal = v === 9 ? 1 : (v as number) + 1
-              break outer
-            }
+      let foundRow = -1, foundCol = -1
+      outer: for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (state.solution[r]?.[c] === 'cross') {
+            foundRow = r; foundCol = c; break outer
           }
         }
       }
       if (foundRow !== -1) {
-        const result = validate(state, { row: foundRow, col: foundCol, value: wrongVal as (1|2|3|4|5|6|7|8|9), isNote: false })
+        const result = validate(state, { row: foundRow, col: foundCol, mark: 'cross' })
+        expect(result.correct).toBe(true)
+        expect(result.lifeLost).toBe(false)
+      }
+    }, 30000)
+
+    it('rejects wrong mark (lifeLost)', () => {
+      const state = makeState('easy', 1)
+      let foundRow = -1, foundCol = -1
+      let wrongMark: CellMark = 'circle'
+      outer: for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (state.solution[r]?.[c] === 'circle') {
+            foundRow = r; foundCol = c; wrongMark = 'cross'; break outer
+          }
+        }
+      }
+      if (foundRow !== -1) {
+        const result = validate(state, { row: foundRow, col: foundCol, mark: wrongMark })
         expect(result.correct).toBe(false)
         expect(result.lifeLost).toBe(true)
       }
     }, 30000)
 
-    it('accepts note move without lifeLost', () => {
+    it('null mark is always correct (empty cell)', () => {
       const state = makeState('easy', 1)
-      const result = validate(state, { row: 1, col: 1, value: 5, isNote: true })
+      const result = validate(state, { row: 0, col: 0, mark: null })
       expect(result.correct).toBe(true)
       expect(result.lifeLost).toBe(false)
     }, 10000)
+
+    it('detects isComplete when all cells correctly marked', () => {
+      const puzzle = generate('easy', 1)
+      const current: CellMark[][] = puzzle.solution.map(row =>
+        row.map(m => m)
+      )
+      // Fill all but last cell
+      const state: SumsState = {
+        ...puzzle,
+        current: current.map((row, r) =>
+          row.map((m, c) => (r === 4 && c === 4 ? null : m))
+        ),
+        mistakes: 0,
+        startedAt: 0,
+        elapsedSeconds: 0,
+      }
+      const lastMark = puzzle.solution[4]?.[4] ?? 'circle'
+      const result = validate(state, { row: 4, col: 4, mark: lastMark })
+      expect(result.correct).toBe(true)
+      expect(result.isComplete).toBe(true)
+    }, 30000)
+  })
+
+  describe('solve', () => {
+    it('returns puzzle when solution is valid', () => {
+      const puzzle = generate('easy', 1)
+      expect(solve(puzzle)).not.toBeNull()
+    }, 30000)
   })
 })
