@@ -80,6 +80,8 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
   const gridWidth = cellSize * size
   const gridHeight = cellSize * size
+  const totalWidth = clueAreaWidth + gridWidth
+  const totalHeight = clueAreaHeight + gridHeight
 
   // Touch area ref (outer fixed-position view)
   const touchAreaRef = useRef<View>(null)
@@ -126,6 +128,14 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   sizeRef.current = size
   const cellSizeRef = useRef(cellSize)
   cellSizeRef.current = cellSize
+  const clueAreaWidthRef = useRef(clueAreaWidth)
+  clueAreaWidthRef.current = clueAreaWidth
+  const clueAreaHeightRef = useRef(clueAreaHeight)
+  clueAreaHeightRef.current = clueAreaHeight
+  const totalWidthRef = useRef(totalWidth)
+  totalWidthRef.current = totalWidth
+  const totalHeightRef = useRef(totalHeight)
+  totalHeightRef.current = totalHeight
 
   const paintTargetRef = useRef<CellState>('filled')
   const dragAxisRef = useRef<'h' | 'v' | null>(null)
@@ -135,14 +145,15 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const previewRef = useRef<PreviewRange>(null)
   previewRef.current = preview
 
-  // Compute grid cell from screen touch position, accounting for scale/pan transforms
-  // transform is: [scale(s), translateX(tx), translateY(ty)]
-  // visX = W/2*(1-s) + tx + gx*s => gx = (relX - W/2*(1-s) - tx) / s
+  // Compute grid cell from screen touch position, accounting for scale/pan transforms.
+  // The full board (clues + grid) is inside the Animated.View, so we:
+  // 1. Invert the transform to get position within the animated view
+  // 2. Subtract clue area offsets to get position within the grid
   const getCellFromTouch = useCallback((pageX: number, pageY: number): { row: number; col: number } | null => {
     const areaX = touchAreaPosRef.current.x
     const areaY = touchAreaPosRef.current.y
-    const W = cellSizeRef.current * sizeRef.current
-    const H = cellSizeRef.current * sizeRef.current
+    const W = totalWidthRef.current
+    const H = totalHeightRef.current
     const s = scaleRef.current
     const tx = panXRef.current
     const ty = panYRef.current
@@ -150,8 +161,13 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
     const relX = pageX - areaX
     const relY = pageY - areaY
 
-    const gx = (relX - W / 2 * (1 - s) - tx) / s
-    const gy = (relY - H / 2 * (1 - s) - ty) / s
+    // Invert: visX = W/2*(1-s) + tx + localX*s
+    const localX = (relX - W / 2 * (1 - s) - tx) / s
+    const localY = (relY - H / 2 * (1 - s) - ty) / s
+
+    // Grid starts after clue areas
+    const gx = localX - clueAreaWidthRef.current
+    const gy = localY - clueAreaHeightRef.current
 
     const col = Math.floor(gx / cellSizeRef.current)
     const row = Math.floor(gy / cellSizeRef.current)
@@ -162,8 +178,8 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   }, [])
 
   const clampPan = useCallback((tx: number, ty: number, s: number) => {
-    const W = cellSizeRef.current * sizeRef.current
-    const H = cellSizeRef.current * sizeRef.current
+    const W = totalWidthRef.current
+    const H = totalHeightRef.current
     const maxX = W * (s - 1) / 2
     const maxY = H * (s - 1) / 2
     return {
@@ -321,34 +337,32 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   }), [cellSize, getCellFromTouch, clampPan, initTwoFinger])
 
   return (
-    <View>
-      {/* Column clues row */}
-      <View style={styles.colCluesRow}>
-        <View style={{ width: clueAreaWidth, height: clueAreaHeight }} />
-        {Array.from({ length: size }, (_, col) => (
-          <View key={col} style={[styles.clueCell, { width: cellSize, height: clueAreaHeight }]}>
-            {colClues[col]?.map((n, i) => (
-              <Text
-                key={i}
-                style={[styles.clueText, { color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] }]}
-              >
-                {n === 0 ? '' : n}
-              </Text>
-            ))}
-          </View>
-        ))}
-      </View>
-
-      {/* Row clues + grid */}
-      <View style={styles.gridRow}>
-        {/* Row clues column */}
-        <View>
-          {Array.from({ length: size }, (_, row) => (
-            <View key={row} style={[styles.rowClueCell, { width: clueAreaWidth, height: cellSize }]}>
-              {rowClues[row]?.map((n, i) => (
+    <View
+      ref={touchAreaRef}
+      onLayout={measureTouchArea}
+      style={{ width: totalWidth, height: totalHeight, overflow: 'hidden' }}
+      {...panResponder.panHandlers}
+    >
+      <Animated.View
+        style={{
+          width: totalWidth,
+          height: totalHeight,
+          transform: [
+            { scale: scaleAnim },
+            { translateX: panXAnim },
+            { translateY: panYAnim },
+          ],
+        }}
+      >
+        {/* Column clues row */}
+        <View style={styles.colCluesRow}>
+          <View style={{ width: clueAreaWidth, height: clueAreaHeight }} />
+          {Array.from({ length: size }, (_, col) => (
+            <View key={col} style={[styles.clueCell, { width: cellSize, height: clueAreaHeight }]}>
+              {colClues[col]?.map((n, i) => (
                 <Text
                   key={i}
-                  style={[styles.clueText, { color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] }]}
+                  style={[styles.clueText, { color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] }]}
                 >
                   {n === 0 ? '' : n}
                 </Text>
@@ -357,24 +371,26 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
           ))}
         </View>
 
-        {/* Touch area + scaled grid */}
-        <View
-          ref={touchAreaRef}
-          onLayout={measureTouchArea}
-          style={{ width: gridWidth, height: gridHeight, overflow: 'hidden' }}
-          {...panResponder.panHandlers}
-        >
-          <Animated.View
-            style={{
-              width: gridWidth,
-              height: gridHeight,
-              transform: [
-                { scale: scaleAnim },
-                { translateX: panXAnim },
-                { translateY: panYAnim },
-              ],
-            }}
-          >
+        {/* Row clues + grid */}
+        <View style={styles.gridRow}>
+          {/* Row clues column */}
+          <View>
+            {Array.from({ length: size }, (_, row) => (
+              <View key={row} style={[styles.rowClueCell, { width: clueAreaWidth, height: cellSize }]}>
+                {rowClues[row]?.map((n, i) => (
+                  <Text
+                    key={i}
+                    style={[styles.clueText, { color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] }]}
+                  >
+                    {n === 0 ? '' : n}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </View>
+
+          {/* Grid cells */}
+          <View>
             {Array.from({ length: size }, (_, row) => (
               <View key={row} style={[styles.row, { height: cellSize }]}>
                 {Array.from({ length: size }, (_, col) => {
@@ -410,9 +426,9 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
                 })}
               </View>
             ))}
-          </Animated.View>
+          </View>
         </View>
-      </View>
+      </Animated.View>
     </View>
   )
 }
