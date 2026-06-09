@@ -1,7 +1,7 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SpiderState, Card, Suit } from '../../../engines/spider/types'
-import { SpiderSelection } from '../../../hooks/useSpiderGame'
+import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
 
 const PAD = 4
 const GAP = 2
@@ -53,9 +53,11 @@ type Props = {
   onDoubleTapCard: (col: number, cardIndex: number) => void
   onDirectMove: (fromCol: number, fromCardIdx: number, toCol: number) => void
   onDeal: () => void
+  completingSet?: CompletingSet | null
+  onSetAnimationDone?: () => void
 }
 
-export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal }: Props) {
+export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal, completingSet, onSetAnimationDone }: Props) {
   const { tableau, stock, foundation, completedSuits } = state
 
   const { width: windowWidth } = useWindowDimensions()
@@ -92,6 +94,40 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   const overlayY = useRef(new Animated.Value(0)).current
   const overlayOpacity = useRef(new Animated.Value(0)).current
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
+
+  // Completing-set animation: fade-out each of the 13 cards with stagger
+  type SetAnimState = { col: number; startIdx: number; opacityAnims: Animated.Value[] }
+  const [setAnim, setSetAnim] = useState<SetAnimState | null>(null)
+  const onSetAnimDoneRef = useRef(onSetAnimationDone)
+  onSetAnimDoneRef.current = onSetAnimationDone
+
+  useEffect(() => {
+    if (!completingSet) {
+      setSetAnim(null)
+      return
+    }
+    const col = completingSet.col
+    const column = tableauRef.current[col] ?? []
+    const startIdx = column.length - completingSet.cards.length
+    const opacityAnims = completingSet.cards.map(() => new Animated.Value(1))
+    setSetAnim({ col, startIdx, opacityAnims })
+
+    const STAGGER_MS = 70
+    const FADE_MS = 220
+    const anims = opacityAnims.map((anim, i) =>
+      Animated.sequence([
+        Animated.delay(i * STAGGER_MS),
+        Animated.timing(anim, { toValue: 0, duration: FADE_MS, useNativeDriver: true }),
+      ])
+    )
+    Animated.parallel(anims).start(({ finished }) => {
+      if (finished) {
+        setSetAnim(null)
+        onSetAnimDoneRef.current?.()
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completingSet])
 
   const overlayStyle = {
     position: 'absolute' as const,
@@ -325,6 +361,22 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
                     dragInfo !== null &&
                     dragInfo.col === ci &&
                     cardi >= dragInfo.cardIndex
+                  const isCompleting =
+                    setAnim !== null &&
+                    ci === setAnim.col &&
+                    cardi >= setAnim.startIdx
+                  const completingIdx = isCompleting ? cardi - setAnim!.startIdx : -1
+
+                  if (isCompleting && completingIdx >= 0) {
+                    return (
+                      <Animated.View
+                        key={cardi}
+                        style={{ position: 'absolute', top: offsets[cardi], opacity: setAnim!.opacityAnims[completingIdx] }}
+                      >
+                        <CardFace card={card} width={CARD_W} height={CARD_H} highlighted />
+                      </Animated.View>
+                    )
+                  }
                   return (
                     <View
                       key={cardi}

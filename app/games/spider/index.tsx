@@ -65,6 +65,7 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
     puzzle, state, selected, isComplete,
     canUndo,
     tapTableau, doubleTapCard, directMove, deal, undo, restart,
+    completingSet, onSetAnimationDone,
   } = useSpiderGame(difficulty)
 
   return (
@@ -101,6 +102,8 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         onDoubleTapCard={doubleTapCard}
         onDirectMove={directMove}
         onDeal={deal}
+        completingSet={completingSet}
+        onSetAnimationDone={onSetAnimationDone}
       />
 
       {/* Win dialog */}

@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { generate, dealState, validate, removeCompleteSets } from '../engines/spider'
-import { SpiderState, SpiderMove, SpiderPuzzle } from '../engines/spider/types'
+import { SpiderState, SpiderMove, SpiderPuzzle, Card, Rank } from '../engines/spider/types'
 import { Difficulty } from '../types/engine'
 
 export type SpiderSelection = { col: number; cardIndex: number }
+export type CompletingSet = { col: number; cards: Card[] }
 
 function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
   const ns: SpiderState = {
@@ -28,7 +29,7 @@ function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
       if (top && !top.faceUp) {
         srcCol[srcCol.length - 1] = { ...top, faceUp: true }
       }
-      removeCompleteSets(ns)
+      // removeCompleteSets is intentionally deferred to enable animation
     }
   } else if (move.type === 'deal') {
     const deal = ns.stock.pop()
@@ -43,6 +44,27 @@ function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
   return ns
 }
 
+function findFirstCompletingSet(state: SpiderState): { col: number; startIdx: number } | null {
+  for (let col = 0; col < 10; col++) {
+    const column = state.tableau[col]!
+    if (column.length < 13) continue
+    const startIdx = column.length - 13
+    const top = column[startIdx]!
+    if (!top.faceUp || top.rank !== 13) continue
+    const suit = top.suit
+    let valid = true
+    for (let i = 0; i < 13; i++) {
+      const c = column[startIdx + i]!
+      if (!c.faceUp || c.suit !== suit || c.rank !== (13 - i) as Rank) {
+        valid = false
+        break
+      }
+    }
+    if (valid) return { col, startIdx }
+  }
+  return null
+}
+
 export function useSpiderGame(difficulty: Difficulty, seed?: number) {
   const [puzzle] = useState<SpiderPuzzle>(() => generate(difficulty, seed ?? Date.now()))
   const [state, setState] = useState<SpiderState>(() => ({
@@ -53,15 +75,46 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
   const [selected, setSelected] = useState<SpiderSelection | null>(null)
   const [isComplete, setIsComplete] = useState(false)
   const [history, setHistory] = useState<SpiderState[]>([])
+  const [completingSet, setCompletingSet] = useState<CompletingSet | null>(null)
+  const pendingStateRef = useRef<SpiderState | null>(null)
 
   const commitState = useCallback((ns: SpiderState) => {
+    const completing = findFirstCompletingSet(ns)
     setHistory(prev => [...prev.slice(-30), state])
-    setState(ns)
-    if (ns.foundation === 8) setIsComplete(true)
+    if (completing) {
+      const cards = ns.tableau[completing.col]!.slice(completing.startIdx).map(c => ({ ...c }))
+      pendingStateRef.current = ns
+      setCompletingSet({ col: completing.col, cards })
+      setState(ns)
+    } else {
+      pendingStateRef.current = null
+      setCompletingSet(null)
+      setState(ns)
+      if (ns.foundation === 8) setIsComplete(true)
+    }
   }, [state])
 
+  const onSetAnimationDone = useCallback(() => {
+    const pending = pendingStateRef.current
+    if (!pending) return
+    const finalState: SpiderState = {
+      tableau: pending.tableau.map(col => col.slice()),
+      stock: pending.stock.map(d => d.slice()),
+      foundation: pending.foundation,
+      completedSuits: [...pending.completedSuits],
+      moves: pending.moves,
+      startedAt: pending.startedAt,
+      elapsedSeconds: pending.elapsedSeconds,
+    }
+    removeCompleteSets(finalState)
+    pendingStateRef.current = null
+    setCompletingSet(null)
+    setState(finalState)
+    if (finalState.foundation === 8) setIsComplete(true)
+  }, [])
+
   const tapTableau = useCallback((col: number, cardIndex: number) => {
-    if (isComplete) return
+    if (isComplete || completingSet !== null) return
     const column = state.tableau[col]
     if (!column) return
 
@@ -86,16 +139,15 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
     const card = column[cardIndex]
     if (!card || !card.faceUp) return
     setSelected({ col, cardIndex })
-  }, [state, selected, isComplete, commitState])
+  }, [state, selected, isComplete, commitState, completingSet])
 
   const doubleTapCard = useCallback((col: number, cardIndex: number) => {
-    if (isComplete) return
+    if (isComplete || completingSet !== null) return
     const column = state.tableau[col]
     if (!column) return
     const card = column[cardIndex]
     if (!card?.faceUp) return
 
-    // Priority 1: non-empty tableau columns
     for (let dst = 0; dst < state.tableau.length; dst++) {
       if (dst === col || state.tableau[dst].length === 0) continue
       const move: SpiderMove = { type: 'move', from: { col, cardIndex }, to: { col: dst } }
@@ -105,7 +157,6 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
         return
       }
     }
-    // Priority 2: empty columns
     for (let dst = 0; dst < state.tableau.length; dst++) {
       if (dst === col || state.tableau[dst].length > 0) continue
       const move: SpiderMove = { type: 'move', from: { col, cardIndex }, to: { col: dst } }
@@ -115,10 +166,10 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
         return
       }
     }
-  }, [state, isComplete, commitState])
+  }, [state, isComplete, commitState, completingSet])
 
   const directMove = useCallback((fromCol: number, fromCardIdx: number, toCol: number) => {
-    if (isComplete) return
+    if (isComplete || completingSet !== null) return
     const move: SpiderMove = {
       type: 'move',
       from: { col: fromCol, cardIndex: fromCardIdx },
@@ -129,18 +180,19 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
       commitState(applySpiderMove(state, move))
       setSelected(null)
     }
-  }, [state, isComplete, commitState])
+  }, [state, isComplete, commitState, completingSet])
 
   const deal = useCallback(() => {
-    if (isComplete) return
+    if (isComplete || completingSet !== null) return
     const move: SpiderMove = { type: 'deal' }
     const result = validate(state, move)
     if (!result.correct) return
     commitState(applySpiderMove(state, move))
     setSelected(null)
-  }, [state, isComplete, commitState])
+  }, [state, isComplete, commitState, completingSet])
 
   const undo = useCallback(() => {
+    if (completingSet !== null) return
     setHistory(prev => {
       if (prev.length === 0) return prev
       const next = [...prev]
@@ -150,9 +202,11 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
       setIsComplete(false)
       return next
     })
-  }, [])
+  }, [completingSet])
 
   const restart = useCallback(() => {
+    pendingStateRef.current = null
+    setCompletingSet(null)
     setState({
       ...dealState(puzzle.seed, puzzle.suitCount),
       startedAt: Date.now(),
@@ -175,5 +229,7 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
     deal,
     undo,
     restart,
+    completingSet,
+    onSetAnimationDone,
   }
 }
