@@ -11,6 +11,7 @@ const CARD_W = Math.floor((SW - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
 const CARD_H = Math.floor(CARD_W * 1.45)
 const FACE_DOWN_STEP = 10
 const FACE_UP_STEP = 22
+const WASTE_FAN_STEP = 12
 const TOP_ROW_H = 8 + CARD_H + 8
 const DOUBLE_TAP_MS = 280
 const DRAG_THRESHOLD = 8
@@ -29,6 +30,7 @@ type DragInfo = {
 type Props = {
   state: SolitaireState
   selected: SelectedCard | null
+  drawMode: 1 | 3
   onTapStock: () => void
   onTapWaste: () => void
   onDoubleTapWaste: () => void
@@ -75,7 +77,7 @@ function EmptySlot({ width, height, label }: { width: number; height: number; la
 }
 
 export function SolitaireBoard({
-  state, selected, onTapStock, onTapWaste, onDoubleTapWaste, onTapFoundation, onTapTableau, onDoubleTapCard, onDirectMove,
+  state, selected, drawMode, onTapStock, onTapWaste, onDoubleTapWaste, onTapFoundation, onTapTableau, onDoubleTapCard, onDirectMove,
 }: Props) {
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
@@ -431,13 +433,32 @@ export function SolitaireBoard({
           </TouchableOpacity>
           <View {...wastePanResponder.panHandlers}>
             {waste.length > 0 ? (
-              <CardView
-                card={waste[waste.length - 1]}
-                width={CARD_W}
-                height={CARD_H}
-                highlighted={selected?.pile === 'waste'}
-                dimmed={dragInfo?.fromPile === 'waste'}
-              />
+              drawMode === 3 ? (
+                <View style={{ width: CARD_W + WASTE_FAN_STEP * (Math.min(waste.length, 3) - 1), height: CARD_H }}>
+                  {waste.slice(-3).map((card, idx, fanned) => (
+                    <View
+                      key={`${card.suit}-${card.rank}`}
+                      style={{ position: idx === 0 ? 'relative' : 'absolute', top: 0, left: idx * WASTE_FAN_STEP }}
+                    >
+                      <CardView
+                        card={card}
+                        width={CARD_W}
+                        height={CARD_H}
+                        highlighted={idx === fanned.length - 1 && selected?.pile === 'waste'}
+                        dimmed={idx === fanned.length - 1 && dragInfo?.fromPile === 'waste'}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <CardView
+                  card={waste[waste.length - 1]}
+                  width={CARD_W}
+                  height={CARD_H}
+                  highlighted={selected?.pile === 'waste'}
+                  dimmed={dragInfo?.fromPile === 'waste'}
+                />
+              )
             ) : (
               <EmptySlot width={CARD_W} height={CARD_H} />
             )}

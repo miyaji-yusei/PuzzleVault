@@ -193,6 +193,7 @@ export default function SolitaireScreen() {
       <SolitaireBoard
         state={state}
         selected={selected}
+        drawMode={puzzle.drawMode}
         onTapStock={tapStock}
         onTapWaste={tapWaste}
         onDoubleTapWaste={doubleTapWaste}
