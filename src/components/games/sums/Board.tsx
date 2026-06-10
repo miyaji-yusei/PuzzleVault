@@ -78,8 +78,8 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
         <View style={{ width: headerSize }} />
         {Array.from({ length: 5 }, (_, j) => (
           <View key={j} style={[styles.sumHeader, { width: cellSize, height: headerSize }]}>
-            <Text style={[styles.sumText, colComplete[j] && styles.sumDone]}>
-              {colSums[j]}
+            <Text style={styles.sumText}>
+              {colComplete[j] ? '' : colSums[j]}
             </Text>
           </View>
         ))}
@@ -90,8 +90,8 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
         <View key={ri} style={styles.gridRow}>
           {/* Row sum header */}
           <View style={[styles.sumHeader, { width: headerSize, height: cellSize }]}>
-            <Text style={[styles.sumText, rowComplete[ri] && styles.sumDone]}>
-              {rowSums[ri]}
+            <Text style={styles.sumText}>
+              {rowComplete[ri] ? '' : rowSums[ri]}
             </Text>
           </View>
 
