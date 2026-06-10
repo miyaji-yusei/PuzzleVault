@@ -91,43 +91,57 @@ function canLineComplete(line: CellState[], hints: number[]): boolean {
   return bt(0, 0)
 }
 
+function canSegmentFit(segment: CellState[], hints: number[]): boolean {
+  if (hints.length === 0) return segment.every(c => c !== 'filled')
+  const minLen = hints.reduce((s, hv) => s + hv, 0) + hints.length - 1
+  if (segment.length < minLen) return false
+  return canLineComplete(segment, hints)
+}
+
 function computeLineHintColors(line: CellState[], hints: number[]): HintColor[] {
   const colors: HintColor[] = hints.map(() => 'default' as HintColor)
   if (hints.length === 0) return colors
 
-  const groups: { len: number; closed: boolean }[] = []
+  const n = line.length
+  const h = hints.length
+
+  const groups: { start: number; len: number; closed: boolean }[] = []
   let i = 0
-  while (i < line.length) {
+  while (i < n) {
     if (line[i] === 'filled') {
       const start = i
-      while (i < line.length && line[i] === 'filled') i++
+      while (i < n && line[i] === 'filled') i++
       const leftClosed = start === 0 || line[start - 1] === 'crossed'
-      const rightClosed = i === line.length || line[i] === 'crossed'
-      groups.push({ len: i - start, closed: leftClosed && rightClosed })
+      const rightClosed = i === n || line[i] === 'crossed'
+      groups.push({ start, len: i - start, closed: leftClosed && rightClosed })
     } else {
       i++
     }
   }
 
   // Line is fully and correctly solved → all blue
-  if (groups.length === hints.length && groups.every((g, idx) => g.len === hints[idx])) {
+  if (groups.length === h && groups.every((g, idx) => g.len === hints[idx])) {
     return hints.map(() => 'blue' as HintColor)
   }
 
-  // Mark closed groups that sequentially match a hint as blue
-  let hintIdx = 0
-  for (const g of groups) {
-    if (hintIdx >= hints.length) break
-    if (g.closed && g.len === hints[hintIdx]) {
-      colors[hintIdx] = 'blue'
-      hintIdx++
-    }
+  // Definitively impossible → all red
+  if (!canLineComplete(line, hints)) {
+    return hints.map(() => 'red' as HintColor)
   }
 
-  // Only show red when there is NO valid completion — definitively wrong
-  if (!canLineComplete(line, hints)) {
-    for (let k = 0; k < hints.length; k++) {
-      colors[k] = 'red'
+  // For each closed group, find all hints it could validly be assigned to.
+  // If exactly one hint is possible, the assignment is definitive → mark blue.
+  for (const g of groups) {
+    if (!g.closed) continue
+    const validHints: number[] = []
+    for (let hi = 0; hi < h; hi++) {
+      if (hints[hi] !== g.len) continue
+      if (!canSegmentFit(line.slice(0, g.start), hints.slice(0, hi))) continue
+      if (!canSegmentFit(line.slice(g.start + g.len), hints.slice(hi + 1))) continue
+      validHints.push(hi)
+    }
+    if (validHints.length === 1) {
+      colors[validHints[0]!] = 'blue'
     }
   }
 
