@@ -43,6 +43,18 @@ function isGroupComplete(state: SumsState, group: ColorGroup): boolean {
     ) === group.targetSum
 }
 
+function getRowLiveSum(state: SumsState, row: number): number {
+  return state.current[row]!.reduce((s, m, j) =>
+    s + (m === 'circle' ? state.grid[row]![j]! : 0), 0
+  )
+}
+
+function getColLiveSum(state: SumsState, col: number): number {
+  return state.current.reduce((s, row, i) =>
+    s + (row[col] === 'circle' ? state.grid[i]![col]! : 0), 0
+  )
+}
+
 type Props = {
   state: SumsState
   flashCells: Set<string>
@@ -62,6 +74,14 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
     () => Array.from({ length: 5 }, (_, j) => isColComplete(state, j)),
     [state]
   )
+  const rowLiveSums = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => getRowLiveSum(state, i)),
+    [state]
+  )
+  const colLiveSums = useMemo(
+    () => Array.from({ length: 5 }, (_, j) => getColLiveSum(state, j)),
+    [state]
+  )
   const groupComplete = useMemo(
     () => colorGroups.map(g => isGroupComplete(state, g)),
     [state, colorGroups]
@@ -79,7 +99,12 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
         {Array.from({ length: 5 }, (_, j) => (
           <View key={j} style={[styles.sumHeader, { width: cellSize, height: headerSize }]}>
             <Text style={styles.sumText}>
-              {colComplete[j] ? '' : colSums[j]}
+              {colComplete[j] ? '' : (
+                <>
+                  <Text style={styles.liveSumText}>{colLiveSums[j]}</Text>
+                  /{colSums[j]}
+                </>
+              )}
             </Text>
           </View>
         ))}
@@ -91,7 +116,12 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
           {/* Row sum header */}
           <View style={[styles.sumHeader, { width: headerSize, height: cellSize }]}>
             <Text style={styles.sumText}>
-              {rowComplete[ri] ? '' : rowSums[ri]}
+              {rowComplete[ri] ? '' : (
+                <>
+                  <Text style={styles.liveSumText}>{rowLiveSums[ri]}</Text>
+                  /{rowSums[ri]}
+                </>
+              )}
             </Text>
           </View>
 
@@ -178,6 +208,11 @@ const styles = StyleSheet.create({
   },
   sumDone: {
     color: '#bbb',
+  },
+  liveSumText: {
+    fontSize: 9,
+    fontWeight: '400',
+    color: '#7986cb',
   },
   cell: {
     borderWidth: 1.5,
