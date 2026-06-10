@@ -149,11 +149,6 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
                     <Text style={[styles.markTextCircle, { fontSize: Math.max(14, Math.floor(cellSize * 0.7)) }]}>○</Text>
                   </View>
                 )}
-                {gDone && mark === 'circle' && (
-                  <View style={[StyleSheet.absoluteFillObject, styles.markOverlayCircle]}>
-                    <Text style={{ fontSize: Math.max(14, Math.floor(cellSize * 0.7)) }}>☆</Text>
-                  </View>
-                )}
               </TouchableOpacity>
             )
           })}
