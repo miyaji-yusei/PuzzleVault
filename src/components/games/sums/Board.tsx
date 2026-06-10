@@ -10,6 +10,18 @@ function getGroupForCell(colorGroups: ColorGroup[], r: number, c: number): Color
   return colorGroups.find(g => g.cells.some(([gr, gc]) => gr === r && gc === c))
 }
 
+// 各グループの一番左上のセル（最小row→最小col）の座標キー("r,c") -> グループ を返す
+function buildGroupTopLeftMap(colorGroups: ColorGroup[]): Map<string, ColorGroup> {
+  const map = new Map<string, ColorGroup>()
+  for (const group of colorGroups) {
+    const [tr, tc] = group.cells.reduce((min, cell) =>
+      (cell[0] < min[0] || (cell[0] === min[0] && cell[1] < min[1])) ? cell : min
+    )
+    map.set(`${tr},${tc}`, group)
+  }
+  return map
+}
+
 function isRowComplete(state: SumsState, row: number): boolean {
   return state.current[row]!.every(m => m !== null) &&
     state.current[row]!.reduce((s, m, j) =>
@@ -54,6 +66,10 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
     () => colorGroups.map(g => isGroupComplete(state, g)),
     [state, colorGroups]
   )
+  const groupTopLeftMap = useMemo(
+    () => buildGroupTopLeftMap(colorGroups),
+    [colorGroups]
+  )
 
   return (
     <View>
@@ -89,6 +105,7 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
             const rowDone = rowComplete[ri] ?? false
             const colDone = colComplete[ci] ?? false
             const showDim = gDone && mark === 'cross'
+            const topLeftGroup = groupTopLeftMap.get(`${ri},${ci}`)
 
             return (
               <TouchableOpacity
@@ -103,6 +120,13 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
                 onPress={() => onTapCell(ri, ci)}
                 activeOpacity={0.7}
               >
+                {/* グループ合計値（左上セルの左上隅に表示） */}
+                {topLeftGroup && (
+                  <Text style={[styles.groupSumLabel, gDone && styles.sumDone]}>
+                    {topLeftGroup.targetSum}
+                  </Text>
+                )}
+
                 {/* Number (hidden if cross in complete group) */}
                 {!showDim && (
                   <Text style={[
@@ -135,25 +159,6 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
           })}
         </View>
       ))}
-
-      {/* Color group legend */}
-      <View style={styles.legend}>
-        {colorGroups.map(group => (
-          <View key={group.id} style={styles.legendItem}>
-            <View style={[styles.legendColor, {
-              backgroundColor: groupComplete[group.id]
-                ? '#ccc'
-                : GROUP_COLORS_LIGHT[group.colorIndex % GROUP_COLORS_LIGHT.length],
-              borderColor: groupComplete[group.id]
-                ? '#aaa'
-                : GROUP_COLORS[group.colorIndex % GROUP_COLORS.length],
-            }]} />
-            <Text style={[styles.legendText, groupComplete[group.id] && styles.sumDone]}>
-              {group.targetSum}
-            </Text>
-          </View>
-        ))}
-      </View>
     </View>
   )
 }
@@ -213,27 +218,13 @@ const styles = StyleSheet.create({
     color: '#2e7d32',
     fontWeight: 'bold',
   },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderWidth: 1.5,
-    borderRadius: 3,
-  },
-  legendText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
+  groupSumLabel: {
+    position: 'absolute',
+    top: 1,
+    left: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#555',
+    zIndex: 1,
   },
 })
