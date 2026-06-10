@@ -1,7 +1,9 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
-import { SelectedCard } from '../../../hooks/useSolitaireGame'
+import { SelectedCard, AutoCompleteAnim } from '../../../hooks/useSolitaireGame'
+
+const AUTO_COMPLETE_ANIM_MS = 220
 
 const PAD = 8
 const GAP = 3
@@ -34,6 +36,7 @@ type Props = {
   onTapTableau: (colIndex: number, cardIndex?: number) => void
   onDoubleTapCard: (colIndex: number, cardIndex: number) => void
   onDirectMove: (move: SolitaireMove) => void
+  autoCompleteAnim?: AutoCompleteAnim | null
 }
 
 function CardView({ card, width, height, highlighted, dimmed }: {
@@ -74,6 +77,7 @@ function EmptySlot({ width, height, label }: { width: number; height: number; la
 
 export function SolitaireBoard({
   state, selected, drawMode, onTapStock, onTapWaste, onDoubleTapWaste, onTapFoundation, onTapTableau, onDoubleTapCard, onDirectMove,
+  autoCompleteAnim,
 }: Props) {
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
@@ -117,6 +121,41 @@ export function SolitaireBoard({
     top: overlayY,
     opacity: overlayOpacity,
     zIndex: 999,
+  }
+
+  // 自動完成中、組札へ飛んでいくカードのアニメーション
+  const flyX = useRef(new Animated.Value(0)).current
+  const flyY = useRef(new Animated.Value(0)).current
+  const [flyingCard, setFlyingCard] = useState<Card | null>(null)
+  const foundationViewRefs = useRef<(View | null)[]>([])
+  const wasteViewRef = useRef<View>(null)
+  const tableauColRefs = useRef<(View | null)[]>([])
+
+  useEffect(() => {
+    if (!autoCompleteAnim) return
+    const { card, from, to } = autoCompleteAnim
+    const fromView = from.pile === 'waste' ? wasteViewRef.current : tableauColRefs.current[from.col]
+    const toView = foundationViewRefs.current[to.index]
+    if (!fromView || !toView) return
+
+    fromView.measure((_x1, _y1, _w1, _h1, fromPageX, fromPageY) => {
+      toView.measure((_x2, _y2, _w2, _h2, toPageX, toPageY) => {
+        flyX.setValue(fromPageX - boardLeftRef.current)
+        flyY.setValue(fromPageY - boardTopRef.current)
+        setFlyingCard(card)
+        Animated.parallel([
+          Animated.timing(flyX, { toValue: toPageX - boardLeftRef.current, duration: AUTO_COMPLETE_ANIM_MS, useNativeDriver: false }),
+          Animated.timing(flyY, { toValue: toPageY - boardTopRef.current, duration: AUTO_COMPLETE_ANIM_MS, useNativeDriver: false }),
+        ]).start(() => setFlyingCard(null))
+      })
+    })
+  }, [autoCompleteAnim, flyX, flyY])
+
+  const flyStyle = {
+    position: 'absolute' as const,
+    left: flyX,
+    top: flyY,
+    zIndex: 1000,
   }
 
   const onTapTableauRef = useRef(onTapTableau)
@@ -425,7 +464,11 @@ export function SolitaireBoard({
             const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
             const isDraggedFromFoundation = dragInfo?.fromPile === 'foundation' && dragInfo.colIndex === fi
             return (
-              <View key={`f-${fi}`} style={{ marginRight: fi < 3 ? GAP : 0 }}>
+              <View
+                key={`f-${fi}`}
+                ref={el => { foundationViewRefs.current[fi] = el }}
+                style={{ marginRight: fi < 3 ? GAP : 0 }}
+              >
                 {pile.length > 0 ? (
                   <CardView card={pile[pile.length - 1]} width={CARD_W} height={CARD_H} highlighted={isFoundationSelected} dimmed={isDraggedFromFoundation} />
                 ) : (
@@ -448,7 +491,7 @@ export function SolitaireBoard({
               </TouchableOpacity>
             )}
           </TouchableOpacity>
-          <View {...wastePanResponder.panHandlers}>
+          <View ref={wasteViewRef} {...wastePanResponder.panHandlers}>
             {waste.length > 0 ? (
               drawMode === 3 ? (
                 <View style={{ width: CARD_W + WASTE_FAN_STEP * (Math.min(waste.length, 3) - 1), height: CARD_H }}>
@@ -462,7 +505,7 @@ export function SolitaireBoard({
                         width={CARD_W}
                         height={CARD_H}
                         highlighted={idx === fanned.length - 1 && selected?.pile === 'waste'}
-                        dimmed={idx === fanned.length - 1 && dragInfo?.fromPile === 'waste'}
+                        dimmed={idx === fanned.length - 1 && (dragInfo?.fromPile === 'waste' || (!!flyingCard && autoCompleteAnim?.from.pile === 'waste'))}
                       />
                     </View>
                   ))}
@@ -473,7 +516,7 @@ export function SolitaireBoard({
                   width={CARD_W}
                   height={CARD_H}
                   highlighted={selected?.pile === 'waste'}
-                  dimmed={dragInfo?.fromPile === 'waste'}
+                  dimmed={dragInfo?.fromPile === 'waste' || (!!flyingCard && autoCompleteAnim?.from.pile === 'waste')}
                 />
               )
             ) : (
@@ -499,7 +542,11 @@ export function SolitaireBoard({
           const colHeight = topAcc + CARD_H
 
           return (
-            <View key={`col-${ci}`} style={{ width: CARD_W, height: colHeight, position: 'relative' }}>
+            <View
+              key={`col-${ci}`}
+              ref={el => { tableauColRefs.current[ci] = el }}
+              style={{ width: CARD_W, height: colHeight, position: 'relative' }}
+            >
               {col.map((card, cardi) => {
                 const inStack =
                   selected?.pile === 'tableau' &&
@@ -509,9 +556,14 @@ export function SolitaireBoard({
                   dragInfo?.fromPile === 'tableau' &&
                   dragInfo.colIndex === ci &&
                   cardi >= dragInfo.cardIndex
+                const isFlyingFrom =
+                  !!flyingCard &&
+                  autoCompleteAnim?.from.pile === 'tableau' &&
+                  autoCompleteAnim.from.col === ci &&
+                  cardi === col.length - 1
                 return (
                   <View key={`card-${ci}-${cardi}`} style={{ position: 'absolute', top: offsets[cardi] }}>
-                    <CardView card={card} width={CARD_W} height={CARD_H} highlighted={inStack} dimmed={isDragged} />
+                    <CardView card={card} width={CARD_W} height={CARD_H} highlighted={inStack} dimmed={isDragged || isFlyingFrom} />
                   </View>
                 )
               })}
@@ -528,6 +580,13 @@ export function SolitaireBoard({
               <CardView card={card} width={CARD_W} height={CARD_H} />
             </View>
           ))}
+        </Animated.View>
+      )}
+
+      {/* Auto-complete: 組札へ飛んでいくカード */}
+      {flyingCard && (
+        <Animated.View style={flyStyle} pointerEvents="none">
+          <CardView card={flyingCard} width={CARD_W} height={CARD_H} />
         </Animated.View>
       )}
     </View>

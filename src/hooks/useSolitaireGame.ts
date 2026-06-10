@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { generate, validate, dealState } from '../engines/solitaire'
-import { SolitaireState, SolitaireMove, Suit } from '../engines/solitaire/types'
+import { SolitaireState, SolitaireMove, Suit, Card } from '../engines/solitaire/types'
 import { Difficulty } from '../types/engine'
 
 const MAX_RESETS: Record<Difficulty, number> = {
@@ -10,6 +10,11 @@ const MAX_RESETS: Record<Difficulty, number> = {
   expert: 1,
 }
 
+// 自動完成: 1枚が組札に飛んでいくアニメーションの長さと、次の1枚までの間隔
+const AUTO_COMPLETE_ANIM_MS = 220
+const AUTO_COMPLETE_STEP_GAP_MS = 60
+const MAX_AUTO_COMPLETE_STEPS = 52 * 6
+
 export type SelectedCard =
   | { pile: 'tableau'; colIndex: number; cardIndex: number }
   | { pile: 'waste' }
@@ -18,6 +23,35 @@ export type SelectedCard =
 function suitIndex(suit: Suit): number {
   const map: Record<Suit, number> = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
   return map[suit]
+}
+
+// 自動完成時、組札に飛んでいくカードのアニメーション情報
+export type AutoCompleteAnim = {
+  card: Card
+  from: { pile: 'tableau'; col: number } | { pile: 'waste' }
+  to: { pile: 'foundation'; index: number }
+}
+
+// 山札・場札から組札へ移動できる次の1枚を探す（カードのランクが小さい順に積まれるため、
+// 各組札ではA→2→3...の順で自然に移動が発生する）
+export function findNextFoundationMove(state: SolitaireState): { move: SolitaireMove; anim: AutoCompleteAnim } | null {
+  if (state.waste.length > 0) {
+    const move: SolitaireMove = { type: 'waste-to-foundation' }
+    if (validate(state, move).correct) {
+      const card = state.waste[state.waste.length - 1]
+      return { move, anim: { card, from: { pile: 'waste' }, to: { pile: 'foundation', index: suitIndex(card.suit) } } }
+    }
+  }
+  for (let i = 0; i < state.tableau.length; i++) {
+    const col = state.tableau[i]
+    if (col.length === 0) continue
+    const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
+    if (validate(state, move).correct) {
+      const card = col[col.length - 1]
+      return { move, anim: { card, from: { pile: 'tableau', col: i }, to: { pile: 'foundation', index: suitIndex(card.suit) } } }
+    }
+  }
+  return null
 }
 
 function applyMove(s: SolitaireState, move: SolitaireMove, drawMode: 1 | 3): SolitaireState {
@@ -133,55 +167,6 @@ function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
   return false
 }
 
-function computeAutoCompleteSteps(s: SolitaireState, drawMode: 1 | 3): SolitaireState[] {
-  const steps: SolitaireState[] = []
-  let current = s
-  const MAX_STEPS = 52 * 6
-
-  for (let iter = 0; iter < MAX_STEPS; iter++) {
-    const total = current.foundation.reduce((n, f) => n + f.length, 0)
-    if (total === 52) break
-
-    // Try waste → foundation
-    if (current.waste.length > 0 && validate(current, { type: 'waste-to-foundation' }).correct) {
-      current = applyMove(current, { type: 'waste-to-foundation' }, drawMode)
-      steps.push(current)
-      continue
-    }
-
-    // Try tableau → foundation
-    let moved = false
-    for (let i = 0; i < current.tableau.length; i++) {
-      if (current.tableau[i].length === 0) continue
-      const move: SolitaireMove = { type: 'tableau-to-foundation', from: { pile: 'tableau', index: i } }
-      if (validate(current, move).correct) {
-        current = applyMove(current, move, drawMode)
-        steps.push(current)
-        moved = true
-        break
-      }
-    }
-    if (moved) continue
-
-    // Draw next stock card one at a time
-    if (current.stock.length > 0) {
-      current = applyMove(current, { type: 'stock-draw' }, 1)
-      steps.push(current)
-      continue
-    }
-
-    // Cycle waste back through stock and keep trying
-    if (current.waste.length > 0 && validate(current, { type: 'stock-reset' }).correct) {
-      current = applyMove(current, { type: 'stock-reset' }, drawMode)
-      steps.push(current)
-      continue
-    }
-
-    break
-  }
-  return steps
-}
-
 export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   const [puzzle, setPuzzle] = useState(() => generate(difficulty, seed ?? Date.now()))
   const [state, setState] = useState<SolitaireState>(() => ({
@@ -191,6 +176,7 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   const [selected, setSelected] = useState<SelectedCard | null>(null)
   const [isComplete, setIsComplete] = useState(false)
   const [history, setHistory] = useState<SolitaireState[]>([])
+  const [autoCompleteAnim, setAutoCompleteAnim] = useState<AutoCompleteAnim | null>(null)
   const maxResets = MAX_RESETS[difficulty]
 
   const prevDifficultyRef = useRef(difficulty)
@@ -435,19 +421,56 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   }, [difficulty])
 
   const autoComplete = useCallback(() => {
-    const steps = computeAutoCompleteSteps(state, puzzle.drawMode)
-    if (steps.length === 0) return
-    steps.forEach((step, i) => {
-      setTimeout(() => {
-        setState(step)
-        setSelected(null)
-        if (step.foundation.every(f => f.length === 13)) setIsComplete(true)
-      }, i * 80)
-    })
+    setSelected(null)
+
+    const advance = (current: SolitaireState, steps: number) => {
+      const total = current.foundation.reduce((n, f) => n + f.length, 0)
+      if (total === 52 || steps >= MAX_AUTO_COMPLETE_STEPS) {
+        setState(current)
+        setAutoCompleteAnim(null)
+        if (total === 52) setIsComplete(true)
+        return
+      }
+
+      const next = findNextFoundationMove(current)
+      if (next) {
+        setAutoCompleteAnim(next.anim)
+        setTimeout(() => {
+          const newState = applyMove(current, next.move, puzzle.drawMode)
+          setState(newState)
+          setAutoCompleteAnim(null)
+          if (newState.foundation.every(f => f.length === 13)) {
+            setIsComplete(true)
+            return
+          }
+          setTimeout(() => advance(newState, steps + 1), AUTO_COMPLETE_STEP_GAP_MS)
+        }, AUTO_COMPLETE_ANIM_MS)
+        return
+      }
+
+      // 組札へ移動できるカードが無い場合は山札を1枚めくる/リセットする（アニメーションなし）
+      if (current.stock.length > 0) {
+        const newState = applyMove(current, { type: 'stock-draw' }, 1)
+        setState(newState)
+        setTimeout(() => advance(newState, steps + 1), AUTO_COMPLETE_STEP_GAP_MS)
+        return
+      }
+
+      if (current.waste.length > 0 && validate(current, { type: 'stock-reset' }).correct) {
+        const newState = applyMove(current, { type: 'stock-reset' }, puzzle.drawMode)
+        setState(newState)
+        setTimeout(() => advance(newState, steps + 1), AUTO_COMPLETE_STEP_GAP_MS)
+        return
+      }
+
+      setState(current)
+    }
+
+    advance(state, 0)
   }, [state, puzzle.drawMode])
 
   return {
-    state, puzzle, selected, isComplete, maxResets, canAutoComplete, isDeadlocked,
+    state, puzzle, selected, isComplete, maxResets, canAutoComplete, isDeadlocked, autoCompleteAnim,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
     canUndo: history.length > 0,
