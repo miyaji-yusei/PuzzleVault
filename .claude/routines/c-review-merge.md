@@ -168,6 +168,23 @@
    ---
 
    ### f. マージ前の最終確認
+
+   #### f-1. PRコメントチェック（必須）
+   ```bash
+   gh pr view {番号} --json comments --jq '.comments[].body'
+   ```
+   コメント内に以下のいずれかに該当する表現があれば **マージしない**:
+   - 「マージしないでください」「マージを保留」「do not merge」
+   - 「〜してから」「〜が完了後」「〜を先に」（前提条件が未完了の可能性）
+   - 「問題があります」「修正が必要」（未対応の修正依頼）
+
+   該当する場合は `do-not-merge` ラベルを付けてスキップする:
+   ```bash
+   gh pr edit {番号} --add-label do-not-merge
+   gh pr comment {番号} --body "[Worker] PRコメントにマージ保留の指示を確認したため、do-not-mergeラベルを付与してスキップします。"
+   ```
+
+   #### f-2. Issueコメントチェック
    PR本文の `Closes #{Issue番号}` からIssue番号を特定し、最新コメントを確認する:
    ```bash
    gh issue view {Issue番号} --json comments --jq '.comments[-3:] | .[].body'
