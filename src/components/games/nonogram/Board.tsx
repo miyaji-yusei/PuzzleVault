@@ -76,8 +76,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const maxColClues = Math.max(...colClues.map(c => c.length))
 
   const clueAreaWidth = maxRowClues * 15
-  const clueAreaHeight = maxColClues * 16
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
+  const clueFontSize = cellSize >= 24 ? 12 : cellSize >= 18 ? 10 : 8
+  const clueLineHeight = clueFontSize + 3
+  const clueAreaHeight = maxColClues * clueLineHeight
   const gridWidth = cellSize * size
   const gridHeight = cellSize * size
   const totalWidth = clueAreaWidth + gridWidth
@@ -362,7 +364,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
               {colClues[col]?.map((n, i) => (
                 <Text
                   key={i}
-                  style={[styles.clueText, { color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] }]}
+                  style={[
+                    styles.clueText,
+                    { fontSize: clueFontSize, lineHeight: clueLineHeight, color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] },
+                  ]}
                 >
                   {n === 0 ? '' : n}
                 </Text>
@@ -380,7 +385,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
                 {rowClues[row]?.map((n, i) => (
                   <Text
                     key={i}
-                    style={[styles.clueText, { color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] }]}
+                    style={[
+                      styles.clueText,
+                      { fontSize: clueFontSize, lineHeight: clueLineHeight, color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] },
+                    ]}
                   >
                     {n === 0 ? '' : n}
                   </Text>
@@ -454,9 +462,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
   },
   clueText: {
-    fontSize: 12,
     fontWeight: '500',
-    lineHeight: 15,
   },
   gridRow: {
     flexDirection: 'row',
