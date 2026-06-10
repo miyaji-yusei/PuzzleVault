@@ -43,7 +43,7 @@ function applySpiderMove(state: SpiderState, move: SpiderMove): SpiderState {
   return ns
 }
 
-export function useSpiderGame(difficulty: Difficulty, seed?: number) {
+export function useSpiderGame(difficulty: Difficulty, seed?: number, options?: { dealWithEmpty?: boolean }) {
   const [puzzle] = useState<SpiderPuzzle>(() => generate(difficulty, seed ?? Date.now()))
   const [state, setState] = useState<SpiderState>(() => ({
     ...dealState(puzzle.seed, puzzle.suitCount),
@@ -133,12 +133,13 @@ export function useSpiderGame(difficulty: Difficulty, seed?: number) {
 
   const deal = useCallback(() => {
     if (isComplete) return
+    if (state.stock.length === 0) return
+    const hasEmpty = state.tableau.some(col => col.length === 0)
+    if (hasEmpty && !options?.dealWithEmpty) return
     const move: SpiderMove = { type: 'deal' }
-    const result = validate(state, move)
-    if (!result.correct) return
     commitState(applySpiderMove(state, move))
     setSelected(null)
-  }, [state, isComplete, commitState])
+  }, [state, isComplete, commitState, options?.dealWithEmpty])
 
   const undo = useCallback(() => {
     setHistory(prev => {

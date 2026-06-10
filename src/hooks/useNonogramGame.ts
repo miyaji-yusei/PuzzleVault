@@ -52,12 +52,14 @@ function computeAutoCrossed(
   return auto
 }
 
+// Returns true if `line` can be completed (empty cells filled/crossed) to exactly match `hints`.
 function canLineComplete(line: CellState[], hints: number[]): boolean {
   const n = line.length
   const h = hints.length
 
   function bt(pos: number, hi: number): boolean {
     if (hi === h) {
+      // All hints placed; remaining cells must not be filled
       for (let i = pos; i < n; i++) {
         if (line[i] === 'filled') return false
       }
@@ -66,16 +68,19 @@ function canLineComplete(line: CellState[], hints: number[]): boolean {
     if (pos >= n) return false
     const len = hints[hi]!
     for (let start = pos; start + len <= n; start++) {
+      // Cells from pos to start-1 will be crossed — none can already be 'filled'
       let ok = true
       for (let i = pos; i < start; i++) {
         if (line[i] === 'filled') { ok = false; break }
       }
-      if (!ok) break
+      if (!ok) break // further start positions also invalid
+      // Cells start..start+len-1 must be crossable to 'filled' (not already 'crossed')
       let canPlace = true
       for (let i = start; i < start + len; i++) {
         if (line[i] === 'crossed') { canPlace = false; break }
       }
       if (!canPlace) continue
+      // Cell immediately after the group must not be 'filled' (separator)
       const after = start + len
       if (after < n && line[after] === 'filled') continue
       if (bt(after + 1, hi + 1)) return true
