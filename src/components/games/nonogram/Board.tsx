@@ -75,7 +75,12 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const maxRowClues = Math.max(...rowClues.map(c => c.length))
   const maxColClues = Math.max(...colClues.map(c => c.length))
 
-  const clueAreaWidth = maxRowClues * 15
+  // 行ヒントの数字数が多い盤面（25x25等）では1桁あたりの幅とフォントサイズを縮小し、左端の見切れを防ぐ
+  const rowClueDigitWidth = maxRowClues >= 9 ? 10 : maxRowClues >= 7 ? 12 : 15
+  const rowClueFontSize = maxRowClues >= 9 ? 8 : maxRowClues >= 7 ? 10 : 12
+  const rowClueLineHeight = rowClueFontSize + 3
+
+  const clueAreaWidth = maxRowClues * rowClueDigitWidth
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
   const clueFontSize = cellSize >= 24 ? 12 : cellSize >= 18 ? 10 : 8
   const clueLineHeight = clueFontSize + 3
@@ -387,7 +392,11 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
                     key={i}
                     style={[
                       styles.clueText,
-                      { fontSize: clueFontSize, lineHeight: clueLineHeight, color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] },
+                      {
+                        fontSize: Math.min(rowClueFontSize, clueFontSize),
+                        lineHeight: Math.min(rowClueLineHeight, clueLineHeight),
+                        color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'],
+                      },
                     ]}
                   >
                     {n === 0 ? '' : n}
