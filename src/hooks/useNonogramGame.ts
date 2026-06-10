@@ -52,6 +52,45 @@ function computeAutoCrossed(
   return auto
 }
 
+// Returns true if `line` can be completed (empty cells filled/crossed) to exactly match `hints`.
+function canLineComplete(line: CellState[], hints: number[]): boolean {
+  const n = line.length
+  const h = hints.length
+
+  function bt(pos: number, hi: number): boolean {
+    if (hi === h) {
+      // All hints placed; remaining cells must not be filled
+      for (let i = pos; i < n; i++) {
+        if (line[i] === 'filled') return false
+      }
+      return true
+    }
+    if (pos >= n) return false
+    const len = hints[hi]!
+    for (let start = pos; start + len <= n; start++) {
+      // Cells from pos to start-1 will be crossed — none can already be 'filled'
+      let ok = true
+      for (let i = pos; i < start; i++) {
+        if (line[i] === 'filled') { ok = false; break }
+      }
+      if (!ok) break // further start positions also invalid
+      // Cells start..start+len-1 must be crossable to 'filled' (not already 'crossed')
+      let canPlace = true
+      for (let i = start; i < start + len; i++) {
+        if (line[i] === 'crossed') { canPlace = false; break }
+      }
+      if (!canPlace) continue
+      // Cell immediately after the group must not be 'filled' (separator)
+      const after = start + len
+      if (after < n && line[after] === 'filled') continue
+      if (bt(after + 1, hi + 1)) return true
+    }
+    return false
+  }
+
+  return bt(0, 0)
+}
+
 function computeLineHintColors(line: CellState[], hints: number[]): HintColor[] {
   const colors: HintColor[] = hints.map(() => 'default' as HintColor)
   if (hints.length === 0) return colors
@@ -70,23 +109,25 @@ function computeLineHintColors(line: CellState[], hints: number[]): HintColor[] 
     }
   }
 
+  // Line is fully and correctly solved → all blue
   if (groups.length === hints.length && groups.every((g, idx) => g.len === hints[idx])) {
     return hints.map(() => 'blue' as HintColor)
   }
 
+  // Mark closed groups that sequentially match a hint as blue
   let hintIdx = 0
   for (const g of groups) {
-    if (hintIdx >= hints.length) {
-      colors[hints.length - 1] = 'red'
-      break
-    }
-    const hint = hints[hintIdx] ?? 0
-    if (g.len > hint) {
-      colors[hintIdx] = 'red'
-      hintIdx++
-    } else if (g.closed && g.len === hint) {
+    if (hintIdx >= hints.length) break
+    if (g.closed && g.len === hints[hintIdx]) {
       colors[hintIdx] = 'blue'
       hintIdx++
+    }
+  }
+
+  // Only show red when there is NO valid completion — definitively wrong
+  if (!canLineComplete(line, hints)) {
+    for (let k = 0; k < hints.length; k++) {
+      colors[k] = 'red'
     }
   }
 

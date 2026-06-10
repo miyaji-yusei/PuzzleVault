@@ -70,6 +70,45 @@
    - 72時間以上経過したready PRを検知:
      `gh pr comment {番号} --body "[Monitor] 72時間以上マージされていません。Workerが次回レビューします。"`
 
+4.5. **CI環境障害チェック**（インフラ問題による即時失敗の検知）
+
+   ready状態（isDraft=false）のPRを対象に、最新CIランを確認して「30秒未満の即時失敗」が複数PRで発生していないかチェックする:
+   ```bash
+   gh pr list --base develop --state open --json number,headRefName,isDraft \
+     --jq '.[] | select(.isDraft == false) | [.number, .headRefName] | @tsv'
+   ```
+   各PRの最新CIランを確認:
+   ```bash
+   gh run list --workflow=ci.yml --branch {headブランチ名} --limit 1 \
+     --json status,conclusion,createdAt,updatedAt,databaseId \
+     --jq '.[0] | {conclusion, duration: ((.updatedAt | fromdate) - (.createdAt | fromdate))}'
+   ```
+
+   **即時失敗と判定する条件**（以下のいずれか）:
+   - `conclusion=failure` かつ 実行時間が **30秒未満**
+   - `databaseId` が取得できない（ランナー未割り当て）
+   - ログ取得を試みると404エラーが返る
+
+   該当PRが **2件以上** → CI環境障害と判定して Issueを作成する:
+   ```bash
+   EXISTING=$(gh issue list --label monitoring-alert --state open --json title \
+     --jq '[.[] | select(.title | contains("CI環境障害"))] | length')
+   if [ "$EXISTING" -eq 0 ]; then
+     gh issue create \
+       --title "[監視] CI環境障害: 全PRで即時失敗を検知（インフラ問題）" \
+       --label monitoring-alert \
+       --body "対象PR: {番号リスト}\n\n複数のPRで30秒未満のCI即時失敗を検知しました。GitHub Actionsのランナーが割り当てられていない（runner_id=0）インフラ側の問題の可能性があります。\n\n**Workerへの指示**: このIssueが未クローズの間、CIが30秒未満で失敗しているPRはコード修正を試みずスキップしてください。"
+   fi
+   ```
+
+   CI環境障害Issueが既に存在する場合:
+   - 最新CI実行が30秒以上で完了していれば → 「環境回復」としてIssueをクローズする:
+     ```bash
+     gh issue close {監視Issue番号} --comment "[Monitor] CIランが正常に完了したため、環境障害は解消されたと判断します。"
+     ```
+
+   → CI環境障害と判定した場合でも他のチェック（ステップ5・6）は続行する。
+
 5. **CI連続失敗チェック**
    ```bash
    gh pr list --base develop --state open --json number,title

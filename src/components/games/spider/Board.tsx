@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SpiderState, Card, Suit } from '../../../engines/spider/types'
+import { isValidMoveUnit } from '../../../engines/spider'
 import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
 
 const PAD = 4
@@ -202,12 +203,20 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         if (!gs.isDragging) {
           gs.isDragging = true
           if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
-          // Overlay positioned relative to container (outside ScrollView)
+          const column = tableauRef.current[col] ?? []
+          const seq = column.slice(cardIndex)
+          // 無効な複数枚シーケンスはドラッグ不可。最前列の1枚（最後尾カード）のみ許可。
+          const effectiveIdx = isValidMoveUnit(seq) ? cardIndex : column.length - 1
+          gs.activeCard = { col, cardIndex: effectiveIdx }
+          const draggableSeq = column.slice(effectiveIdx)
+          if (draggableSeq.length === 0 || !draggableSeq[0]!.faceUp) {
+            gs.isDragging = false
+            return
+          }
           overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - cardWRef.current / 2)
           overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - cardHRef.current / 4)
           Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
-          const column = tableauRef.current[col] ?? []
-          setDragInfo({ col, cardIndex, cards: column.slice(cardIndex) })
+          setDragInfo({ col, cardIndex: effectiveIdx, cards: draggableSeq })
         }
         overlayX.setValue(e.nativeEvent.pageX - containerLeftRef.current - cardWRef.current / 2)
         overlayY.setValue(e.nativeEvent.pageY - containerTopRef.current - cardHRef.current / 4)

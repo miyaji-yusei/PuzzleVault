@@ -73,8 +73,28 @@
    gh pr checks {番号}
    ```
    - 全て `pending` または `in_progress` → 「CI実行中、スキップ」と出力して次のPRへ
-   - `failure` あり → 差分とCIログを確認して修正（ステップeへ）
+   - `failure` あり → まず **CI環境障害か確認する**（下記）
    - 全て `success` → コードレビューへ（ステップcへ）
+
+   #### b-1. CI失敗時: インフラ障害か確認する
+   `failure` を確認したら、コード修正の前に必ずインフラ障害を排除する:
+   ```bash
+   # 最新CIランの実行時間を確認
+   gh run list --workflow=ci.yml --branch {headブランチ名} --limit 1 \
+     --json status,conclusion,createdAt,updatedAt,databaseId
+   ```
+   以下のいずれかに該当する場合 → **インフラ障害と判定**してコード修正をスキップ:
+   - 実行時間が **30秒未満**（`createdAt`〜`updatedAt` の差分）
+   - `databaseId` が 0 またはログ取得に失敗（404）
+   - 複数PRで同じパターン（`[監視] CI環境障害` Issueが存在する）
+
+   インフラ障害と判定した場合:
+   ```bash
+   gh pr comment {番号} --body "[Worker] CIが30秒未満で失敗しています。GitHub Actionsのインフラ問題の可能性があるためコード修正をスキップします。環境が回復したら次回Workerで再確認されます。"
+   ```
+   → 次のPRへ進む（このPRのステップeは実行しない）
+
+   インフラ障害でない場合（実行時間30秒以上、通常のCI失敗）→ 差分とCIログを確認して修正（ステップeへ）
 
    ---
 
