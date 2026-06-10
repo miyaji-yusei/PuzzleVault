@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Animated, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Animated, Dimensions, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import * as ScreenOrientation from 'expo-screen-orientation'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
 import { Difficulty } from '../../../src/types/engine'
 import { useProgressStore } from '../../../src/stores/progressStore'
+import { useSettingsStore } from '../../../src/stores/settingsStore'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 const SUITS = ['♠', '♥', '♦', '♣']
@@ -106,6 +108,22 @@ export default function SolitaireScreen() {
   const [showDeadlockDialog, setShowDeadlockDialog] = useState(false)
   const [deadlockHandled, setDeadlockHandled] = useState(false)
   const [showRestartDialog, setShowRestartDialog] = useState(false)
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+
+  const landscapeEnabled = useSettingsStore(s => s.solitaireLandscapeEnabled)
+  const setLandscapeEnabled = useSettingsStore(s => s.setSolitaireLandscapeEnabled)
+
+  // 横画面表示が許可されている間だけ画面回転を許可し、画面を離れるときは縦画面に戻す
+  useEffect(() => {
+    if (landscapeEnabled) {
+      ScreenOrientation.unlockAsync()
+    } else {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+  }, [landscapeEnabled])
 
   useEffect(() => {
     if (canAutoComplete && !autoCompleteHandled) {
@@ -180,6 +198,9 @@ export default function SolitaireScreen() {
             <TouchableOpacity onPress={() => setShowRestartDialog(true)} style={styles.iconButton}>
               <Text style={styles.iconButtonText}>↺</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowSettingsDialog(true)} style={styles.iconButton}>
+              <Text style={styles.iconButtonText}>⚙</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -224,6 +245,32 @@ export default function SolitaireScreen() {
                 }}
               >
                 <Text style={styles.dialogButtonTextOk}>はい</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings dialog */}
+      <Modal visible={showSettingsDialog} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>設定</Text>
+            <View style={styles.settingsRow}>
+              <Text style={styles.settingsLabel}>横画面表示を許可</Text>
+              <Switch
+                value={landscapeEnabled}
+                onValueChange={setLandscapeEnabled}
+                trackColor={{ false: '#555', true: '#66bb6a' }}
+                thumbColor={landscapeEnabled ? '#fff' : '#ccc'}
+              />
+            </View>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonOk]}
+                onPress={() => setShowSettingsDialog(false)}
+              >
+                <Text style={styles.dialogButtonTextOk}>閉じる</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -444,6 +491,18 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
     textAlign: 'center',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  settingsLabel: {
+    fontSize: 14,
+    color: '#333',
   },
   dialogButtons: {
     flexDirection: 'row',
