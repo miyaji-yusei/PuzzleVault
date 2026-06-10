@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Switch } from 'react-native'
-import { useState } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
+import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { Difficulty } from '../../../src/types/engine'
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
@@ -61,7 +61,8 @@ function DifficultySelect() {
 
 function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   const router = useRouter()
-  const [dealWithEmpty, setDealWithEmpty] = useState(false)
+  const dealWithEmpty = useSettingsStore(s => s.solitaireAllowDealWithEmptyColumn)
+  const setDealWithEmpty = useSettingsStore(s => s.setSolitaireAllowDealWithEmptyColumn)
 
   const {
     puzzle, state, selected, isComplete,
