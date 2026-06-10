@@ -6,11 +6,13 @@ interface SettingsState {
   theme: 'light' | 'dark'
   isPurchased: boolean
   solitaireAllowDealWithEmptyColumn: boolean
+  solitaireLandscapeEnabled: boolean
   setSoundEnabled: (enabled: boolean) => void
   setVibrationEnabled: (enabled: boolean) => void
   setTheme: (theme: 'light' | 'dark') => void
   setPurchased: (purchased: boolean) => void
   setSolitaireAllowDealWithEmptyColumn: (allow: boolean) => void
+  setSolitaireLandscapeEnabled: (enabled: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -19,9 +21,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   theme: 'light',
   isPurchased: false,
   solitaireAllowDealWithEmptyColumn: false,
+  solitaireLandscapeEnabled: false,
   setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
   setVibrationEnabled: (enabled) => set({ vibrationEnabled: enabled }),
   setTheme: (theme) => set({ theme }),
   setPurchased: (purchased) => set({ isPurchased: purchased }),
   setSolitaireAllowDealWithEmptyColumn: (allow) => set({ solitaireAllowDealWithEmptyColumn: allow }),
+  setSolitaireLandscapeEnabled: (enabled) => set({ solitaireLandscapeEnabled: enabled }),
 }))

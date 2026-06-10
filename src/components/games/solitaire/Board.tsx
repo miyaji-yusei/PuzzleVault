@@ -1,18 +1,14 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
 import { SelectedCard } from '../../../hooks/useSolitaireGame'
 
-const { width: SW } = Dimensions.get('window')
 const PAD = 8
 const GAP = 3
 const NUM_COLS = 7
-const CARD_W = Math.floor((SW - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
-const CARD_H = Math.floor(CARD_W * 1.45)
 const FACE_DOWN_STEP = 10
 const FACE_UP_STEP = 22
 const WASTE_FAN_STEP = 12
-const TOP_ROW_H = 8 + CARD_H + 8
 const DOUBLE_TAP_MS = 280
 const DRAG_THRESHOLD = 8
 
@@ -82,6 +78,23 @@ export function SolitaireBoard({
   const { tableau, foundation, stock, waste } = state
   const foundationLabels = ['♠', '♥', '♦', '♣']
 
+  // Use the shorter window dimension as the basis for card sizing so cards stay a
+  // consistent, sensible size whether the device is in portrait or landscape.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
+  const portraitWidth = Math.min(windowWidth, windowHeight)
+  const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
+  const CARD_H = Math.floor(CARD_W * 1.45)
+  const TOP_ROW_H = 8 + CARD_H + 8
+
+  // Refs so PanResponder callbacks always read the latest dimensions without
+  // needing to be recreated on every orientation change.
+  const cardWRef = useRef(CARD_W)
+  cardWRef.current = CARD_W
+  const cardHRef = useRef(CARD_H)
+  cardHRef.current = CARD_H
+  const topRowHRef = useRef(TOP_ROW_H)
+  topRowHRef.current = TOP_ROW_H
+
   const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
   const boardLeftRef = useRef(0)
@@ -127,13 +140,15 @@ export function SolitaireBoard({
   foundationRef.current = foundation
 
   const getCardAt = useCallback((relX: number, relY: number) => {
-    const col = Math.floor((relX - PAD) / (CARD_W + GAP))
+    const cardW = cardWRef.current
+    const cardH = cardHRef.current
+    const col = Math.floor((relX - PAD) / (cardW + GAP))
     if (col < 0 || col >= NUM_COLS) return null
     // Accept any X that falls within the column's allocated space (card + gap)
     // Math.floor already assigns gap pixels to the left column, so no further check needed
     const column = tableauRef.current[col] ?? []
     if (column.length === 0) {
-      return relY < CARD_H * 2 ? { col, card: -1 } : null
+      return relY < cardH * 2 ? { col, card: -1 } : null
     }
 
     let topAcc = 0
@@ -145,7 +160,7 @@ export function SolitaireBoard({
 
     const lastIdx = column.length - 1
     // Allow dragging from empty space below the last card — treat as the last card
-    if (relY >= offsets[lastIdx] + CARD_H) return { col, card: lastIdx }
+    if (relY >= offsets[lastIdx] + cardH) return { col, card: lastIdx }
 
     let cardIdx = 0
     for (let i = lastIdx; i >= 0; i--) {
@@ -157,14 +172,16 @@ export function SolitaireBoard({
   const handleDrop = useCallback((absX: number, absY: number, fromCol: number, fromCardIdx: number) => {
     const relY = absY - boardTopRef.current
     const relX = absX - boardLeftRef.current
+    const cardW = cardWRef.current
+    const topRowH = topRowHRef.current
 
-    if (relY >= 0 && relY < TOP_ROW_H) {
+    if (relY >= 0 && relY < topRowH) {
       onDirectMoveRef.current({
         type: 'tableau-to-foundation',
         from: { pile: 'tableau', index: fromCol, cardIndex: fromCardIdx },
       })
-    } else if (relY >= TOP_ROW_H) {
-      const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+    } else if (relY >= topRowH) {
+      const toCol = Math.round((relX - PAD) / (cardW + GAP))
       const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
       if (clampedCol !== fromCol) {
         onDirectMoveRef.current({
@@ -195,13 +212,13 @@ export function SolitaireBoard({
             wasteGestureState.current.isDragging = true
             if (wasteTapTimer) { clearTimeout(wasteTapTimer); wasteTapTimer = null; wastePendingTap = false }
             const card = wasteRef.current[wasteRef.current.length - 1]
-            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
             Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
             setDragInfo({ fromPile: 'waste', colIndex: -1, cardIndex: 0, cards: [card] })
           }
-          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
         }
       },
       onPanResponderRelease: (e) => {
@@ -211,10 +228,10 @@ export function SolitaireBoard({
           setDragInfo(null)
           const relY = e.nativeEvent.pageY - boardTopRef.current
           const relX = e.nativeEvent.pageX - boardLeftRef.current
-          if (relY >= 0 && relY < TOP_ROW_H) {
+          if (relY >= 0 && relY < topRowHRef.current) {
             onDirectMoveRef.current({ type: 'waste-to-foundation' })
-          } else if (relY >= TOP_ROW_H) {
-            const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+          } else if (relY >= topRowHRef.current) {
+            const toCol = Math.round((relX - PAD) / (cardWRef.current + GAP))
             const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
             onDirectMoveRef.current({ type: 'waste-to-tableau', to: { pile: 'tableau', index: clampedCol } })
           }
@@ -254,7 +271,7 @@ export function SolitaireBoard({
       onPanResponderGrant: (e) => {
         gs.isDragging = false
         const relX = e.nativeEvent.pageX - boardLeftRef.current - PAD
-        const fi = Math.floor(relX / (CARD_W + GAP))
+        const fi = Math.floor(relX / (cardWRef.current + GAP))
         const pile = foundationRef.current[fi]
         gs.activeFi = (fi >= 0 && fi < 4 && pile && pile.length > 0) ? fi : null
       },
@@ -266,13 +283,13 @@ export function SolitaireBoard({
           if (!gs.isDragging) {
             gs.isDragging = true
             const card = pile[pile.length - 1]!
-            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+            overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+            overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
             Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
             setDragInfo({ fromPile: 'foundation', colIndex: gs.activeFi, cardIndex: 0, cards: [card] })
           }
-          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
         }
       },
       onPanResponderRelease: (e) => {
@@ -283,8 +300,8 @@ export function SolitaireBoard({
           if (gs.activeFi !== null) {
             const relY = e.nativeEvent.pageY - boardTopRef.current
             const relX = e.nativeEvent.pageX - boardLeftRef.current
-            if (relY >= TOP_ROW_H) {
-              const toCol = Math.round((relX - PAD) / (CARD_W + GAP))
+            if (relY >= topRowHRef.current) {
+              const toCol = Math.round((relX - PAD) / (cardWRef.current + GAP))
               const clampedCol = Math.max(0, Math.min(NUM_COLS - 1, toCol))
               onDirectMoveRef.current({
                 type: 'foundation-to-tableau',
@@ -323,7 +340,7 @@ export function SolitaireBoard({
       const gs = gestureState.current
       gs.isDragging = false
       const relX = e.nativeEvent.pageX - boardLeftRef.current
-      const relY = e.nativeEvent.pageY - boardTopRef.current - TOP_ROW_H
+      const relY = e.nativeEvent.pageY - boardTopRef.current - topRowHRef.current
       gs.activeCard = relY >= 0 ? getCardAt(relX, relY) : null
     },
     onPanResponderMove: (e, g) => {
@@ -338,14 +355,14 @@ export function SolitaireBoard({
           gs.isDragging = true
           if (gs.tapTimer) { clearTimeout(gs.tapTimer); gs.tapTimer = null; gs.pendingTap = null }
           // Position overlay relative to board (position: absolute within board view)
-          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+          overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+          overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
           Animated.timing(overlayOpacity, { toValue: 0.9, duration: 80, useNativeDriver: false }).start()
           const column = tableauRef.current[col] ?? []
           setDragInfo({ fromPile: 'tableau', colIndex: col, cardIndex: card, cards: column.slice(card) })
         }
-        overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - CARD_W / 2)
-        overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - CARD_H / 4)
+        overlayX.setValue(e.nativeEvent.pageX - boardLeftRef.current - cardWRef.current / 2)
+        overlayY.setValue(e.nativeEvent.pageY - boardTopRef.current - cardHRef.current / 4)
       }
     },
     onPanResponderRelease: (e) => {
