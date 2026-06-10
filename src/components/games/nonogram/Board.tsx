@@ -81,8 +81,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const rowClueLineHeight = rowClueFontSize + 3
 
   const clueAreaWidth = maxRowClues * rowClueDigitWidth
-  const clueAreaHeight = maxColClues * 16
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
+  const clueFontSize = cellSize >= 24 ? 12 : cellSize >= 18 ? 10 : 8
+  const clueLineHeight = clueFontSize + 3
+  const clueAreaHeight = maxColClues * clueLineHeight
   const gridWidth = cellSize * size
   const gridHeight = cellSize * size
   const totalWidth = clueAreaWidth + gridWidth
@@ -367,7 +369,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
               {colClues[col]?.map((n, i) => (
                 <Text
                   key={i}
-                  style={[styles.clueText, { color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] }]}
+                  style={[
+                    styles.clueText,
+                    { fontSize: clueFontSize, lineHeight: clueLineHeight, color: HINT_COLOR[colClueColors[col]?.[i] ?? 'default'] },
+                  ]}
                 >
                   {n === 0 ? '' : n}
                 </Text>
@@ -387,7 +392,11 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
                     key={i}
                     style={[
                       styles.clueText,
-                      { fontSize: rowClueFontSize, lineHeight: rowClueLineHeight, color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'] },
+                      {
+                        fontSize: Math.min(rowClueFontSize, clueFontSize),
+                        lineHeight: Math.min(rowClueLineHeight, clueLineHeight),
+                        color: HINT_COLOR[rowClueColors[row]?.[i] ?? 'default'],
+                      },
                     ]}
                   >
                     {n === 0 ? '' : n}
@@ -462,9 +471,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
   },
   clueText: {
-    fontSize: 12,
     fontWeight: '500',
-    lineHeight: 15,
   },
   gridRow: {
     flexDirection: 'row',
