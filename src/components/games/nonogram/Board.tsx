@@ -75,7 +75,7 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const maxRowClues = Math.max(...rowClues.map(c => c.length))
   const maxColClues = Math.max(...colClues.map(c => c.length))
 
-  const clueAreaWidth = maxRowClues * 18
+  const clueAreaWidth = maxRowClues * 15
   const cellSize = Math.min(Math.floor((MAX_BOARD - clueAreaWidth) / size), 28)
   const clueFontSize = cellSize >= 24 ? 12 : cellSize >= 18 ? 10 : 8
   const clueLineHeight = clueFontSize + 3
@@ -456,8 +456,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingRight: 4,
-    gap: 2,
+    paddingRight: 2,
+    gap: 1,
     borderBottomWidth: 0.5,
     borderColor: '#ccc',
   },
