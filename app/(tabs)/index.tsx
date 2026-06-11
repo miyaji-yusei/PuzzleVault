@@ -70,6 +70,12 @@ const GAMES: GameInfo[] = [
     description: '蛇の頭と尾を動かして同じ色の穴に入れよう',
     implemented: true,
   },
+  {
+    id: 'goita',
+    name: 'ごいた',
+    description: '能登発祥の伝統ボードゲーム。AIと2対2で対戦しよう',
+    implemented: true,
+  },
 ]
 
 type GameCardProps = {
