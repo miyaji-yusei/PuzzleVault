@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { PandaState, CellContent } from '../../../engines/panda/types'
+import { GameIcon } from '../../ui/GameIcon'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const HINT_SIZE = 28
@@ -113,20 +114,17 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
     const isConfirmed = confirmedCells.has(`${row},${col}`)
 
     if (isFixed || cell === 'A') {
-      return <Text style={[styles.cellText, { fontSize: cellSize * 0.55 }]}>🎋</Text>
+      return <GameIcon name="bamboo" size={Math.floor(cellSize * 0.62)} color="#8E8D85" />
     }
     if (cell === 'B') {
       return (
-        <Text
-          style={[
-            styles.cellText,
-            { fontSize: cellSize * 0.55 },
-            isError && styles.cellTextError,
-            isConfirmed && styles.cellTextConfirmed,
-          ]}
-        >
-          🐼
-        </Text>
+        <View style={isError && styles.cellTextError}>
+          <GameIcon
+            name="panda"
+            size={Math.floor(cellSize * 0.66)}
+            color={isConfirmed ? '#FFFFFF' : '#C9C7BD'}
+          />
+        </View>
       )
     }
     if (cell === 'crossed') {
@@ -218,26 +216,26 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#555',
+    color: '#8E8D85',
   },
   hintTextComplete: {
-    color: '#2e7d32',
+    color: '#2FA876',
   },
   cell: {
     borderWidth: 1,
-    borderColor: '#bbb',
+    borderColor: '#2E3036',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#232428',
   },
   cellFixed: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#17181B',
   },
   cellCrossed: {
-    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    backgroundColor: 'rgba(255, 210, 48, 0.12)',
   },
   cellError: {
-    backgroundColor: 'rgba(244, 67, 54, 0.25)',
+    backgroundColor: 'rgba(201, 72, 59, 0.35)',
   },
   cellText: {
     fontWeight: 'bold',
@@ -249,6 +247,6 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   cellTextCross: {
-    color: 'rgba(0,150,0,0.5)',
+    color: 'rgba(255, 210, 48, 0.55)',
   },
 })
