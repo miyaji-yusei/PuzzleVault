@@ -13,6 +13,9 @@ const FACE_UP_STEP = 22
 const WASTE_FAN_STEP = 12
 const DOUBLE_TAP_MS = 280
 const DRAG_THRESHOLD = 8
+// Approx. height consumed by the screen header outside of this board component.
+const HEADER_ALLOWANCE = 60
+const MIN_CARD_W = 24
 
 const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
@@ -86,7 +89,19 @@ export function SolitaireBoard({
   // consistent, sensible size whether the device is in portrait or landscape.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const portraitWidth = Math.min(windowWidth, windowHeight)
-  const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
+  const widthBasedCardW = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
+
+  // In landscape, the limited height (rather than width) tends to be the binding
+  // constraint, so shrink cards further if the tallest tableau column wouldn't fit.
+  let CARD_W = widthBasedCardW
+  if (windowWidth > windowHeight) {
+    const maxColLen = Math.max(1, ...tableau.map(col => col.length))
+    const availableHeight = windowHeight - HEADER_ALLOWANCE
+    const heightBasedCardW = Math.floor(
+      (availableHeight - 24 - (maxColLen - 1) * FACE_UP_STEP) / (2 * 1.45)
+    )
+    CARD_W = Math.min(widthBasedCardW, Math.max(heightBasedCardW, MIN_CARD_W))
+  }
   const CARD_H = Math.floor(CARD_W * 1.45)
   const TOP_ROW_H = 8 + CARD_H + 8
 
