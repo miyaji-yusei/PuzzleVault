@@ -51,6 +51,7 @@ export const jewels = {
   hashi: '#1E908C',
   sums: '#D86A53',
   gechoout: '#A8553F',
+  goita: '#8F6B3B',
 } as const
 
 export type GameId = keyof typeof jewels

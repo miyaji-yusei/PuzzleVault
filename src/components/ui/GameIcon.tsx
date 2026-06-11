@@ -11,6 +11,7 @@ export type IconName =
   | 'hashi'
   | 'sums'
   | 'gechoout'
+  | 'goita'
   | 'sun'
   | 'moon'
   | 'bamboo'
@@ -140,6 +141,12 @@ export function GameIcon({ name, size = 24, color = '#FFFFFF' }: Props) {
             <Path d="M4 12h10" />
             <Path d="m10.5 8.5 3.5 3.5-3.5 3.5" />
           </G>
+        </Svg>
+      )
+    case 'goita': // 駒（将棋駒型）
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M12 3 7 6.5 5.5 20h13L17 6.5 12 3z" fill={color} />
         </Svg>
       )
     case 'sun': // 太陽（白黒）
