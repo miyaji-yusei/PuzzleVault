@@ -141,7 +141,7 @@ function applyMove(s: SolitaireState, move: SolitaireMove, drawMode: 1 | 3): Sol
   return ns
 }
 
-function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
+export function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
   if (s.stock.length > 0) return true
   if (s.stockResets < maxResets && s.waste.length > 0) return true
 
@@ -160,6 +160,11 @@ function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
       if (!tableauCol[ci].faceUp) continue
       for (let dst = 0; dst < s.tableau.length; dst++) {
         if (dst === col) continue
+        const dstCol = s.tableau[dst]
+        // Moving an entire column onto an empty column is a no-op: it doesn't reveal
+        // new cards or change the board configuration, so it shouldn't count as a move
+        // that gets the player out of a deadlock.
+        if (ci === 0 && dstCol.length === 0) continue
         if (validate(s, { type: 'tableau-to-tableau', from: { pile: 'tableau', index: col, cardIndex: ci }, to: { pile: 'tableau', index: dst } }).correct) return true
       }
     }
