@@ -64,6 +64,12 @@ const GAMES: GameInfo[] = [
     description: '数字の合計を埋めるカカロパズル',
     implemented: true,
   },
+  {
+    id: 'gechoout',
+    name: 'Gecho Out',
+    description: '蛇の頭と尾を動かして同じ色の穴に入れよう',
+    implemented: true,
+  },
 ]
 
 type GameCardProps = {
