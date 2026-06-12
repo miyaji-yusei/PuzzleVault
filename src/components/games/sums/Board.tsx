@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   sumText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: '#FFFFFF',
   },
   sumDone: {
     color: '#bbb',
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   liveSumText: {
     fontSize: 9,
     fontWeight: '400',
-    color: '#7986cb',
+    color: '#ADB8E8',
   },
   cell: {
     borderWidth: 1.5,

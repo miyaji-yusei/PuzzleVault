@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { LibraState, CellValue, Constraint } from '../../../engines/libra/types'
+import { GameIcon } from '../../ui/GameIcon'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_PADDING = 24
@@ -86,17 +87,11 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
                   ]}
                 >
                   {value !== null && (
-                    <Text
-                      style={[
-                        styles.cellText,
-                        { fontSize: cellSize * 0.42 },
-                        isFixed && styles.cellTextFixed,
-                        value === 'A' && styles.cellTextA,
-                        value === 'B' && styles.cellTextB,
-                      ]}
-                    >
-                      {value === 'A' ? '☀️' : '🌙'}
-                    </Text>
+                    <GameIcon
+                      name={value === 'A' ? 'sun' : 'moon'}
+                      size={Math.floor(cellSize * 0.55)}
+                      color="#FFFFFF"
+                    />
                   )}
                 </View>
               )
@@ -145,8 +140,8 @@ const styles = StyleSheet.create({
   grid: {
     borderTopWidth: 2,
     borderLeftWidth: 2,
-    borderColor: '#555',
-    backgroundColor: '#fff',
+    borderColor: '#3A3C42',
+    backgroundColor: '#17181B',
   },
   row: {
     flexDirection: 'row',
@@ -156,24 +151,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderTopWidth: 0,
     borderLeftWidth: 0,
-    borderColor: '#999',
+    borderColor: '#2E3036',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: '#232428',
   },
   cellFixed: {
-    backgroundColor: '#e8eaf6',
+    backgroundColor: '#17181B',
   },
   cellFlash: {
     backgroundColor: 'rgba(244, 67, 54, 0.35)',
   },
   cellRightBorder: {
     borderRightWidth: 2,
-    borderRightColor: '#555',
+    borderRightColor: '#3A3C42',
   },
   cellBottomBorder: {
     borderBottomWidth: 2,
-    borderBottomColor: '#555',
+    borderBottomColor: '#3A3C42',
   },
   cellText: {
     fontWeight: 'bold',
@@ -189,7 +184,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CONSTRAINT_BOX,
     height: CONSTRAINT_BOX,
-    backgroundColor: '#fff',
+    backgroundColor: '#3A3C42',
     borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -199,9 +194,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   constraintEq: {
-    color: '#2e7d32',
+    color: '#2FA876',
   },
   constraintNeq: {
-    color: '#c62828',
+    color: '#E06D60',
   },
 })
