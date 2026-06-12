@@ -100,11 +100,16 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   const overlayOpacity = useRef(new Animated.Value(0)).current
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
 
-  // Completing-set animation: fade-out each of the 13 cards with stagger
-  type SetAnimState = { col: number; startIdx: number; opacityAnims: Animated.Value[] }
+  // Completing-set animation: cards fade out and slide toward the foundation area,
+  // starting from the Ace (last card in the set) so the suction reads as A→K.
+  type SetAnimState = { col: number; startIdx: number; opacityAnims: Animated.Value[]; translateAnims: Animated.ValueXY[] }
   const [setAnim, setSetAnim] = useState<SetAnimState | null>(null)
   const onSetAnimDoneRef = useRef(onSetAnimationDone)
   onSetAnimDoneRef.current = onSetAnimationDone
+
+  // Refs used to compute the on-screen offset from a tableau column to the foundation area
+  const tableauColRefs = useRef<(View | null)[]>([])
+  const foundationAreaRef = useRef<View>(null)
 
   useEffect(() => {
     if (!completingSet) {
@@ -115,22 +120,53 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
     const column = tableauRef.current[col] ?? []
     const startIdx = column.length - completingSet.cards.length
     const opacityAnims = completingSet.cards.map(() => new Animated.Value(1))
-    setSetAnim({ col, startIdx, opacityAnims })
+    const translateAnims = completingSet.cards.map(() => new Animated.ValueXY({ x: 0, y: 0 }))
+    setSetAnim({ col, startIdx, opacityAnims, translateAnims })
+
+    const offsets: number[] = []
+    let acc = 0
+    for (let i = 0; i < column.length; i++) {
+      offsets.push(acc)
+      if (i < column.length - 1) acc += column[i]!.faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
+    }
 
     const STAGGER_MS = 70
     const FADE_MS = 220
-    const anims = opacityAnims.map((anim, i) =>
-      Animated.sequence([
-        Animated.delay(i * STAGGER_MS),
-        Animated.timing(anim, { toValue: 0, duration: FADE_MS, useNativeDriver: true }),
-      ])
-    )
-    Animated.parallel(anims).start(({ finished }) => {
-      if (finished) {
-        setSetAnim(null)
-        onSetAnimDoneRef.current?.()
-      }
-    })
+    const MOVE_MS = 250
+    const n = opacityAnims.length
+
+    // i=n-1 is the Ace (cards[12]); it should be the first to fade/slide away,
+    // so its delay is 0 and the King (i=0) goes last.
+    const runAnims = (dx: number, dyBase: number) => {
+      const anims = opacityAnims.map((opacity, i) => {
+        const cardOffset = offsets[startIdx + i] ?? 0
+        return Animated.sequence([
+          Animated.delay((n - 1 - i) * STAGGER_MS),
+          Animated.parallel([
+            Animated.timing(opacity, { toValue: 0, duration: FADE_MS, useNativeDriver: true }),
+            Animated.timing(translateAnims[i]!, { toValue: { x: dx, y: dyBase - cardOffset }, duration: MOVE_MS, useNativeDriver: true }),
+          ]),
+        ])
+      })
+      Animated.parallel(anims).start(({ finished }) => {
+        if (finished) {
+          setSetAnim(null)
+          onSetAnimDoneRef.current?.()
+        }
+      })
+    }
+
+    const colView = tableauColRefs.current[col]
+    const foundationView = foundationAreaRef.current
+    if (colView && foundationView) {
+      colView.measure((_x1, _y1, _w1, _h1, colPageX, colPageY) => {
+        foundationView.measure((_x2, _y2, _w2, _h2, fPageX, fPageY) => {
+          runAnims(fPageX - colPageX, fPageY - colPageY)
+        })
+      })
+    } else {
+      runAnims(0, 0)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completingSet])
 
@@ -300,7 +336,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         onLayout={(e) => { statusBarHeightRef.current = e.nativeEvent.layout.height }}
       >
         {/* Foundation pips with suit icons */}
-        <View style={styles.foundationArea}>
+        <View style={styles.foundationArea} ref={foundationAreaRef}>
           {Array.from({ length: 8 }, (_, i) => {
             const suit = completedSuits[i]
             const isCompleted = i < foundation
@@ -361,7 +397,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
           {...panResponder.panHandlers}
         >
           {colData.map(({ col, offsets, totalH }, ci) => (
-            <View key={ci} style={{ width: CARD_W, height: totalH }}>
+            <View key={ci} ref={el => { tableauColRefs.current[ci] = el }} style={{ width: CARD_W, height: totalH }}>
               {col.length === 0 ? (
                 <View style={[cs.empty, { width: CARD_W, height: CARD_H }]} />
               ) : (
@@ -384,7 +420,13 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
                     return (
                       <Animated.View
                         key={cardi}
-                        style={{ position: 'absolute', top: offsets[cardi], opacity: setAnim!.opacityAnims[completingIdx] }}
+                        style={{
+                          position: 'absolute',
+                          top: offsets[cardi],
+                          zIndex: 50,
+                          opacity: setAnim!.opacityAnims[completingIdx],
+                          transform: setAnim!.translateAnims[completingIdx]!.getTranslateTransform(),
+                        }}
                       >
                         <CardFace card={card} width={CARD_W} height={CARD_H} highlighted />
                       </Animated.View>
