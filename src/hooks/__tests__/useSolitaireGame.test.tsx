@@ -82,7 +82,7 @@ describe('hasValidMoves', () => {
         [],
       ],
     })
-    expect(hasValidMoves(state, 3)).toBe(false)
+    expect(hasValidMoves(state)).toBe(false)
   })
 
   it('still recognizes a real move onto an empty column (partial sequence)', () => {
@@ -97,6 +97,25 @@ describe('hasValidMoves', () => {
         [],
       ],
     })
-    expect(hasValidMoves(state, 3)).toBe(true)
+    expect(hasValidMoves(state)).toBe(true)
+  })
+
+  it('treats remaining waste cards as a valid move regardless of stockResets count', () => {
+    // No tableau move is possible, but the waste pile can always be reset into
+    // the stock again (resets are unlimited), so this is not a deadlock.
+    const state = makeState({
+      tableau: [
+        [card('spades', 13)],
+        [],
+        [card('hearts', 5)],
+        [card('clubs', 7)],
+        [card('diamonds', 9, false)],
+        [],
+        [],
+      ],
+      waste: [card('hearts', 1)],
+      stockResets: 999,
+    })
+    expect(hasValidMoves(state)).toBe(true)
   })
 })

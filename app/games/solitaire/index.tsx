@@ -40,7 +40,7 @@ export default function SolitaireScreen() {
   const { solitaireStats, recordSolitairePlay, recordSolitaireClear } = useProgressStore()
 
   const {
-    state, puzzle, selected, isComplete, maxResets,
+    state, puzzle, selected, isComplete,
     canAutoComplete, canUndo, isDeadlocked, autoCompleteAnim,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
@@ -145,8 +145,6 @@ export default function SolitaireScreen() {
     }
   }, [isDeadlocked, deadlockHandled])
 
-  const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
-
   if (!selectedDifficulty) {
     return (
       <SafeAreaView style={styles.container}>
@@ -207,7 +205,7 @@ export default function SolitaireScreen() {
 
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ リセット残: {resetLeft} ・ 手数: {state.moves}
+          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ 手数: {state.moves}
         </Text>
       </View>
 
