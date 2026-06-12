@@ -22,7 +22,7 @@ const GAMES: GameInfo[] = [
   { id: 'panda', name: 'Panda', icon: 'panda', implemented: true },
   { id: 'hashi', name: 'Hashi', icon: 'hashi', implemented: true },
   { id: 'sums', name: 'Sums', icon: 'sums', implemented: true },
-  { id: 'gechoout', name: 'Gecho Out', icon: 'gechoout', implemented: true },
+  { id: 'gechoout', name: 'Snake Escape', icon: 'gechoout', implemented: true },
   { id: 'goita', name: 'ごいた', icon: 'goita', implemented: true },
 ]
 

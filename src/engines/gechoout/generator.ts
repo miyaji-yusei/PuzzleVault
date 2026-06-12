@@ -25,14 +25,15 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
 interface DifficultyConfig {
   size: number
   snakeCount: number
-  snakeLength: number
+  minLen: number
+  maxLen: number
 }
 
 const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
-  easy: { size: 4, snakeCount: 2, snakeLength: 2 },
-  normal: { size: 5, snakeCount: 3, snakeLength: 2 },
-  hard: { size: 6, snakeCount: 4, snakeLength: 2 },
-  expert: { size: 7, snakeCount: 5, snakeLength: 2 },
+  easy: { size: 5, snakeCount: 3, minLen: 2, maxLen: 3 },
+  normal: { size: 6, snakeCount: 4, minLen: 3, maxLen: 4 },
+  hard: { size: 7, snakeCount: 5, minLen: 3, maxLen: 5 },
+  expert: { size: 8, snakeCount: 6, minLen: 4, maxLen: 6 },
 }
 
 const DIRS: Position[] = [
@@ -113,7 +114,7 @@ const MAX_ATTEMPTS = 300
 
 // 障害物なし・単色蛇の基本ステージを生成する。同一seedなら同一問題を返す。
 export function generate(difficulty: Difficulty, seed: number): GechoOutPuzzle {
-  const { size, snakeCount, snakeLength } = DIFFICULTY_CONFIG[difficulty]
+  const { size, snakeCount, minLen, maxLen } = DIFFICULTY_CONFIG[difficulty]
   const actualSeed = seed >>> 0
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -126,7 +127,8 @@ export function generate(difficulty: Difficulty, seed: number): GechoOutPuzzle {
     let failed = false
 
     for (let colorId = 0; colorId < snakeCount; colorId++) {
-      const cells = placeRandomSnake(size, snakeLength, occupied, rng)
+      const length = minLen + Math.floor(rng() * (maxLen - minLen + 1))
+      const cells = placeRandomSnake(size, length, occupied, rng)
       if (!cells) {
         failed = true
         break

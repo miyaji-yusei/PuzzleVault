@@ -1,5 +1,5 @@
 import { generate } from '../generator'
-import { solve, countSolutions } from '../solver'
+import { solve, countSolutions, isSolvable } from '../solver'
 import { validate } from '../validator'
 import { applyMove, canApplyMove, createInitialState, moveSnake } from '../physics'
 import { GechoOutPuzzle, GechoOutState, Snake } from '../types'
@@ -7,17 +7,24 @@ import { GechoOutPuzzle, GechoOutState, Snake } from '../types'
 jest.setTimeout(60000)
 
 const DIFFICULTY_SIZES = {
-  easy: 4,
-  normal: 5,
-  hard: 6,
-  expert: 7,
+  easy: 5,
+  normal: 6,
+  hard: 7,
+  expert: 8,
 } as const
 
 const DIFFICULTY_SNAKE_COUNT = {
-  easy: 2,
-  normal: 3,
-  hard: 4,
-  expert: 5,
+  easy: 3,
+  normal: 4,
+  hard: 5,
+  expert: 6,
+} as const
+
+const DIFFICULTY_LEN_RANGE = {
+  easy: { min: 2, max: 3 },
+  normal: { min: 3, max: 4 },
+  hard: { min: 3, max: 5 },
+  expert: { min: 4, max: 6 },
 } as const
 
 function applyPath(puzzle: GechoOutPuzzle): GechoOutState {
@@ -39,6 +46,7 @@ describe('Gecho Out Engine', () => {
     for (const difficulty of difficulties) {
       describe(difficulty, () => {
         it('generates 10 solvable puzzles', () => {
+          const { min, max } = DIFFICULTY_LEN_RANGE[difficulty]
           for (let i = 0; i < 10; i++) {
             const puzzle = generate(difficulty, 1000 + i)
 
@@ -46,6 +54,10 @@ describe('Gecho Out Engine', () => {
             expect(puzzle.snakes).toHaveLength(DIFFICULTY_SNAKE_COUNT[difficulty])
             expect(puzzle.holes).toHaveLength(DIFFICULTY_SNAKE_COUNT[difficulty])
             expect(puzzle.difficulty).toBe(difficulty)
+            for (const snake of puzzle.snakes) {
+              expect(snake.cells.length).toBeGreaterThanOrEqual(min)
+              expect(snake.cells.length).toBeLessThanOrEqual(max)
+            }
 
             const finalState = applyPath(puzzle)
             expect(finalState.current).toHaveLength(0)
@@ -164,6 +176,38 @@ describe('Gecho Out Engine', () => {
         seed: 0,
       }
       expect(countSolutions(puzzle)).toBe(0)
+    })
+  })
+
+  describe('isSolvable', () => {
+    it('returns true for a generated puzzle', () => {
+      const puzzle = generate('normal', 5)
+      expect(isSolvable(puzzle)).toBe(true)
+    })
+
+    it('returns true for an already-cleared puzzle', () => {
+      const puzzle = generate('easy', 5)
+      const empty: GechoOutPuzzle = { ...puzzle, snakes: [] }
+      expect(isSolvable(empty)).toBe(true)
+    })
+
+    it('returns false for an unsolvable puzzle', () => {
+      const puzzle: GechoOutPuzzle = {
+        id: 'test-unsolvable',
+        size: 2,
+        snakes: [
+          { id: 0, color: 0, cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }] },
+          { id: 1, color: 1, cells: [{ row: 1, col: 0 }, { row: 1, col: 1 }] },
+        ],
+        holes: [
+          { color: 0, position: { row: 0, col: 0 } },
+          { color: 1, position: { row: 1, col: 1 } },
+        ],
+        obstacles: [],
+        difficulty: 'easy',
+        seed: 0,
+      }
+      expect(isSolvable(puzzle)).toBe(false)
     })
   })
 

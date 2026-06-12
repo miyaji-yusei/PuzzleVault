@@ -3,6 +3,7 @@ import { GechoOutMove, GechoOutPuzzle, GechoOutState, Position } from './types'
 
 const MAX_SOLO_NODES = 5000
 const MAX_DFS_NODES = 5000
+const MAX_SOLVABLE_STATES = 200000
 
 function serializeState(state: GechoOutState): string {
   const snakes = [...state.current]
@@ -130,4 +131,36 @@ export function countSolutions(puzzle: GechoOutPuzzle, limit = 2): number {
   }
 
   return count
+}
+
+// 全ての蛇のセル配置をまとめて1つの状態として扱い、全蛇が穴に入る状態へ到達できるかをBFSで判定する。
+// 探索した状態数が上限(MAX_SOLVABLE_STATES)を超えた場合は不明として false を返す。
+export function isSolvable(puzzle: GechoOutPuzzle): boolean {
+  const initial = createInitialState(puzzle)
+  if (initial.current.length === 0) return true
+
+  const visited = new Set<string>()
+  visited.add(serializeState(initial))
+
+  let queue: GechoOutState[] = [initial]
+  let states = 0
+
+  while (queue.length > 0) {
+    const next: GechoOutState[] = []
+    for (const state of queue) {
+      for (const candidate of nextStates(state)) {
+        if (candidate.state.current.length === 0) return true
+
+        if (++states > MAX_SOLVABLE_STATES) return false
+
+        const key = serializeState(candidate.state)
+        if (visited.has(key)) continue
+        visited.add(key)
+        next.push(candidate.state)
+      }
+    }
+    queue = next
+  }
+
+  return false
 }
