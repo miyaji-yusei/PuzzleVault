@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useRef } from 'react'
-import { View, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
 import { DIRECTION_DELTA } from '../../../engines/gechoout'
-import { Direction, GechoOutState, SnakeEnd } from '../../../engines/gechoout/types'
+import { Direction, GechoOutState, Position, Snake, SnakeEnd } from '../../../engines/gechoout/types'
 import { MoveResult } from '../../../hooks/useGechooutGame'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -10,6 +10,9 @@ const BOARD_PADDING = 32
 const SNAKE_COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00897b']
 
 const DRAG_THRESHOLD_RATIO = 0.5
+const INNER_RATIO = 0.86
+const MOVE_MS = 90
+const VANISH_MS = 150
 
 type Props = {
   state: GechoOutState
@@ -23,6 +26,32 @@ interface DragInfo {
   originY: number
 }
 
+interface AnimSnake {
+  id: number
+  color: number
+  cellsLen: number
+  anims: Animated.ValueXY[]
+  opacity: Animated.Value
+  scale: Animated.Value
+}
+
+// セルの論理座標を、盤面内のピクセル位置(蛇セグメント用、INNER_RATIO分のオフセット込み)に変換する
+function toPixel(pos: Position, cellSize: number): { x: number; y: number } {
+  const offset = (cellSize * (1 - INNER_RATIO)) / 2
+  return { x: pos.col * cellSize + offset, y: pos.row * cellSize + offset }
+}
+
+function buildAnimSnakes(snakes: Snake[], cellSize: number): AnimSnake[] {
+  return snakes.map((s) => ({
+    id: s.id,
+    color: s.color,
+    cellsLen: s.cells.length,
+    anims: s.cells.map((c) => new Animated.ValueXY(toPixel(c, cellSize))),
+    opacity: new Animated.Value(1),
+    scale: new Animated.Value(1),
+  }))
+}
+
 export function GechoOutBoard({ state, onMove }: Props) {
   const { size, current, holes, obstacles, cleared } = state
   const cellSize = Math.floor((SCREEN_WIDTH - BOARD_PADDING) / size)
@@ -33,6 +62,64 @@ export function GechoOutBoard({ state, onMove }: Props) {
   stateRef.current = state
   const onMoveRef = useRef(onMove)
   onMoveRef.current = onMove
+
+  const [animSnakes, setAnimSnakes] = useState<AnimSnake[]>(() => buildAnimSnakes(current, cellSize))
+  const prevPuzzleIdRef = useRef(state.id)
+
+  // current(蛇の位置)が変わるたびに、各セグメントを新しい位置へスライドアニメーションさせる。
+  // 蛇が穴に入って消えた場合はフェード+縮小してから一覧から除去する。
+  // 別のパズル(リスタート/難易度変更)に切り替わった場合はアニメーションなしで即時再構築する。
+  useEffect(() => {
+    if (prevPuzzleIdRef.current !== state.id) {
+      prevPuzzleIdRef.current = state.id
+      setAnimSnakes(buildAnimSnakes(current, cellSize))
+      return
+    }
+
+    setAnimSnakes((prev) => {
+      const next: AnimSnake[] = []
+
+      for (const snake of current) {
+        const existing = prev.find((a) => a.id === snake.id)
+        if (!existing || existing.cellsLen !== snake.cells.length) {
+          next.push({
+            id: snake.id,
+            color: snake.color,
+            cellsLen: snake.cells.length,
+            anims: snake.cells.map((c) => new Animated.ValueXY(toPixel(c, cellSize))),
+            opacity: new Animated.Value(1),
+            scale: new Animated.Value(1),
+          })
+          continue
+        }
+
+        snake.cells.forEach((cell, i) => {
+          Animated.timing(existing.anims[i]!, {
+            toValue: toPixel(cell, cellSize),
+            duration: MOVE_MS,
+            useNativeDriver: true,
+          }).start()
+        })
+        next.push(existing)
+      }
+
+      for (const old of prev) {
+        if (current.some((s) => s.id === old.id)) continue
+        next.push(old)
+        Animated.parallel([
+          Animated.timing(old.opacity, { toValue: 0, duration: VANISH_MS, useNativeDriver: true }),
+          Animated.timing(old.scale, { toValue: 0.3, duration: VANISH_MS, useNativeDriver: true }),
+        ]).start(({ finished }) => {
+          if (finished) {
+            setAnimSnakes((cur) => cur.filter((a) => a.id !== old.id))
+          }
+        })
+      }
+
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, cellSize])
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
@@ -51,20 +138,6 @@ export function GechoOutBoard({ state, onMove }: Props) {
     },
     [cellSize, size]
   )
-
-  const cellMap = useMemo(() => {
-    const map = new Map<string, { color: number; isHead: boolean; isTail: boolean }>()
-    for (const snake of current) {
-      snake.cells.forEach((c, idx) => {
-        map.set(`${c.row},${c.col}`, {
-          color: snake.color,
-          isHead: idx === snake.cells.length - 1,
-          isTail: idx === 0,
-        })
-      })
-    }
-    return map
-  }, [current])
 
   const holeMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -149,7 +222,6 @@ export function GechoOutBoard({ state, onMove }: Props) {
             const key = `${row},${col}`
             const isObstacle = obstacleSet.has(key)
             const holeColor = holeMap.get(key)
-            const snakeCell = cellMap.get(key)
 
             return (
               <View
@@ -160,7 +232,7 @@ export function GechoOutBoard({ state, onMove }: Props) {
                   isObstacle && styles.obstacle,
                 ]}
               >
-                {holeColor !== undefined && !snakeCell && (
+                {holeColor !== undefined && (
                   <View
                     style={[
                       styles.hole,
@@ -173,31 +245,45 @@ export function GechoOutBoard({ state, onMove }: Props) {
                     ]}
                   />
                 )}
-                {snakeCell && (
-                  <View
-                    style={[
-                      styles.snakeCell,
-                      {
-                        width: cellSize * 0.86,
-                        height: cellSize * 0.86,
-                        borderRadius: cellSize * 0.18,
-                        backgroundColor: SNAKE_COLORS[snakeCell.color % SNAKE_COLORS.length],
-                      },
-                    ]}
-                  >
-                    {snakeCell.isHead && (
-                      <View style={[styles.eye, { width: cellSize * 0.18, height: cellSize * 0.18, borderRadius: cellSize * 0.09 }]} />
-                    )}
-                    {snakeCell.isTail && (
-                      <View style={[styles.tailMark, { width: cellSize * 0.22, height: cellSize * 0.22, borderRadius: cellSize * 0.04 }]} />
-                    )}
-                  </View>
-                )}
               </View>
             )
           })}
         </View>
       ))}
+
+      {/* 蛇のオーバーレイ: 各セグメントを絶対配置し、移動時はスライド・消去時はフェード+縮小でアニメーションする */}
+      <View style={styles.overlay} pointerEvents="none">
+        {animSnakes.flatMap((snake) =>
+          Array.from({ length: snake.cellsLen }, (_, i) => {
+            const isHead = i === snake.cellsLen - 1
+            const isTail = i === 0
+
+            return (
+              <Animated.View
+                key={`${snake.id}-${i}`}
+                style={[
+                  styles.snakeCell,
+                  {
+                    width: cellSize * INNER_RATIO,
+                    height: cellSize * INNER_RATIO,
+                    borderRadius: cellSize * 0.18,
+                    backgroundColor: SNAKE_COLORS[snake.color % SNAKE_COLORS.length],
+                    opacity: snake.opacity,
+                    transform: [...snake.anims[i]!.getTranslateTransform(), { scale: snake.scale }],
+                  },
+                ]}
+              >
+                {isHead && (
+                  <View style={[styles.eye, { width: cellSize * 0.18, height: cellSize * 0.18, borderRadius: cellSize * 0.09 }]} />
+                )}
+                {isTail && (
+                  <View style={[styles.tailMark, { width: cellSize * 0.22, height: cellSize * 0.22, borderRadius: cellSize * 0.04 }]} />
+                )}
+              </Animated.View>
+            )
+          })
+        )}
+      </View>
     </View>
   )
 }
@@ -225,7 +311,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     backgroundColor: 'transparent',
   },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   snakeCell: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

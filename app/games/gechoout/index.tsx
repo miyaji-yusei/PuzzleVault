@@ -17,7 +17,7 @@ export default function GechoOutScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <GameHeader title="Gecho Out" onRestart={restart} />
+      <GameHeader title="Snake Escape" onRestart={restart} />
       <InfoBanner text={`蛇の頭か尾をドラッグして、同じ色の穴に入れよう（残り ${remaining} 匹）`} />
 
       <View style={styles.boardContainer}>

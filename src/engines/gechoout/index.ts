@@ -1,5 +1,5 @@
 export { generate } from './generator'
-export { solve, countSolutions } from './solver'
+export { solve, countSolutions, isSolvable } from './solver'
 export { validate } from './validator'
 export {
   applyMove,
