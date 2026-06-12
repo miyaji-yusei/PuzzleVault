@@ -126,13 +126,18 @@ function getIslandCurrentBridges(islandId: number, current: Bridge[]): number {
   }, 0)
 }
 
+function isIslandSatisfied(island: Island, current: Bridge[]): boolean {
+  return getIslandCurrentBridges(island.id, current) === island.bridges
+}
+
 function computeDragToTarget(
   startIsland: Island,
   pairs: [number, number][],
   islandMap: Map<number, Island>,
   fingerRow: number,
   fingerCol: number,
-  cs: number
+  cs: number,
+  current: Bridge[]
 ): { pair: [number, number]; progress: number; line: DragLine } | null {
   const dRow = fingerRow - (startIsland.row + 0.5)
   const dCol = fingerCol - (startIsland.col + 0.5)
@@ -148,6 +153,8 @@ function computeDragToTarget(
     const candidateId = aId === startIsland.id ? bId : aId
     const candidate = islandMap.get(candidateId)
     if (!candidate) continue
+    // 接続先の島が既に完成済み(緑)の場合、橋の変更でその完成状態が崩れてしまうため対象外にする
+    if (isIslandSatisfied(candidate, current)) continue
 
     if (horizontal && candidate.row === startIsland.row) {
       const dir = candidate.col > startIsland.col ? 1 : -1
@@ -287,7 +294,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       if (!startIsland) return
 
       const result = computeDragToTarget(
-        startIsland, pairsRef.current, islandMapRef.current, fingerRow, fingerCol, cs
+        startIsland, pairsRef.current, islandMapRef.current, fingerRow, fingerCol, cs, currentRef.current
       )
       setDragLineRef.current(result ? result.line : null)
     },
@@ -314,7 +321,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
           const startIsland = islandsRef.current.find(i => i.id === startIslandId)
           if (startIsland) {
             const result = computeDragToTarget(
-              startIsland, pairsRef.current, islandMapRef.current, tapRow, tapCol, cs
+              startIsland, pairsRef.current, islandMapRef.current, tapRow, tapCol, cs, currentRef.current
             )
             // Confirm bridge only if finger reached 90%+ of the way to the target island
             if (result && result.progress >= DRAG_CONFIRM_THRESHOLD) {
@@ -330,7 +337,15 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       if (!isDrag && startBridge) {
         const endBridge = findTappedBridge(pairsRef.current, islandMapRef.current, tapRow, tapCol, currentRef.current)
         if (endBridge && endBridge[0] === startBridge[0] && endBridge[1] === startBridge[1]) {
-          onToggleBridgeRef.current(startBridge[0], startBridge[1])
+          // 橋の両端の島がどちらも完成済み(緑)の場合は、橋の本数を変更すると
+          // その完成状態が崩れてしまうためトグル操作を無効化する
+          const islandA = islandMapRef.current.get(endBridge[0])
+          const islandB = islandMapRef.current.get(endBridge[1])
+          const bothSatisfied =
+            !!islandA && !!islandB &&
+            isIslandSatisfied(islandA, currentRef.current) &&
+            isIslandSatisfied(islandB, currentRef.current)
+          if (!bothSatisfied) onToggleBridgeRef.current(startBridge[0], startBridge[1])
         }
       }
     },
@@ -418,8 +433,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
       {/* Islands */}
       {islands.map(island => {
-        const currentCount = getIslandCurrentBridges(island.id, current)
-        const isSatisfied = currentCount === island.bridges
+        const isSatisfied = isIslandSatisfied(island, current)
 
         const left = island.col * cellSize + cellSize / 2 - islandRadius
         const top = island.row * cellSize + cellSize / 2 - islandRadius

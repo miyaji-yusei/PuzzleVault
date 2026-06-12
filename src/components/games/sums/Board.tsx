@@ -98,13 +98,9 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
         <View style={{ width: headerSize }} />
         {Array.from({ length: 5 }, (_, j) => (
           <View key={j} style={[styles.sumHeader, { width: cellSize, height: headerSize }]}>
-            <Text style={styles.sumText}>
-              {colComplete[j] ? '' : (
-                <>
-                  <Text style={styles.liveSumText}>{colLiveSums[j]}</Text>
-                  /{colSums[j]}
-                </>
-              )}
+            <Text style={[styles.sumText, colComplete[j] && styles.sumDone]}>
+              <Text style={[styles.liveSumText, colComplete[j] && styles.sumDone]}>{colLiveSums[j]}</Text>
+              /{colSums[j]}
             </Text>
           </View>
         ))}
@@ -115,13 +111,9 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
         <View key={ri} style={styles.gridRow}>
           {/* Row sum header */}
           <View style={[styles.sumHeader, { width: headerSize, height: cellSize }]}>
-            <Text style={styles.sumText}>
-              {rowComplete[ri] ? '' : (
-                <>
-                  <Text style={styles.liveSumText}>{rowLiveSums[ri]}</Text>
-                  /{rowSums[ri]}
-                </>
-              )}
+            <Text style={[styles.sumText, rowComplete[ri] && styles.sumDone]}>
+              <Text style={[styles.liveSumText, rowComplete[ri] && styles.sumDone]}>{rowLiveSums[ri]}</Text>
+              /{rowSums[ri]}
             </Text>
           </View>
 
@@ -134,7 +126,7 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
 
             const rowDone = rowComplete[ri] ?? false
             const colDone = colComplete[ci] ?? false
-            const showDim = gDone && mark === 'cross'
+            const showDim = (gDone || rowDone || colDone) && mark === 'cross'
             const topLeftGroup = groupTopLeftMap.get(`${ri},${ci}`)
 
             return (
@@ -169,7 +161,7 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
                 )}
 
                 {/* Mark overlay */}
-                {mark === 'cross' && !gDone && (
+                {mark === 'cross' && !gDone && !rowDone && !colDone && (
                   <View style={[StyleSheet.absoluteFillObject, styles.markOverlay]}>
                     <Text style={[styles.markText, { fontSize: Math.max(14, Math.floor(cellSize * 0.7)) }]}>×</Text>
                   </View>
