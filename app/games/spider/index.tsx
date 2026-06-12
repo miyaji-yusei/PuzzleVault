@@ -94,16 +94,6 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         </Text>
       </View>
 
-      <View style={styles.settingsRow}>
-        <Text style={styles.settingsLabel}>空列があっても山札を配る</Text>
-        <Switch
-          value={dealWithEmpty}
-          onValueChange={setDealWithEmpty}
-          trackColor={{ false: vault.borderLight, true: gold.deep }}
-          thumbColor={dealWithEmpty ? gold.accent : '#ccc'}
-        />
-      </View>
-
       <SpiderBoard
         state={state}
         selected={selected}
@@ -138,6 +128,15 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
             onValueChange={setLandscapeEnabled}
             trackColor={{ false: vault.borderLight, true: gold.deep }}
             thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
+          />
+        </View>
+        <View style={styles.dialogSettingsRow}>
+          <Text style={styles.dialogSettingsLabel}>空列があっても山札を配る</Text>
+          <Switch
+            value={dealWithEmpty}
+            onValueChange={setDealWithEmpty}
+            trackColor={{ false: vault.borderLight, true: gold.deep }}
+            thumbColor={dealWithEmpty ? gold.accent : '#ccc'}
           />
         </View>
       </AppDialog>
@@ -185,17 +184,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: felt.dark },
   infoRow: { paddingHorizontal: 12, paddingVertical: 4, backgroundColor: felt.base },
   infoText: { fontSize: fontSize.xs, color: ink.body, textAlign: 'center' },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: felt.dark,
-    borderBottomWidth: 1,
-    borderBottomColor: felt.base,
-  },
-  settingsLabel: { fontSize: fontSize.xs, color: ink.body },
   dialogSettingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
