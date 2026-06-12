@@ -3,13 +3,6 @@ import { generate, validate, dealState } from '../engines/solitaire'
 import { SolitaireState, SolitaireMove, Suit, Card } from '../engines/solitaire/types'
 import { Difficulty } from '../types/engine'
 
-const MAX_RESETS: Record<Difficulty, number> = {
-  easy: 999,
-  normal: 3,
-  hard: 3,
-  expert: 1,
-}
-
 // 自動完成: 1枚が組札に飛んでいくアニメーションの長さと、次の1枚までの間隔
 const AUTO_COMPLETE_ANIM_MS = 220
 const AUTO_COMPLETE_STEP_GAP_MS = 60
@@ -141,16 +134,9 @@ function applyMove(s: SolitaireState, move: SolitaireMove, drawMode: 1 | 3): Sol
   return ns
 }
 
-export function hasValidMoves(s: SolitaireState, maxResets: number): boolean {
+export function hasValidMoves(s: SolitaireState): boolean {
   if (s.stock.length > 0) return true
-  if (s.stockResets < maxResets && s.waste.length > 0) return true
-
-  if (s.waste.length > 0) {
-    if (validate(s, { type: 'waste-to-foundation' }).correct) return true
-    for (let i = 0; i < s.tableau.length; i++) {
-      if (validate(s, { type: 'waste-to-tableau', to: { pile: 'tableau', index: i } }).correct) return true
-    }
-  }
+  if (s.waste.length > 0) return true
 
   for (let col = 0; col < s.tableau.length; col++) {
     const tableauCol = s.tableau[col]
@@ -182,7 +168,6 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   const [isComplete, setIsComplete] = useState(false)
   const [history, setHistory] = useState<SolitaireState[]>([])
   const [autoCompleteAnim, setAutoCompleteAnim] = useState<AutoCompleteAnim | null>(null)
-  const maxResets = MAX_RESETS[difficulty]
 
   const prevDifficultyRef = useRef(difficulty)
   useEffect(() => {
@@ -201,9 +186,9 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     state.tableau.every(col => col.every(c => c.faceUp))
 
   const isDeadlocked = useMemo(
-    () => !isComplete && !canAutoComplete && !hasValidMoves(state, maxResets),
+    () => !isComplete && !canAutoComplete && !hasValidMoves(state),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state, isComplete, canAutoComplete, maxResets]
+    [state, isComplete, canAutoComplete]
   )
 
   const commitState = useCallback((newState: SolitaireState) => {
@@ -217,11 +202,11 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
     if (state.stock.length > 0) {
       const move: SolitaireMove = { type: 'stock-draw' }
       if (validate(state, move).correct) commitState(applyMove(state, move, puzzle.drawMode))
-    } else if (state.stockResets < maxResets && state.waste.length > 0) {
+    } else if (state.waste.length > 0) {
       const move: SolitaireMove = { type: 'stock-reset' }
       if (validate(state, move).correct) commitState(applyMove(state, move, puzzle.drawMode))
     }
-  }, [state, puzzle.drawMode, maxResets, commitState])
+  }, [state, puzzle.drawMode, commitState])
 
   const tapWaste = useCallback(() => {
     if (state.waste.length === 0) return
@@ -475,7 +460,7 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
   }, [state, puzzle.drawMode])
 
   return {
-    state, puzzle, selected, isComplete, maxResets, canAutoComplete, isDeadlocked, autoCompleteAnim,
+    state, puzzle, selected, isComplete, canAutoComplete, isDeadlocked, autoCompleteAnim,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
     canUndo: history.length > 0,
