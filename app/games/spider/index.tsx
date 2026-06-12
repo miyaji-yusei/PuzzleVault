@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import * as ScreenOrientation from 'expo-screen-orientation'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
@@ -53,6 +55,10 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   const router = useRouter()
   const dealWithEmpty = useSettingsStore(s => s.solitaireAllowDealWithEmptyColumn)
   const setDealWithEmpty = useSettingsStore(s => s.setSolitaireAllowDealWithEmptyColumn)
+  const landscapeEnabled = useSettingsStore(s => s.spiderLandscapeEnabled)
+  const setLandscapeEnabled = useSettingsStore(s => s.setSpiderLandscapeEnabled)
+
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   const {
     state, isComplete,
@@ -61,9 +67,26 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
     completingSet, onSetAnimationDone,
   } = useSpiderGame(difficulty, undefined, { dealWithEmpty })
 
+  // 横画面表示が許可されている間だけ画面回転を許可し、画面を離れるときは縦画面に戻す
+  useEffect(() => {
+    if (landscapeEnabled) {
+      ScreenOrientation.unlockAsync()
+    } else {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+  }, [landscapeEnabled])
+
   return (
     <SafeAreaView style={styles.container}>
-      <GameHeader title="Spider" onUndo={canUndo ? undo : undefined} onRestart={restart} />
+      <GameHeader
+        title="Spider"
+        onUndo={canUndo ? undo : undefined}
+        onRestart={restart}
+        onSettings={() => setShowSettingsDialog(true)}
+      />
 
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
@@ -102,6 +125,23 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         ]}
       />
 
+      <AppDialog
+        visible={showSettingsDialog}
+        title="設定"
+        actions={[{ label: '閉じる', onPress: () => setShowSettingsDialog(false) }]}
+      >
+        <View style={styles.dialogSettingsRow}>
+          <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
+          <Switch
+            value={landscapeEnabled}
+            onValueChange={setLandscapeEnabled}
+            trackColor={{ false: vault.borderLight, true: gold.deep }}
+            thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
+          />
+        </View>
+      </AppDialog>
+
+      {/* Deal unavailable hint (strict mode only) */}
       {!dealWithEmpty && state.stock.length > 0 &&
         state.tableau.some(col => col.length === 0) && (
         <View style={styles.hintBar}>
@@ -155,6 +195,14 @@ const styles = StyleSheet.create({
     borderBottomColor: felt.base,
   },
   settingsLabel: { fontSize: fontSize.xs, color: ink.body },
+  dialogSettingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: 8,
+  },
+  dialogSettingsLabel: { fontSize: fontSize.sm, color: ink.body },
   hintBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
