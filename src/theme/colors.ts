@@ -24,8 +24,8 @@ export const gold = {
 /** テキスト（ダークテーマ向け明色系） */
 export const ink = {
   strong: '#F5F4EF',
-  body: '#C9C7BD',
-  muted: '#8E8D85',
+  body: '#F0EFE9',
+  muted: '#C9C7BD',
   faint: '#5E5D57',
   /** 黄色ボタン等、明るい背景上の文字色 */
   onGold: '#1A1505',

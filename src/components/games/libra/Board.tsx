@@ -90,7 +90,7 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
                     <GameIcon
                       name={value === 'A' ? 'sun' : 'moon'}
                       size={Math.floor(cellSize * 0.55)}
-                      color={isFixed ? '#FFFFFF' : '#C9C7BD'}
+                      color="#FFFFFF"
                     />
                   )}
                 </View>

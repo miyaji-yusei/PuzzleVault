@@ -114,7 +114,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
     const isConfirmed = confirmedCells.has(`${row},${col}`)
 
     if (isFixed || cell === 'A') {
-      return <GameIcon name="bamboo" size={Math.floor(cellSize * 0.62)} color="#8E8D85" />
+      return <GameIcon name="bamboo" size={Math.floor(cellSize * 0.62)} color="#C9C7BD" />
     }
     if (cell === 'B') {
       return (
@@ -122,7 +122,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
           <GameIcon
             name="panda"
             size={Math.floor(cellSize * 0.66)}
-            color={isConfirmed ? '#FFFFFF' : '#C9C7BD'}
+            color="#FFFFFF"
           />
         </View>
       )
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#8E8D85',
+    color: '#FFFFFF',
   },
   hintTextComplete: {
     color: '#2FA876',

@@ -1,4 +1,5 @@
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useRef } from 'react'
 import { GameIcon, IconName } from '../../src/components/ui'
@@ -47,9 +48,10 @@ function GameTile({ game, onPress }: { game: GameInfo; onPress: () => void }) {
 export default function HomeScreen() {
   const router = useRouter()
   const navigatingRef = useRef(false)
+  const insets = useSafeAreaInsets()
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.hero}>
         <View style={styles.heroBadge}>
           <GameIcon name="bolt" size={22} color={gold.accent} />
