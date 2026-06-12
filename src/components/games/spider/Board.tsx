@@ -54,11 +54,12 @@ type Props = {
   onDoubleTapCard: (col: number, cardIndex: number) => void
   onDirectMove: (fromCol: number, fromCardIdx: number, toCol: number) => void
   onDeal: () => void
+  dealWithEmpty: boolean
   completingSet?: CompletingSet | null
   onSetAnimationDone?: () => void
 }
 
-export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal, completingSet, onSetAnimationDone }: Props) {
+export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal, dealWithEmpty, completingSet, onSetAnimationDone }: Props) {
   const { tableau, stock, foundation, completedSuits } = state
 
   // Use the shorter window dimension as the basis for card sizing so cards stay a
@@ -319,7 +320,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         {/* Stock pile visual */}
         <TouchableOpacity
           onPress={onDeal}
-          disabled={stock.length === 0 || tableau.some(col => col.length === 0)}
+          disabled={stock.length === 0 || (tableau.some(col => col.length === 0) && !dealWithEmpty)}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={[styles.stockArea, stock.length === 0 && styles.stockAreaEmpty]}
