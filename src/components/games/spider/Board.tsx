@@ -61,8 +61,11 @@ type Props = {
 export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, onDirectMove, onDeal, completingSet, onSetAnimationDone }: Props) {
   const { tableau, stock, foundation, completedSuits } = state
 
-  const { width: windowWidth } = useWindowDimensions()
-  const CARD_W = Math.floor((windowWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
+  // Use the shorter window dimension as the basis for card sizing so cards stay a
+  // consistent, sensible size whether the device is in portrait or landscape.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
+  const portraitWidth = Math.min(windowWidth, windowHeight)
+  const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.5)
 
   // Refs so panResponder can use latest card dimensions without recreating

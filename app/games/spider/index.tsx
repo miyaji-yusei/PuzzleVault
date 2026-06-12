@@ -1,9 +1,13 @@
+import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import * as ScreenOrientation from 'expo-screen-orientation'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { Difficulty } from '../../../src/types/engine'
+
+type ModalOrientation = 'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right'
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
 
@@ -63,6 +67,10 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   const router = useRouter()
   const dealWithEmpty = useSettingsStore(s => s.solitaireAllowDealWithEmptyColumn)
   const setDealWithEmpty = useSettingsStore(s => s.setSolitaireAllowDealWithEmptyColumn)
+  const landscapeEnabled = useSettingsStore(s => s.spiderLandscapeEnabled)
+  const setLandscapeEnabled = useSettingsStore(s => s.setSpiderLandscapeEnabled)
+
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   const {
     puzzle, state, selected, isComplete,
@@ -70,6 +78,24 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
     tapTableau, doubleTapCard, directMove, deal, undo, restart,
     completingSet, onSetAnimationDone,
   } = useSpiderGame(difficulty, undefined, { dealWithEmpty })
+
+  // 横画面表示が許可されている間だけ画面回転を許可し、画面を離れるときは縦画面に戻す
+  useEffect(() => {
+    if (landscapeEnabled) {
+      ScreenOrientation.unlockAsync()
+    } else {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    }
+  }, [landscapeEnabled])
+
+  // iOSではModalはデフォルトでportraitに固定されるため、横画面表示時はモーダルにも
+  // landscapeを許可してダイアログ表示中に縦画面へ戻されないようにする
+  const modalSupportedOrientations: ModalOrientation[] = landscapeEnabled
+    ? ['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']
+    : ['portrait']
 
   return (
     <SafeAreaView style={styles.container}>
@@ -88,6 +114,9 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
           </TouchableOpacity>
           <TouchableOpacity onPress={restart} style={styles.iconBtn}>
             <Text style={styles.iconBtnText}>↺</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowSettingsDialog(true)} style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}>⚙</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -120,7 +149,7 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
       />
 
       {/* Win dialog */}
-      <Modal visible={isComplete} transparent animationType="fade">
+      <Modal visible={isComplete} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>🎉 クリア！</Text>
@@ -131,6 +160,32 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnOk]} onPress={restart}>
                 <Text style={styles.dialogBtnTextOk}>もう一度</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings dialog */}
+      <Modal visible={showSettingsDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>設定</Text>
+            <View style={styles.dialogSettingsRow}>
+              <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
+              <Switch
+                value={landscapeEnabled}
+                onValueChange={setLandscapeEnabled}
+                trackColor={{ false: '#555', true: '#66bb6a' }}
+                thumbColor={landscapeEnabled ? '#fff' : '#ccc'}
+              />
+            </View>
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogBtn, styles.dialogBtnOk]}
+                onPress={() => setShowSettingsDialog(false)}
+              >
+                <Text style={styles.dialogBtnTextOk}>閉じる</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -238,6 +293,15 @@ const styles = StyleSheet.create({
   },
   dialogTitle: { fontSize: 22, fontWeight: 'bold', color: '#1b5e20', marginBottom: 8 },
   dialogMessage: { fontSize: 14, color: '#555', textAlign: 'center' },
+  dialogSettingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  dialogSettingsLabel: { fontSize: 14, color: '#333' },
   dialogButtons: { flexDirection: 'row', gap: 12, marginTop: 20 },
   dialogBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, minWidth: 90, alignItems: 'center' },
   dialogBtnCancel: { backgroundColor: '#eee' },
