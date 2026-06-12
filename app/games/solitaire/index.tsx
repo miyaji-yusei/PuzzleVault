@@ -24,6 +24,8 @@ function makeScatterCards() {
   }))
 }
 
+type ModalOrientation = 'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right'
+
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
 
 function isDifficulty(v: unknown): v is Difficulty {
@@ -125,6 +127,12 @@ export default function SolitaireScreen() {
     }
   }, [landscapeEnabled])
 
+  // iOSではModalはデフォルトでportraitに固定されるため、横画面表示時はモーダルにも
+  // landscapeを許可してダイアログ表示中に縦画面へ戻されないようにする
+  const modalSupportedOrientations: ModalOrientation[] = landscapeEnabled
+    ? ['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']
+    : ['portrait']
+
   useEffect(() => {
     if (canAutoComplete && !autoCompleteHandled) {
       setShowAutoCompleteDialog(true)
@@ -224,7 +232,7 @@ export default function SolitaireScreen() {
       />
 
       {/* Restart confirmation dialog */}
-      <Modal visible={showRestartDialog} transparent animationType="fade">
+      <Modal visible={showRestartDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>リセット確認</Text>
@@ -251,7 +259,7 @@ export default function SolitaireScreen() {
       </Modal>
 
       {/* Settings dialog */}
-      <Modal visible={showSettingsDialog} transparent animationType="fade">
+      <Modal visible={showSettingsDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>設定</Text>
@@ -277,7 +285,7 @@ export default function SolitaireScreen() {
       </Modal>
 
       {/* Auto-complete dialog */}
-      <Modal visible={showAutoCompleteDialog} transparent animationType="fade">
+      <Modal visible={showAutoCompleteDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>自動完成</Text>
@@ -304,7 +312,7 @@ export default function SolitaireScreen() {
       </Modal>
 
       {/* Deadlock dialog */}
-      <Modal visible={showDeadlockDialog} transparent animationType="fade">
+      <Modal visible={showDeadlockDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>詰みました</Text>
@@ -371,7 +379,7 @@ export default function SolitaireScreen() {
       )}
 
       {/* Win dialog */}
-      <Modal visible={showWinDialog} transparent animationType="fade">
+      <Modal visible={showWinDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>🎉 クリア！</Text>
