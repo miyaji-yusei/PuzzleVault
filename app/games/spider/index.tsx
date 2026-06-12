@@ -115,6 +115,7 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         onDoubleTapCard={doubleTapCard}
         onDirectMove={directMove}
         onDeal={deal}
+        dealWithEmpty={dealWithEmpty}
         completingSet={completingSet}
         onSetAnimationDone={onSetAnimationDone}
       />
