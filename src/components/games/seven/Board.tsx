@@ -1,134 +1,127 @@
-import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
-import { SevenState, Card, Suit, Rank } from '../../../engines/seven/types'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native'
+import { Card, DrawSource, SevenState, Suit } from '../../../engines/seven/types'
+import { vault, ink, gold, fontSize, radii } from '../../../theme'
 
-const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs']
+const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣', joker: '★' }
+const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
+const RANK_LABEL: Partial<Record<number, string>> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
 
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  spades: '♠',
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
+type CardSize = { width: number; height: number }
+
+function CardFace({ card, size, dimmed }: { card: Card; size: CardSize; dimmed?: boolean }) {
+  if (card.suit === 'joker') {
+    return (
+      <View style={[cStyles.base, size, dimmed && cStyles.dimmed]}>
+        <Text style={cStyles.jokerText}>JOKER</Text>
+      </View>
+    )
+  }
+  const rank = RANK_LABEL[card.rank] ?? String(card.rank)
+  const isRed = RED_SUITS.has(card.suit)
+  const color = isRed ? '#c62828' : '#212121'
+  return (
+    <View style={[cStyles.base, size, dimmed && cStyles.dimmed]}>
+      <Text style={[cStyles.corner, { color }]}>{rank}</Text>
+      <Text style={[cStyles.suitCorner, { color }]}>{SUIT_SYM[card.suit]}</Text>
+      <View style={cStyles.centerArea}>
+        <Text style={[cStyles.suitCenter, { color }]}>{SUIT_SYM[card.suit]}</Text>
+      </View>
+    </View>
+  )
 }
 
-function isRedSuit(suit: Suit): boolean {
-  return suit === 'hearts' || suit === 'diamonds'
+function CardBack({ size, dimmed }: { size: CardSize; dimmed?: boolean }) {
+  return (
+    <View style={[cStyles.base, cStyles.back, size, dimmed && cStyles.dimmed]}>
+      <Text style={cStyles.backText}>★</Text>
+    </View>
+  )
 }
 
-function rankStr(rank: Rank): string {
-  if (rank === 1) return 'A'
-  if (rank === 11) return 'J'
-  if (rank === 12) return 'Q'
-  if (rank === 13) return 'K'
-  return String(rank)
-}
-
-function sortHand(cards: Card[]): Card[] {
-  const suitOrder: Record<Suit, number> = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
-  return [...cards].sort((a, b) => {
-    const sd = suitOrder[a.suit] - suitOrder[b.suit]
-    return sd !== 0 ? sd : a.rank - b.rank
-  })
+function EmptySlot({ size }: { size: CardSize }) {
+  return <View style={[cStyles.base, cStyles.empty, size]} />
 }
 
 type Props = {
   state: SevenState
-  selectedCard: Card | null
-  playableCards: Card[]
+  selectedIndices: number[]
   isHumanTurn: boolean
-  onSelectCard: (card: Card) => void
+  onSelectCard: (index: number) => void
+  onDrawFrom: (source: DrawSource) => void
 }
 
-export function SevenBoard({ state, selectedCard, playableCards, isHumanTurn, onSelectCard }: Props) {
-  const humanHand = sortHand(state.hands[0] ?? [])
-  const aiHands = state.hands.slice(1)
+export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, onDrawFrom }: Props) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
+  const portraitWidth = Math.min(windowWidth, windowHeight)
+  const cardWidth = Math.min(56, Math.floor((portraitWidth - 32) / 7))
+  const size: CardSize = { width: cardWidth, height: Math.floor(cardWidth * 1.4) }
+
+  const opponentHand = state.hands[1]
+  const discardTop = state.discard[state.discard.length - 1] ?? null
+  const canDraw = isHumanTurn && selectedIndices.length > 0
+
+  const sortedHand = state.hands[0]
+    .map((card, index) => ({ card, index }))
+    .sort((a, b) => a.card.rank - b.card.rank)
 
   return (
     <View style={styles.container}>
-      {/* AI hands */}
-      <View style={styles.aiSection}>
-        {aiHands.map((hand, idx) => {
-          const playerIdx = idx + 1
-          const isFinished = state.finished.includes(playerIdx)
-          const isCurrentTurn = state.currentPlayer === playerIdx
-          return (
-            <View key={idx} style={styles.aiRow}>
-              <Text style={[styles.aiLabel, isCurrentTurn && styles.activeLabel]}>
-                {isCurrentTurn ? '▶ ' : '   '}AI {idx + 1}
-                {isFinished ? ' (上がり)' : ` ${hand.length}枚`}
-              </Text>
-              <View style={styles.aiCards}>
-                {hand.slice(0, 6).map((_, i) => (
-                  <View key={i} style={styles.cardBack} />
-                ))}
-                {hand.length > 6 && (
-                  <Text style={styles.cardBackMore}>+{hand.length - 6}</Text>
-                )}
-              </View>
-            </View>
-          )
-        })}
+      <View style={styles.opponentSection}>
+        <Text style={styles.sectionLabel}>相手の手札（{opponentHand.length}枚）</Text>
+        <View style={styles.opponentCards}>
+          {opponentHand.map((_, i) => (
+            <CardBack key={i} size={{ width: size.width * 0.7, height: size.height * 0.7 }} />
+          ))}
+        </View>
       </View>
 
-      {/* Field */}
-      <View style={styles.fieldSection}>
-        <Text style={styles.fieldTitle}>場</Text>
-        {SUITS.map(suit => {
-          const f = state.field[suit]
-          const sym = SUIT_SYMBOLS[suit]
-          const red = isRedSuit(suit)
-          return (
-            <View key={suit} style={styles.fieldRow}>
-              <Text style={[styles.suitSymbol, red && styles.redSuit]}>{sym}</Text>
-              {!f.started ? (
-                <Text style={styles.fieldRange}>── 7 ──</Text>
-              ) : (
-                <Text style={styles.fieldRange}>
-                  {rankStr(f.min)} ← 7 → {rankStr(f.max)}
-                </Text>
-              )}
+      <View style={styles.middleRow}>
+        <TouchableOpacity
+          style={styles.pile}
+          onPress={() => onDrawFrom('deck')}
+          disabled={!canDraw}
+          activeOpacity={0.7}
+        >
+          <View>
+            <CardBack size={size} dimmed={!canDraw} />
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{state.deck.length}</Text>
             </View>
-          )
-        })}
+          </View>
+          <Text style={styles.pileLabel}>山札から引く</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.pile}
+          onPress={() => onDrawFrom('discard')}
+          disabled={!canDraw}
+          activeOpacity={0.7}
+        >
+          {discardTop ? <CardFace card={discardTop} size={size} dimmed={!canDraw} /> : <EmptySlot size={size} />}
+          <Text style={styles.pileLabel}>捨て札から引く</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Human hand */}
       <View style={styles.handSection}>
-        <Text style={[styles.handTitle, isHumanTurn && styles.activeLabel]}>
-          {isHumanTurn ? '▶ あなたの手番' : 'あなたの手札'}
+        <Text style={styles.sectionLabel}>
+          {isHumanTurn ? 'あなたの手札（同じランクをタップして選択）' : 'あなたの手札'}
         </Text>
-        {state.finished.includes(0) ? (
-          <Text style={styles.finishedText}>上がり！</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.handScroll}>
-            <View style={styles.handCards}>
-              {humanHand.map((card, i) => {
-                const isPlayable = playableCards.some(c => c.suit === card.suit && c.rank === card.rank)
-                const isSelected = selectedCard?.suit === card.suit && selectedCard?.rank === card.rank
-                const red = isRedSuit(card.suit)
-                return (
-                  <TouchableOpacity
-                    key={i}
-                    style={[
-                      styles.card,
-                      isSelected && styles.selectedCard,
-                      !isPlayable && styles.unplayableCard,
-                    ]}
-                    onPress={() => onSelectCard(card)}
-                    disabled={!isPlayable || !isHumanTurn}
-                  >
-                    <Text style={[styles.cardRank, red && styles.redText, !isPlayable && styles.dimText]}>
-                      {rankStr(card.rank)}
-                    </Text>
-                    <Text style={[styles.cardSuit, red && styles.redText, !isPlayable && styles.dimText]}>
-                      {SUIT_SYMBOLS[card.suit]}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-          </ScrollView>
-        )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.handRow}>
+          {sortedHand.map(({ card, index }) => {
+            const isSelected = selectedIndices.includes(index)
+            return (
+              <TouchableOpacity
+                key={index}
+                onPress={() => onSelectCard(index)}
+                disabled={!isHumanTurn}
+                style={[styles.handCard, isSelected && styles.selectedCard]}
+                activeOpacity={0.7}
+              >
+                <CardFace card={card} size={size} />
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
       </View>
     </View>
   )
@@ -137,146 +130,118 @@ export function SevenBoard({ state, selectedCard, playableCards, isHumanTurn, on
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'space-between',
   },
-  aiSection: {
-    backgroundColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  opponentSection: {
+    padding: 12,
+  },
+  opponentCards: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 6,
+  },
+  middleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: 32,
+    paddingVertical: 12,
+  },
+  pile: {
+    alignItems: 'center',
     gap: 6,
   },
-  aiRow: {
-    flexDirection: 'row',
+  badge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 4,
+    borderRadius: radii.full,
+    backgroundColor: gold.accent,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
-  aiLabel: {
-    fontSize: 12,
-    color: '#666',
-    width: 80,
-  },
-  activeLabel: {
-    color: '#1976d2',
+  badgeText: {
+    fontSize: fontSize.xs,
     fontWeight: 'bold',
+    color: ink.onGold,
   },
-  aiCards: {
-    flexDirection: 'row',
-    gap: 2,
-    flexWrap: 'wrap',
-  },
-  cardBack: {
-    width: 18,
-    height: 26,
-    backgroundColor: '#1a237e',
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#0d47a1',
-  },
-  cardBackMore: {
-    fontSize: 11,
-    color: '#666',
-    alignSelf: 'center',
-  },
-  fieldSection: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  fieldTitle: {
-    fontSize: 11,
-    color: '#999',
-    marginBottom: 6,
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  fieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 3,
-    gap: 8,
-  },
-  suitSymbol: {
-    fontSize: 16,
-    width: 20,
-    color: '#333',
-  },
-  redSuit: {
-    color: '#c62828',
-  },
-  fieldRange: {
-    fontSize: 14,
-    color: '#333',
-    fontFamily: 'monospace',
+  pileLabel: {
+    fontSize: fontSize.xs,
+    color: ink.muted,
   },
   handSection: {
-    backgroundColor: '#fff9c4',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flex: 1,
+    padding: 12,
   },
-  handTitle: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-  },
-  handScroll: {
-    flexGrow: 0,
-  },
-  handCards: {
+  handRow: {
     flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 8,
   },
-  card: {
-    width: 44,
-    height: 62,
+  handCard: {
+    marginTop: 12,
+  },
+  selectedCard: {
+    marginTop: 0,
+  },
+  sectionLabel: {
+    fontSize: fontSize.xs,
+    color: ink.muted,
+  },
+})
+
+const cStyles = StyleSheet.create({
+  base: {
     backgroundColor: '#fff',
-    borderRadius: 6,
+    borderRadius: radii.sm,
     borderWidth: 1.5,
     borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  selectedCard: {
-    borderColor: '#ffa000',
-    borderWidth: 2.5,
-    backgroundColor: '#fffde7',
-    transform: [{ translateY: -4 }],
+  back: {
+    backgroundColor: vault.card,
+    borderColor: gold.deep,
   },
-  unplayableCard: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#e0e0e0',
+  empty: {
+    backgroundColor: 'transparent',
+    borderColor: vault.borderLight,
+    borderStyle: 'dashed',
   },
-  cardRank: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    lineHeight: 20,
+  dimmed: {
+    opacity: 0.4,
   },
-  cardSuit: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 16,
-  },
-  redText: {
-    color: '#c62828',
-  },
-  dimText: {
-    color: '#bdbdbd',
-  },
-  finishedText: {
+  backText: {
     fontSize: 18,
-    color: '#4caf50',
+    color: gold.accent,
+  },
+  corner: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    fontSize: fontSize.sm,
     fontWeight: 'bold',
-    textAlign: 'center',
-    paddingVertical: 20,
+  },
+  suitCorner: {
+    position: 'absolute',
+    top: 18,
+    left: 5,
+    fontSize: fontSize.xs,
+  },
+  centerArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suitCenter: {
+    fontSize: 20,
+  },
+  jokerText: {
+    fontSize: fontSize.xs,
+    fontWeight: 'bold',
+    color: gold.deep,
+    transform: [{ rotate: '-30deg' }],
   },
 })

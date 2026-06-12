@@ -12,6 +12,7 @@ export type IconName =
   | 'sums'
   | 'gechoout'
   | 'goita'
+  | 'seven'
   | 'sun'
   | 'moon'
   | 'bamboo'
@@ -195,6 +196,15 @@ export function GameIcon({ name, size = 24, color = '#FFFFFF' }: Props) {
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M12 3 7 6.5 5.5 20h13L17 6.5 12 3z" fill={color} />
+        </Svg>
+      )
+    case 'seven': // トランプ風カードに数字の7
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <G {...p}>
+            <Rect x="4.5" y="2.5" width="15" height="19" rx="2" />
+          </G>
+          <Path d="M8 6.5h8l-4.6 11h-2.4l4.4-9.5H8z" fill={color} />
         </Svg>
       )
     case 'sun': // 太陽（白黒）
