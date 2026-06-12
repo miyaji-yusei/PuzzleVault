@@ -1,5 +1,6 @@
 import { StyleSheet, View, Text, Switch } from 'react-native'
 import { useSettingsStore } from '../../src/stores/settingsStore'
+import { vault, gold, ink, fontSize, radii } from '../../src/theme'
 
 export default function SettingsScreen() {
   const soundEnabled = useSettingsStore((state) => state.soundEnabled)
@@ -15,12 +16,22 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>サウンド・振動</Text>
         <View style={styles.row}>
           <Text style={styles.label}>効果音</Text>
-          <Switch value={soundEnabled} onValueChange={setSoundEnabled} />
+          <Switch
+            value={soundEnabled}
+            onValueChange={setSoundEnabled}
+            trackColor={{ true: gold.deep }}
+            thumbColor={soundEnabled ? gold.accent : undefined}
+          />
         </View>
         <View style={styles.divider} />
         <View style={styles.row}>
           <Text style={styles.label}>振動</Text>
-          <Switch value={vibrationEnabled} onValueChange={setVibrationEnabled} />
+          <Switch
+            value={vibrationEnabled}
+            onValueChange={setVibrationEnabled}
+            trackColor={{ true: gold.deep }}
+            thumbColor={vibrationEnabled ? gold.accent : undefined}
+          />
         </View>
       </View>
     </View>
@@ -30,18 +41,20 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: vault.bg,
     padding: 16,
   },
   section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: vault.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: vault.border,
     padding: 16,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: fontSize.sm,
     fontWeight: '600',
-    color: '#999',
+    color: ink.muted,
     textTransform: 'uppercase',
     marginBottom: 12,
   },
@@ -52,11 +65,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   label: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: fontSize.base,
+    color: ink.strong,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: vault.border,
   },
 })

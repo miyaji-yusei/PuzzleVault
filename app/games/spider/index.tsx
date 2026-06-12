@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Switch } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { Difficulty } from '../../../src/types/engine'
-
-type ModalOrientation = 'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right'
-
-const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
-
-function isDifficulty(v: unknown): v is Difficulty {
-  return VALID_DIFFICULTIES.includes(v as Difficulty)
-}
+import { isDifficulty } from '../../../src/utils/difficulty'
+import { GameHeader, AppDialog } from '../../../src/components/ui'
+import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
 type DifficultyOption = {
   id: Difficulty
@@ -32,15 +27,8 @@ function DifficultySelect() {
   const router = useRouter()
 
   return (
-    <SafeAreaView style={dsStyles.container}>
-      <View style={dsStyles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={dsStyles.backButton}>
-          <Text style={dsStyles.backText}>← 戻る</Text>
-        </TouchableOpacity>
-        <Text style={dsStyles.title}>Spider Solitaire</Text>
-        <View style={{ minWidth: 60 }} />
-      </View>
-
+    <SafeAreaView style={styles.container}>
+      <GameHeader title="Spider Solitaire" />
       <View style={dsStyles.content}>
         <Text style={dsStyles.subtitle}>難易度を選んでください</Text>
 
@@ -73,8 +61,8 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   const {
-    puzzle, state, selected, isComplete,
-    canUndo,
+    state, isComplete,
+    canUndo, selected,
     tapTableau, doubleTapCard, directMove, deal, undo, restart,
     completingSet, onSetAnimationDone,
   } = useSpiderGame(difficulty, undefined, { dealWithEmpty })
@@ -91,35 +79,14 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
     }
   }, [landscapeEnabled])
 
-  // iOSではModalはデフォルトでportraitに固定されるため、横画面表示時はモーダルにも
-  // landscapeを許可してダイアログ表示中に縦画面へ戻されないようにする
-  const modalSupportedOrientations: ModalOrientation[] = landscapeEnabled
-    ? ['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']
-    : ['portrait']
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Spider</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            onPress={undo}
-            disabled={!canUndo}
-            style={[styles.iconBtn, !canUndo && styles.iconBtnDisabled]}
-          >
-            <Text style={styles.iconBtnText}>↩</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={restart} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>↺</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowSettingsDialog(true)} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>⚙</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <GameHeader
+        title="Spider"
+        onUndo={canUndo ? undo : undefined}
+        onRestart={restart}
+        onSettings={() => setShowSettingsDialog(true)}
+      />
 
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
@@ -132,8 +99,8 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         <Switch
           value={dealWithEmpty}
           onValueChange={setDealWithEmpty}
-          trackColor={{ false: '#555', true: '#66bb6a' }}
-          thumbColor={dealWithEmpty ? '#fff' : '#ccc'}
+          trackColor={{ false: vault.borderLight, true: gold.deep }}
+          thumbColor={dealWithEmpty ? gold.accent : '#ccc'}
         />
       </View>
 
@@ -148,49 +115,31 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         onSetAnimationDone={onSetAnimationDone}
       />
 
-      {/* Win dialog */}
-      <Modal visible={isComplete} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
-            <Text style={styles.dialogMessage}>全8セット完成！手数: {state.moves}</Text>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnCancel]} onPress={() => router.back()}>
-                <Text style={styles.dialogBtnTextCancel}>タイトルに戻る</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.dialogBtn, styles.dialogBtnOk]} onPress={restart}>
-                <Text style={styles.dialogBtnTextOk}>もう一度</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AppDialog
+        visible={isComplete}
+        title="🎉 クリア！"
+        message={`全8セット完成！手数: ${state.moves}`}
+        actions={[
+          { label: 'もう一度', onPress: restart },
+          { label: 'タイトルに戻る', onPress: () => router.back(), variant: 'secondary' },
+        ]}
+      />
 
-      {/* Settings dialog */}
-      <Modal visible={showSettingsDialog} transparent animationType="fade" supportedOrientations={modalSupportedOrientations}>
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>設定</Text>
-            <View style={styles.dialogSettingsRow}>
-              <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
-              <Switch
-                value={landscapeEnabled}
-                onValueChange={setLandscapeEnabled}
-                trackColor={{ false: '#555', true: '#66bb6a' }}
-                thumbColor={landscapeEnabled ? '#fff' : '#ccc'}
-              />
-            </View>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity
-                style={[styles.dialogBtn, styles.dialogBtnOk]}
-                onPress={() => setShowSettingsDialog(false)}
-              >
-                <Text style={styles.dialogBtnTextOk}>閉じる</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <AppDialog
+        visible={showSettingsDialog}
+        title="設定"
+        actions={[{ label: '閉じる', onPress: () => setShowSettingsDialog(false) }]}
+      >
+        <View style={styles.dialogSettingsRow}>
+          <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
+          <Switch
+            value={landscapeEnabled}
+            onValueChange={setLandscapeEnabled}
+            trackColor={{ false: vault.borderLight, true: gold.deep }}
+            thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
+          />
         </View>
-      </Modal>
+      </AppDialog>
 
       {/* Deal unavailable hint (strict mode only) */}
       {!dealWithEmpty && state.stock.length > 0 &&
@@ -211,27 +160,14 @@ export default function SpiderScreen() {
   return <SpiderGame difficulty={params.difficulty} />
 }
 
-// --- DifficultySelect styles ---
 const dsStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1b5e20' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#1b5e20',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2e7d32',
-  },
-  backButton: { padding: 4, minWidth: 60 },
-  backText: { fontSize: 14, color: '#a5d6a7' },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   content: { flex: 1, padding: 24, justifyContent: 'center' },
-  subtitle: { fontSize: 16, color: '#c8e6c9', textAlign: 'center', marginBottom: 24 },
+  subtitle: { fontSize: fontSize.base, color: ink.body, textAlign: 'center', marginBottom: 24 },
   card: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 12,
+    backgroundColor: vault.card,
+    borderWidth: 1,
+    borderColor: gold.deep,
+    borderRadius: radii.lg,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -239,79 +175,38 @@ const dsStyles = StyleSheet.create({
     gap: 16,
   },
   cardLeft: { minWidth: 80 },
-  cardLabel: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  cardSuit: { fontSize: 13, color: '#a5d6a7', marginTop: 2 },
-  cardDesc: { fontSize: 14, color: '#c8e6c9', flex: 1 },
+  cardLabel: { fontSize: fontSize.md, fontWeight: 'bold', color: gold.accent },
+  cardSuit: { fontSize: fontSize.sm, color: ink.muted, marginTop: 2 },
+  cardDesc: { fontSize: fontSize.sm, color: ink.body, flex: 1 },
 })
 
-// --- SpiderGame styles ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1b5e20' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#1b5e20',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2e7d32',
-  },
-  backButton: { padding: 4 },
-  backText: { fontSize: 14, color: '#a5d6a7' },
-  title: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  headerButtons: { flexDirection: 'row', gap: 8 },
-  iconBtn: {
-    backgroundColor: '#2e7d32',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  iconBtnDisabled: { opacity: 0.4 },
-  iconBtnText: { color: '#fff', fontSize: 16 },
-  infoRow: { paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#2e7d32' },
-  infoText: { fontSize: 11, color: '#c8e6c9', textAlign: 'center' },
+  container: { flex: 1, backgroundColor: felt.dark },
+  infoRow: { paddingHorizontal: 12, paddingVertical: 4, backgroundColor: felt.base },
+  infoText: { fontSize: fontSize.xs, color: ink.body, textAlign: 'center' },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 4,
-    backgroundColor: '#1b5e20',
+    backgroundColor: felt.dark,
     borderBottomWidth: 1,
-    borderBottomColor: '#2e7d32',
+    borderBottomColor: felt.base,
   },
-  settingsLabel: { fontSize: 11, color: '#c8e6c9' },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dialog: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 24, width: 280, alignItems: 'center',
-  },
-  dialogTitle: { fontSize: 22, fontWeight: 'bold', color: '#1b5e20', marginBottom: 8 },
-  dialogMessage: { fontSize: 14, color: '#555', textAlign: 'center' },
+  settingsLabel: { fontSize: fontSize.xs, color: ink.body },
   dialogSettingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
     paddingVertical: 8,
-    marginTop: 8,
   },
-  dialogSettingsLabel: { fontSize: 14, color: '#333' },
-  dialogButtons: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  dialogBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, minWidth: 90, alignItems: 'center' },
-  dialogBtnCancel: { backgroundColor: '#eee' },
-  dialogBtnOk: { backgroundColor: '#1b5e20' },
-  dialogBtnTextCancel: { color: '#333', fontWeight: '600' },
-  dialogBtnTextOk: { color: '#fff', fontWeight: '600' },
+  dialogSettingsLabel: { fontSize: fontSize.sm, color: ink.body },
   hintBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingVertical: 6, alignItems: 'center',
   },
-  hintText: { color: '#fff', fontSize: 12 },
+  hintText: { color: ink.strong, fontSize: fontSize.xs },
 })

@@ -1,14 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal } from 'react-native'
+import { View, StyleSheet, SafeAreaView } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { GechoOutBoard } from '../../../src/components/games/gechoout/Board'
 import { useGechooutGame } from '../../../src/hooks/useGechooutGame'
 import { Difficulty } from '../../../src/types/engine'
-
-const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
-
-function isDifficulty(v: unknown): v is Difficulty {
-  return VALID_DIFFICULTIES.includes(v as Difficulty)
-}
+import { isDifficulty } from '../../../src/utils/difficulty'
+import { GameHeader, AppDialog, InfoBanner } from '../../../src/components/ui'
+import { vault } from '../../../src/theme'
 
 export default function GechoOutScreen() {
   const router = useRouter()
@@ -20,46 +17,24 @@ export default function GechoOutScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Gecho Out</Text>
-        <TouchableOpacity onPress={restart} style={styles.restartButton}>
-          <Text style={styles.restartText}>↺</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.infoRow}>
-        <Text style={styles.infoText}>蛇の頭か尾をドラッグして、同じ色の穴に入れよう</Text>
-        <Text style={styles.remainingText}>残り {remaining} 匹</Text>
-      </View>
+      <GameHeader title="Gecho Out" onRestart={restart} />
+      <InfoBanner text={`蛇の頭か尾をドラッグして、同じ色の穴に入れよう（残り ${remaining} 匹）`} />
 
       <View style={styles.boardContainer}>
         <GechoOutBoard state={state} onMove={move} />
       </View>
 
-      <View style={styles.legend}>
-        <Text style={styles.legendText}>● 頭（白い目）／ ▪ 尾（薄い印）をドラッグ</Text>
-      </View>
+      <InfoBanner text="● 頭（白い目）／ ▪ 尾（薄い印）をドラッグ" />
 
-      {/* Win dialog */}
-      <Modal visible={isComplete} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
-            <Text style={styles.dialogMessage}>すべての蛇を穴に入れました！</Text>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity style={[styles.dialogButton, styles.dialogButtonOk]} onPress={restart}>
-                <Text style={styles.dialogButtonText}>もう一度プレイ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.dialogButton, styles.dialogButtonCancel]} onPress={() => router.back()}>
-                <Text style={styles.dialogButtonTextCancel}>タイトルに戻る</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AppDialog
+        visible={isComplete}
+        title="🎉 クリア！"
+        message="すべての蛇を穴に入れました！"
+        actions={[
+          { label: 'もう一度プレイ', onPress: restart },
+          { label: 'タイトルに戻る', onPress: () => router.back(), variant: 'secondary' },
+        ]}
+      />
     </SafeAreaView>
   )
 }
@@ -67,124 +42,12 @@ export default function GechoOutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#4A90E2',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  restartButton: {
-    padding: 4,
-  },
-  restartText: {
-    fontSize: 22,
-    color: '#4A90E2',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#fffde7',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#795548',
-    flexShrink: 1,
-  },
-  remainingText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#795548',
-    marginLeft: 8,
+    backgroundColor: vault.bg,
   },
   boardContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-  },
-  legend: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    alignItems: 'center',
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#888',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dialog: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    width: 280,
-    alignItems: 'center',
-  },
-  dialogTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  dialogMessage: {
-    fontSize: 15,
-    color: '#555',
-    textAlign: 'center',
-  },
-  dialogButtons: {
-    marginTop: 20,
-    gap: 10,
-    width: '100%',
-  },
-  dialogButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  dialogButtonOk: {
-    backgroundColor: '#4285f4',
-  },
-  dialogButtonCancel: {
-    backgroundColor: '#f0f0f0',
-  },
-  dialogButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  dialogButtonTextCancel: {
-    color: '#555',
-    fontWeight: '600',
-    fontSize: 15,
   },
 })

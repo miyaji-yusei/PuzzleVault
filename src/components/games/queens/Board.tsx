@@ -1,14 +1,15 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
 import { QueensState } from '../../../engines/queens/types'
+import { GameIcon } from '../../ui/GameIcon'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_PADDING = 32
 
 const REGION_COLORS = [
-  '#f28b82', '#fbbc04', '#34a853', '#4285f4', '#a142f4',
-  '#ff6d00', '#00bcd4', '#8bc34a', '#e91e63', '#795548',
-  '#607d8b', '#ff5722',
+  '#C97B7B', '#C9A86A', '#7FA882', '#7B93B8', '#9C84B0',
+  '#C98A66', '#6FA3A8', '#94A878', '#B87B95', '#8C7B6E',
+  '#7E8C99', '#A88670',
 ]
 
 const DRAG_THRESHOLD = 8
@@ -164,17 +165,11 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
               >
                 {cellState === 'queen' && (
                   isNewCorrect ? (
-                    <Animated.Text
-                      style={[styles.queen, { fontSize: cellSize * 0.55, transform: [{ scale: queenScale }] }]}
-                    >
-                      ♛
-                    </Animated.Text>
+                    <Animated.View style={{ transform: [{ scale: queenScale }] }}>
+                      <GameIcon name="crown" size={cellSize * 0.55} color="#FFFFFF" />
+                    </Animated.View>
                   ) : (
-                    <Text
-                      style={[styles.queen, { fontSize: cellSize * 0.55 }, isFlashing && styles.queenWrong]}
-                    >
-                      ♛
-                    </Text>
+                    <GameIcon name="crown" size={cellSize * 0.55} color={isFlashing ? '#f44336' : '#FFFFFF'} />
                   )
                 )}
                 {cellState === 'crossed' && (
@@ -206,16 +201,6 @@ const styles = StyleSheet.create({
   },
   cellFlash: {
     backgroundColor: 'rgba(244, 67, 54, 0.4)',
-  },
-  queen: {
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  queenWrong: {
-    color: '#f44336',
-    textShadowColor: 'rgba(0,0,0,0.3)',
   },
   cross: {
     color: 'rgba(0,0,0,0.5)',
