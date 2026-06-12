@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Modal, Animated, Dimensions, Switch } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
@@ -7,10 +7,13 @@ import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
 import { Difficulty } from '../../../src/types/engine'
 import { useProgressStore } from '../../../src/stores/progressStore'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
+import { isDifficulty } from '../../../src/utils/difficulty'
+import { GameHeader, AppDialog } from '../../../src/components/ui'
+import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 const SUITS = ['♠', '♥', '♦', '♣']
-const CARD_COLORS = ['#1b5e20', '#b71c1c', '#b71c1c', '#1b5e20']
+const CARD_COLORS = ['#1A1A1A', '#C9483B', '#C9483B', '#1A1A1A']
 
 const SCATTER_COUNT = 8
 
@@ -24,12 +27,6 @@ function makeScatterCards() {
   }))
 }
 
-const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'expert']
-
-function isDifficulty(v: unknown): v is Difficulty {
-  return VALID_DIFFICULTIES.includes(v as Difficulty)
-}
-
 export default function SolitaireScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ difficulty?: string }>()
@@ -40,7 +37,7 @@ export default function SolitaireScreen() {
   const { solitaireStats, recordSolitairePlay, recordSolitaireClear } = useProgressStore()
 
   const {
-    state, puzzle, selected, isComplete, maxResets,
+    state, puzzle, selected, isComplete,
     canAutoComplete, canUndo, isDeadlocked, autoCompleteAnim,
     tapStock, tapWaste, tapTableau, tapFoundation, doubleTapCard, doubleTapWaste, directMove,
     undo, restart, newGame, autoComplete,
@@ -60,7 +57,6 @@ export default function SolitaireScreen() {
   const [showWinDialog, setShowWinDialog] = useState(false)
   const prevComplete = useRef(false)
 
-  // ゲーム開始時に統計記録
   useEffect(() => {
     if (selectedDifficulty) recordSolitairePlay()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,18 +141,10 @@ export default function SolitaireScreen() {
     }
   }, [isDeadlocked, deadlockHandled])
 
-  const resetLeft = maxResets === 999 ? '∞' : String(maxResets - state.stockResets)
-
   if (!selectedDifficulty) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← 戻る</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>ソリティア</Text>
-          <View style={{ width: 60 }} />
-        </View>
+        <GameHeader title="ソリティア" />
         <View style={styles.selectScreen}>
           <Text style={styles.selectTitle}>難易度を選択</Text>
           <TouchableOpacity
@@ -180,34 +168,17 @@ export default function SolitaireScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>ソリティア</Text>
-        <View style={styles.headerRight}>
-          <Text style={styles.metaText}>スコア: {state.score}</Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              onPress={undo}
-              disabled={!canUndo}
-              style={[styles.iconButton, !canUndo && styles.iconButtonDisabled]}
-            >
-              <Text style={styles.iconButtonText}>↩</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowRestartDialog(true)} style={styles.iconButton}>
-              <Text style={styles.iconButtonText}>↺</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSettingsDialog(true)} style={styles.iconButton}>
-              <Text style={styles.iconButtonText}>⚙</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      <GameHeader
+        title="ソリティア"
+        score={state.score}
+        onUndo={canUndo ? undo : undefined}
+        onRestart={() => setShowRestartDialog(true)}
+        onSettings={() => setShowSettingsDialog(true)}
+      />
 
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>
-          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ リセット残: {resetLeft} ・ 手数: {state.moves}
+          {puzzle.drawMode === 1 ? '1枚めくり' : '3枚めくり'} ・ {difficulty} ・ 手数: {state.moves}
         </Text>
       </View>
 
@@ -225,126 +196,54 @@ export default function SolitaireScreen() {
         autoCompleteAnim={autoCompleteAnim}
       />
 
-      {/* Restart confirmation dialog */}
-      <Modal visible={showRestartDialog} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>リセット確認</Text>
-            <Text style={styles.dialogMessage}>ゲームをリセットしますか？</Text>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonCancel]}
-                onPress={() => setShowRestartDialog(false)}
-              >
-                <Text style={styles.dialogButtonTextCancel}>いいえ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={() => {
-                  setShowRestartDialog(false)
-                  restart()
-                }}
-              >
-                <Text style={styles.dialogButtonTextOk}>はい</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AppDialog
+        visible={showRestartDialog}
+        title="リセット確認"
+        message="ゲームをリセットしますか？"
+        actions={[
+          { label: 'はい', onPress: () => { setShowRestartDialog(false); restart() } },
+          { label: 'いいえ', onPress: () => setShowRestartDialog(false), variant: 'secondary' },
+        ]}
+      />
 
-      {/* Settings dialog */}
-      <Modal visible={showSettingsDialog} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>設定</Text>
-            <View style={styles.settingsRow}>
-              <Text style={styles.settingsLabel}>横画面表示を許可</Text>
-              <Switch
-                value={landscapeEnabled}
-                onValueChange={setLandscapeEnabled}
-                trackColor={{ false: '#555', true: '#66bb6a' }}
-                thumbColor={landscapeEnabled ? '#fff' : '#ccc'}
-              />
-            </View>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={() => setShowSettingsDialog(false)}
-              >
-                <Text style={styles.dialogButtonTextOk}>閉じる</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <AppDialog
+        visible={showSettingsDialog}
+        title="設定"
+        actions={[{ label: '閉じる', onPress: () => setShowSettingsDialog(false) }]}
+      >
+        <View style={styles.settingsRow}>
+          <Text style={styles.settingsLabel}>横画面表示を許可</Text>
+          <Switch
+            value={landscapeEnabled}
+            onValueChange={setLandscapeEnabled}
+            trackColor={{ false: vault.borderLight, true: gold.deep }}
+            thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
+          />
         </View>
-      </Modal>
+      </AppDialog>
 
-      {/* Auto-complete dialog */}
-      <Modal visible={showAutoCompleteDialog} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>自動完成</Text>
-            <Text style={styles.dialogMessage}>すべてのカードを組み札に移動しますか？</Text>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonCancel]}
-                onPress={() => setShowAutoCompleteDialog(false)}
-              >
-                <Text style={styles.dialogButtonTextCancel}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={() => {
-                  setShowAutoCompleteDialog(false)
-                  autoComplete()
-                }}
-              >
-                <Text style={styles.dialogButtonTextOk}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AppDialog
+        visible={showAutoCompleteDialog}
+        title="自動完成"
+        message="すべてのカードを組み札に移動しますか？"
+        actions={[
+          { label: 'OK', onPress: () => { setShowAutoCompleteDialog(false); autoComplete() } },
+          { label: 'キャンセル', onPress: () => setShowAutoCompleteDialog(false), variant: 'secondary' },
+        ]}
+      />
 
-      {/* Deadlock dialog */}
-      <Modal visible={showDeadlockDialog} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>詰みました</Text>
-            <Text style={styles.dialogMessage}>これ以上有効な手がありません。</Text>
-            <View style={styles.dialogButtons}>
-              {canUndo && (
-                <TouchableOpacity
-                  style={[styles.dialogButton, styles.dialogButtonCancel]}
-                  onPress={() => {
-                    setShowDeadlockDialog(false)
-                    undo()
-                  }}
-                >
-                  <Text style={styles.dialogButtonTextCancel}>手を戻す</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonCancel]}
-                onPress={() => {
-                  setShowDeadlockDialog(false)
-                  restart()
-                }}
-              >
-                <Text style={styles.dialogButtonTextCancel}>リセット</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={() => {
-                  setShowDeadlockDialog(false)
-                  newGame()
-                }}
-              >
-                <Text style={styles.dialogButtonTextOk}>新しいゲーム</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AppDialog
+        visible={showDeadlockDialog}
+        title="詰みました"
+        message="これ以上有効な手がありません。"
+        actions={[
+          { label: '新しいゲーム', onPress: () => { setShowDeadlockDialog(false); newGame() } },
+          { label: 'リセット', onPress: () => { setShowDeadlockDialog(false); restart() }, variant: 'secondary' },
+          ...(canUndo
+            ? [{ label: '手を戻す', onPress: () => { setShowDeadlockDialog(false); undo() }, variant: 'secondary' as const }]
+            : []),
+        ]}
+      />
 
       {/* カード散布アニメーション */}
       {showScatter && (
@@ -372,36 +271,22 @@ export default function SolitaireScreen() {
         </View>
       )}
 
-      {/* Win dialog */}
-      <Modal visible={showWinDialog} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>🎉 クリア！</Text>
-            <Text style={styles.dialogMessage}>スコア: {state.score}点</Text>
-            <Text style={styles.dialogMessage}>手数: {state.moves}手</Text>
-            <View style={styles.statsBox}>
-              <Text style={styles.statsTitle}>通算成績</Text>
-              <Text style={styles.statsText}>プレイ: {solitaireStats.totalPlayed}回</Text>
-              <Text style={styles.statsText}>クリア: {solitaireStats.totalCleared}回</Text>
-              <Text style={styles.statsText}>勝率: {winRate}%</Text>
-            </View>
-            <View style={styles.dialogButtons}>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonCancel]}
-                onPress={() => router.back()}
-              >
-                <Text style={styles.dialogButtonTextCancel}>タイトルに戻る</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonOk]}
-                onPress={() => { setShowWinDialog(false); restart() }}
-              >
-                <Text style={styles.dialogButtonTextOk}>もう一度プレイ</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <AppDialog
+        visible={showWinDialog}
+        title="🎉 クリア！"
+        message={`スコア: ${state.score}点 ・ 手数: ${state.moves}手`}
+        actions={[
+          { label: 'もう一度プレイ', onPress: () => { setShowWinDialog(false); restart() } },
+          { label: 'タイトルに戻る', onPress: () => router.back(), variant: 'secondary' },
+        ]}
+      >
+        <View style={styles.statsBox}>
+          <Text style={styles.statsTitle}>通算成績</Text>
+          <Text style={styles.statsText}>プレイ: {solitaireStats.totalPlayed}回</Text>
+          <Text style={styles.statsText}>クリア: {solitaireStats.totalCleared}回</Text>
+          <Text style={styles.statsText}>勝率: {winRate}%</Text>
         </View>
-      </Modal>
+      </AppDialog>
     </SafeAreaView>
   )
 }
@@ -409,88 +294,16 @@ export default function SolitaireScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1b5e20',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#1b5e20',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2e7d32',
-  },
-  backButton: {
-    padding: 4,
-  },
-  backText: {
-    fontSize: 14,
-    color: '#a5d6a7',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 11,
-    color: '#c8e6c9',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    backgroundColor: '#2e7d32',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  iconButtonDisabled: {
-    opacity: 0.4,
-  },
-  iconButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    backgroundColor: felt.dark,
   },
   infoRow: {
     paddingHorizontal: 12,
     paddingVertical: 4,
-    backgroundColor: '#2e7d32',
+    backgroundColor: felt.base,
   },
   infoText: {
-    fontSize: 11,
-    color: '#c8e6c9',
-    textAlign: 'center',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dialog: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    width: 280,
-    alignItems: 'center',
-  },
-  dialogTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1b5e20',
-    marginBottom: 8,
-  },
-  dialogMessage: {
-    fontSize: 15,
-    color: '#333',
-    marginBottom: 4,
+    fontSize: fontSize.xs,
+    color: ink.body,
     textAlign: 'center',
   },
   settingsRow: {
@@ -502,34 +315,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   settingsLabel: {
-    fontSize: 14,
-    color: '#333',
-  },
-  dialogButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  dialogButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  dialogButtonCancel: {
-    backgroundColor: '#eee',
-  },
-  dialogButtonOk: {
-    backgroundColor: '#1b5e20',
-  },
-  dialogButtonTextCancel: {
-    color: '#333',
-    fontWeight: '600',
-  },
-  dialogButtonTextOk: {
-    color: '#fff',
-    fontWeight: '600',
+    fontSize: fontSize.sm,
+    color: ink.strong,
   },
   scatterOverlay: {
     position: 'absolute',
@@ -546,7 +333,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 60,
     backgroundColor: '#fff',
-    borderRadius: 6,
+    borderRadius: radii.sm,
     borderWidth: 1.5,
     borderColor: '#ccc',
     alignItems: 'center',
@@ -562,22 +349,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   statsBox: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    backgroundColor: vault.surface,
+    borderRadius: radii.md,
     padding: 12,
     marginTop: 12,
     width: '100%',
     alignItems: 'center',
   },
   statsTitle: {
-    fontSize: 13,
+    fontSize: fontSize.sm,
     fontWeight: '700',
-    color: '#555',
+    color: ink.muted,
     marginBottom: 4,
   },
   statsText: {
-    fontSize: 13,
-    color: '#333',
+    fontSize: fontSize.sm,
+    color: ink.body,
     lineHeight: 20,
   },
   selectScreen: {
@@ -588,27 +375,29 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   selectTitle: {
-    fontSize: 22,
+    fontSize: fontSize.xl,
     fontWeight: 'bold',
-    color: '#fff',
+    color: ink.strong,
     marginBottom: 16,
   },
   selectButton: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 12,
+    backgroundColor: vault.card,
+    borderWidth: 1,
+    borderColor: gold.deep,
+    borderRadius: radii.lg,
     padding: 20,
     width: '100%',
     maxWidth: 320,
     alignItems: 'center',
   },
   selectButtonTitle: {
-    fontSize: 20,
+    fontSize: fontSize.lg,
     fontWeight: 'bold',
-    color: '#fff',
+    color: gold.accent,
     marginBottom: 4,
   },
   selectButtonDesc: {
-    fontSize: 14,
-    color: '#c8e6c9',
+    fontSize: fontSize.sm,
+    color: ink.body,
   },
 })

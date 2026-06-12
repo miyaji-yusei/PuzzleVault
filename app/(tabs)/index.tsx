@@ -1,95 +1,46 @@
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useRef } from 'react'
+import { GameIcon, IconName } from '../../src/components/ui'
+import { vault, gold, ink, jewels, fontSize, radii, shadows, GameId } from '../../src/theme'
 
 type GameInfo = {
-  id: string
+  id: GameId
   name: string
-  description: string
+  icon: IconName
   implemented: boolean
 }
 
 const GAMES: GameInfo[] = [
-  {
-    id: 'solitaire',
-    name: 'ソリティア',
-    description: 'クラシックなクロンダイクソリティア',
-    implemented: true,
-  },
-  {
-    id: 'sudoku',
-    name: 'ナンプレ',
-    description: '9×9マスに数字を埋めよう',
-    implemented: true,
-  },
-  {
-    id: 'nonogram',
-    name: 'イラストロジック',
-    description: 'ヒントを頼りにマスを塗りつぶそう',
-    implemented: true,
-  },
-  {
-    id: 'queens',
-    name: 'クイーンパズル',
-    description: 'すべての色にクイーンを1つずつ置こう',
-    implemented: true,
-  },
-  {
-    id: 'libra',
-    name: 'Libra',
-    description: '天秤のバランスを合わせよう',
-    implemented: true,
-  },
-  {
-    id: 'panda',
-    name: 'Panda',
-    description: 'パンダをペアにしよう',
-    implemented: true,
-  },
-  {
-    id: 'hashi',
-    name: 'Hashi',
-    description: '橋をかけて島をすべてつなごう',
-    implemented: true,
-  },
-  {
-    id: 'spider',
-    name: 'スパイダソリティア',
-    description: '2デッキで遊ぶ本格ソリティア',
-    implemented: true,
-  },
-  {
-    id: 'sums',
-    name: 'Sums',
-    description: '数字の合計を埋めるカカロパズル',
-    implemented: true,
-  },
-  {
-    id: 'gechoout',
-    name: 'Gecho Out',
-    description: '蛇の頭と尾を動かして同じ色の穴に入れよう',
-    implemented: true,
-  },
+  { id: 'solitaire', name: 'ソリティア', icon: 'solitaire', implemented: true },
+  { id: 'spider', name: 'スパイダ', icon: 'spider', implemented: true },
+  { id: 'sudoku', name: 'ナンプレ', icon: 'sudoku', implemented: true },
+  { id: 'nonogram', name: 'イラストロジック', icon: 'nonogram', implemented: true },
+  { id: 'queens', name: 'クイーン', icon: 'queens', implemented: true },
+  { id: 'libra', name: 'Libra', icon: 'libra', implemented: true },
+  { id: 'panda', name: 'Panda', icon: 'panda', implemented: true },
+  { id: 'hashi', name: 'Hashi', icon: 'hashi', implemented: true },
+  { id: 'sums', name: 'Sums', icon: 'sums', implemented: true },
+  { id: 'gechoout', name: 'Gecho Out', icon: 'gechoout', implemented: true },
+  { id: 'goita', name: 'ごいた', icon: 'goita', implemented: true },
 ]
 
-type GameCardProps = {
-  game: GameInfo
-  onPress: () => void
-}
-
-function GameCard({ game, onPress }: GameCardProps) {
+function GameTile({ game, onPress }: { game: GameInfo; onPress: () => void }) {
   return (
     <TouchableOpacity
-      style={[styles.card, !game.implemented && styles.cardDisabled]}
+      style={[styles.tile, !game.implemented && styles.tileDisabled]}
       onPress={onPress}
       disabled={!game.implemented}
       activeOpacity={0.7}
     >
-      <Text style={styles.cardName}>{game.name}</Text>
-      <Text style={styles.cardDescription}>{game.description}</Text>
-      {!game.implemented && (
-        <Text style={styles.comingSoon}>準備中</Text>
-      )}
+      <View style={[styles.iconWrap, { backgroundColor: jewels[game.id] }]}>
+        <GameIcon name={game.icon} size={30} color="#FFFFFF" />
+      </View>
+      <Text style={styles.tileName} numberOfLines={2}>
+        {game.name}
+      </Text>
+      {!game.implemented && <Text style={styles.comingSoon}>準備中</Text>}
     </TouchableOpacity>
   )
 }
@@ -97,67 +48,113 @@ function GameCard({ game, onPress }: GameCardProps) {
 export default function HomeScreen() {
   const router = useRouter()
   const navigatingRef = useRef(false)
+  const insets = useSafeAreaInsets()
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.subtitle}>ゲームを選んでください</Text>
-      {GAMES.map((game) => (
-        <GameCard
-          key={game.id}
-          game={game}
-          onPress={() => {
-            if (navigatingRef.current) return
-            navigatingRef.current = true
-            router.push(`/games/${game.id}`)
-            setTimeout(() => { navigatingRef.current = false }, 1000)
-          }}
-        />
-      ))}
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
+      <View style={styles.hero}>
+        <View style={styles.heroBadge}>
+          <GameIcon name="bolt" size={22} color={gold.accent} />
+        </View>
+        <Text style={styles.heroTitle}>PuzzleVault</Text>
+        <Text style={styles.heroSubtitle}>クラシックパズル コレクション</Text>
+      </View>
+      <View style={styles.grid}>
+        {GAMES.map((game) => (
+          <GameTile
+            key={game.id}
+            game={game}
+            onPress={() => {
+              if (navigatingRef.current) return
+              navigatingRef.current = true
+              router.push(`/games/${game.id}`)
+              setTimeout(() => { navigatingRef.current = false }, 1000)
+            }}
+          />
+        ))}
+      </View>
     </ScrollView>
   )
 }
 
+const TILE_GAP = 10
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: vault.bg,
   },
   content: {
     padding: 16,
+    paddingBottom: 32,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
+  hero: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginBottom: 8,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  heroBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.lg,
+    backgroundColor: vault.card,
+    borderWidth: 1,
+    borderColor: gold.deep,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  cardDisabled: {
-    opacity: 0.5,
-  },
-  cardName: {
-    fontSize: 18,
+  heroTitle: {
+    fontSize: fontSize.xl,
     fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#333',
+    color: gold.accent,
+    letterSpacing: 1,
   },
-  cardDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+  heroSubtitle: {
+    fontSize: fontSize.sm,
+    color: ink.muted,
+    marginTop: 4,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: TILE_GAP,
+  },
+  tile: {
+    // 横3列: コンテンツ幅から gap 2つ分を引いた1/3
+    width: `${100 / 3}%` as never,
+    flexBasis: '31%',
+    flexGrow: 1,
+    maxWidth: '32%',
+    backgroundColor: vault.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: vault.border,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    ...shadows.card,
+  },
+  tileDisabled: {
+    opacity: 0.45,
+  },
+  iconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  tileName: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: ink.strong,
+    textAlign: 'center',
   },
   comingSoon: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
+    fontSize: fontSize.xs,
+    color: ink.muted,
+    marginTop: 4,
   },
 })

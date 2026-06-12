@@ -60,7 +60,7 @@ function listPreviewCells(p: PreviewRange): { row: number; col: number }[] {
 }
 
 const HINT_COLOR: Record<HintColor, string> = {
-  default: '#333',
+  default: '#FFFFFF',
   blue: '#1a7fd4',
   red: '#d93025',
 }
