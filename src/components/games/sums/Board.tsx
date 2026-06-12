@@ -202,8 +202,8 @@ const styles = StyleSheet.create({
     color: '#bbb',
   },
   liveSumText: {
-    fontSize: 9,
-    fontWeight: '400',
+    fontSize: 12,
+    fontWeight: 'bold',
     color: '#ADB8E8',
   },
   cell: {
