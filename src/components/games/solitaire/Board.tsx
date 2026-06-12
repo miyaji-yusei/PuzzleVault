@@ -15,7 +15,35 @@ const DOUBLE_TAP_MS = 280
 const DRAG_THRESHOLD = 8
 // Approx. height consumed by the screen header outside of this board component.
 const HEADER_ALLOWANCE = 60
-const MIN_CARD_W = 24
+// Lower bounds when compressing tableau fan steps in landscape; below these the
+// rank/suit corner of covered cards becomes unreadable.
+const MIN_FACE_UP_STEP = 10
+const MIN_FACE_DOWN_STEP = 4
+
+// Vertical offsets of each card in a tableau column. When the column's natural
+// height exceeds availH (landscape), the fan steps are scaled down uniformly —
+// the card size itself is never changed.
+function getColumnOffsets(column: Card[], cardH: number, availH: number | null): number[] {
+  let upStep: number = FACE_UP_STEP
+  let downStep: number = FACE_DOWN_STEP
+  if (availH !== null && column.length > 1) {
+    let natural = 0
+    for (let i = 0; i < column.length - 1; i++) natural += column[i]!.faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
+    const maxStack = availH - cardH
+    if (natural > maxStack && natural > 0) {
+      const scale = Math.max(0, maxStack / natural)
+      upStep = Math.max(MIN_FACE_UP_STEP, FACE_UP_STEP * scale)
+      downStep = Math.max(MIN_FACE_DOWN_STEP, FACE_DOWN_STEP * scale)
+    }
+  }
+  const offsets: number[] = []
+  let topAcc = 0
+  for (let i = 0; i < column.length; i++) {
+    offsets.push(topAcc)
+    if (i < column.length - 1) topAcc += column[i]!.faceUp ? upStep : downStep
+  }
+  return offsets
+}
 
 const SUIT_SYM: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 const RED_SUITS = new Set<Suit>(['hearts', 'diamonds'])
@@ -89,21 +117,16 @@ export function SolitaireBoard({
   // consistent, sensible size whether the device is in portrait or landscape.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const portraitWidth = Math.min(windowWidth, windowHeight)
-  const widthBasedCardW = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
-
-  // In landscape, the limited height (rather than width) tends to be the binding
-  // constraint, so shrink cards further if the tallest tableau column wouldn't fit.
-  let CARD_W = widthBasedCardW
-  if (windowWidth > windowHeight) {
-    const maxColLen = Math.max(1, ...tableau.map(col => col.length))
-    const availableHeight = windowHeight - HEADER_ALLOWANCE
-    const heightBasedCardW = Math.floor(
-      (availableHeight - 24 - (maxColLen - 1) * FACE_UP_STEP) / (2 * 1.45)
-    )
-    CARD_W = Math.min(widthBasedCardW, Math.max(heightBasedCardW, MIN_CARD_W))
-  }
+  const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.45)
   const TOP_ROW_H = 8 + CARD_H + 8
+
+  // In landscape the limited height is the binding constraint: instead of
+  // shrinking the cards, compress each overflowing column's fan offsets so the
+  // whole column fits in the space below the top row.
+  const tableauAvailH = windowWidth > windowHeight
+    ? windowHeight - HEADER_ALLOWANCE - TOP_ROW_H - 8
+    : null
 
   // Refs so PanResponder callbacks always read the latest dimensions without
   // needing to be recreated on every orientation change.
@@ -113,6 +136,8 @@ export function SolitaireBoard({
   cardHRef.current = CARD_H
   const topRowHRef = useRef(TOP_ROW_H)
   topRowHRef.current = TOP_ROW_H
+  const tableauAvailHRef = useRef(tableauAvailH)
+  tableauAvailHRef.current = tableauAvailH
 
   const boardRef = useRef<View>(null)
   const boardTopRef = useRef(0)
@@ -205,16 +230,11 @@ export function SolitaireBoard({
       return relY < cardH * 2 ? { col, card: -1 } : null
     }
 
-    let topAcc = 0
-    const offsets: number[] = []
-    for (let i = 0; i < column.length; i++) {
-      offsets.push(topAcc)
-      if (i < column.length - 1) topAcc += column[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
-    }
+    const offsets = getColumnOffsets(column, cardH, tableauAvailHRef.current)
 
     const lastIdx = column.length - 1
     // Allow dragging from empty space below the last card — treat as the last card
-    if (relY >= offsets[lastIdx] + cardH) return { col, card: lastIdx }
+    if (relY >= offsets[lastIdx]! + cardH) return { col, card: lastIdx }
 
     let cardIdx = 0
     for (let i = lastIdx; i >= 0; i--) {
@@ -548,13 +568,8 @@ export function SolitaireBoard({
             return <EmptySlot key={`col-${ci}`} width={CARD_W} height={CARD_H} />
           }
 
-          const offsets: number[] = []
-          let topAcc = 0
-          for (let i = 0; i < col.length; i++) {
-            offsets.push(topAcc)
-            if (i < col.length - 1) topAcc += col[i].faceUp ? FACE_UP_STEP : FACE_DOWN_STEP
-          }
-          const colHeight = topAcc + CARD_H
+          const offsets = getColumnOffsets(col, CARD_H, tableauAvailH)
+          const colHeight = offsets[col.length - 1]! + CARD_H
 
           return (
             <View
