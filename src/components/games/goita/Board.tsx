@@ -3,23 +3,29 @@ import { View, Text, StyleSheet } from 'react-native'
 import { getTeamScore, teamOf } from '../../../engines/goita'
 import { GoitaState, Piece, PieceType } from '../../../engines/goita/types'
 import { HUMAN_PLAYER, LeadInfo } from '../../../hooks/useGoitaGame'
+import { PieceIcon } from './PieceIcon'
+import { gold as goldColor } from '../../../theme'
 
+// 駒の表示名（ひらがなの動物名）。動物アイコンと併記する。
 export const PIECE_LABELS: Record<PieceType, string> = {
-  king: '王',
-  rook: '飛',
-  bishop: '角',
-  gold: '金',
-  silver: '銀',
-  knight: '桂',
-  lance: '香',
-  pawn: '歩',
-  shi: 'し',
-  do: 'ど',
-  ne: 'ね',
-  hi: 'ひ',
-  ko: 'こ',
-  sa: 'さ',
+  king: 'らいおん',
+  rook: 'わし',
+  bishop: 'しか',
+  gold: 'とら',
+  silver: 'おおかみ',
+  knight: 'うま',
+  lance: 'へび',
+  pawn: 'ねずみ',
+  shi: 'ねこ',
+  do: 'いぬ',
+  ne: 'うさぎ',
+  hi: 'ひつじ',
+  ko: 'こあら',
+  sa: 'さる',
 }
+
+// 強い駒（king/rook/bishop/gold/silver）はタイル枠を金色にして差別化する
+const HIGH_VALUE_TYPES = new Set<PieceType>(['king', 'rook', 'bishop', 'gold', 'silver'])
 
 const PLAYER_NAMES = ['あなた', '右の相手', '相方', '左の相手']
 
@@ -43,8 +49,17 @@ export function PieceTile({ piece, faceDown = false, size = 44, highlighted = fa
   }
 
   return (
-    <View style={[styles.tile, styles.tileFace, highlighted && styles.tileHighlight, dimensions]}>
-      <Text style={[styles.tileText, { fontSize: size * 0.42 }]}>{PIECE_LABELS[piece.type]}</Text>
+    <View
+      style={[
+        styles.tile,
+        styles.tileFace,
+        HIGH_VALUE_TYPES.has(piece.type) && styles.tileHighValue,
+        highlighted && styles.tileHighlight,
+        dimensions,
+      ]}
+    >
+      <PieceIcon type={piece.type} size={size * 0.52} />
+      <Text style={[styles.tileText, { fontSize: size * 0.2 }]}>{PIECE_LABELS[piece.type]}</Text>
     </View>
   )
 }
@@ -203,6 +218,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#8d6e63',
   },
+  tileHighValue: {
+    borderWidth: 2,
+    borderColor: goldColor.deep,
+  },
   tileHighlight: {
     borderColor: '#fbc02d',
     borderWidth: 3,
@@ -216,5 +235,6 @@ const styles = StyleSheet.create({
   tileText: {
     color: '#3e2723',
     fontWeight: 'bold',
+    marginTop: 1,
   },
 })

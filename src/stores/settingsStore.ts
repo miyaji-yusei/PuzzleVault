@@ -8,6 +8,7 @@ interface SettingsState {
   solitaireAllowDealWithEmptyColumn: boolean
   solitaireLandscapeEnabled: boolean
   spiderLandscapeEnabled: boolean
+  goitaHowToPlayShown: boolean
   setSoundEnabled: (enabled: boolean) => void
   setVibrationEnabled: (enabled: boolean) => void
   setTheme: (theme: 'light' | 'dark') => void
@@ -15,6 +16,7 @@ interface SettingsState {
   setSolitaireAllowDealWithEmptyColumn: (allow: boolean) => void
   setSolitaireLandscapeEnabled: (enabled: boolean) => void
   setSpiderLandscapeEnabled: (enabled: boolean) => void
+  setGoitaHowToPlayShown: (shown: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -25,6 +27,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   solitaireAllowDealWithEmptyColumn: false,
   solitaireLandscapeEnabled: false,
   spiderLandscapeEnabled: false,
+  goitaHowToPlayShown: false,
   setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
   setVibrationEnabled: (enabled) => set({ vibrationEnabled: enabled }),
   setTheme: (theme) => set({ theme }),
@@ -32,4 +35,5 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setSolitaireAllowDealWithEmptyColumn: (allow) => set({ solitaireAllowDealWithEmptyColumn: allow }),
   setSolitaireLandscapeEnabled: (enabled) => set({ solitaireLandscapeEnabled: enabled }),
   setSpiderLandscapeEnabled: (enabled) => set({ spiderLandscapeEnabled: enabled }),
+  setGoitaHowToPlayShown: (shown) => set({ goitaHowToPlayShown: shown }),
 }))

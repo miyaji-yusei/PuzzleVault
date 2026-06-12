@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { GoitaBoard, PieceTile } from '../../../src/components/games/goita/Board'
+import { HowToPlayDialog } from '../../../src/components/games/goita/HowToPlayDialog'
 import { useGoitaGame } from '../../../src/hooks/useGoitaGame'
+import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { Difficulty } from '../../../src/types/engine'
 import { GameHeader, AppDialog, InfoBanner, Button } from '../../../src/components/ui'
-import { vault, ink, fontSize } from '../../../src/theme'
+import { vault, ink, gold, fontSize } from '../../../src/theme'
 
 const GOITA_DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
 
@@ -23,9 +26,32 @@ export default function GoitaScreen() {
   const myHand = state.hands[0]
   const gameOver = state.finished
 
+  const [howToPlayVisible, setHowToPlayVisible] = useState(false)
+  const goitaHowToPlayShown = useSettingsStore((s) => s.goitaHowToPlayShown)
+  const setGoitaHowToPlayShown = useSettingsStore((s) => s.setGoitaHowToPlayShown)
+
+  useEffect(() => {
+    if (!goitaHowToPlayShown) {
+      setHowToPlayVisible(true)
+      setGoitaHowToPlayShown(true)
+    }
+  }, [goitaHowToPlayShown, setGoitaHowToPlayShown])
+
   return (
     <SafeAreaView style={styles.container}>
-      <GameHeader title="ごいた" onRestart={restart} />
+      <GameHeader
+        title="ごいた"
+        onRestart={restart}
+        right={
+          <TouchableOpacity
+            onPress={() => setHowToPlayVisible(true)}
+            style={styles.helpButton}
+            accessibilityLabel="遊び方を見る"
+          >
+            <Text style={styles.helpButtonText}>？</Text>
+          </TouchableOpacity>
+        }
+      />
       <InfoBanner
         text={
           gameOver
@@ -72,6 +98,8 @@ export default function GoitaScreen() {
           { label: 'タイトルに戻る', onPress: () => router.back(), variant: 'secondary' },
         ]}
       />
+
+      <HowToPlayDialog visible={howToPlayVisible} onClose={() => setHowToPlayVisible(false)} />
     </SafeAreaView>
   )
 }
@@ -107,5 +135,18 @@ const styles = StyleSheet.create({
   playButton: {
     marginTop: 8,
     paddingHorizontal: 40,
+  },
+  helpButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: vault.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpButtonText: {
+    fontSize: 18,
+    color: gold.accent,
+    fontWeight: 'bold',
   },
 })
