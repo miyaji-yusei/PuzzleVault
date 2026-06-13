@@ -103,6 +103,22 @@ eas build:configure
 }
 ```
 
+### 3.2.1 development build（AdMob動作確認用）
+
+`react-native-google-mobile-ads` はネイティブモジュールのため **Expo Go では動作しない**。
+広告表示を実機で確認するには development build が必要。`npx expo prebuild` は使わず、EAS Build でビルドする。
+
+```powershell
+# iOS用 development build を作成（Apple Developer登録済みの実機が必要）
+eas build --profile development --platform ios
+
+# Android用 development build を作成
+eas build --profile development --platform android
+```
+
+ビルド完了後、生成されたアプリをインストールして `npx expo start --dev-client` で接続する。
+Expo Go や Web ではバナー広告コンポーネントは表示されない（`src/config/ads.ts` の `adsEnabled` が false になるため）。
+
 ### 3.3 GitHub Secrets登録
 
 GitHubリポジトリ → Settings → Secrets and variables → Actions → **New repository secret**

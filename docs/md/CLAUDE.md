@@ -160,3 +160,9 @@ Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: false }).
 
 ### npm install は必ず --legacy-peer-deps を使う
 プロジェクトルートの `.npmrc` に `legacy-peer-deps=true` を設定済みのため、`npm install` のみで動作する。
+
+### react-native-google-mobile-ads は Expo Go 非対応
+`react-native-google-mobile-ads` もネイティブモジュールのため Expo Go では動作しない。
+`src/config/ads.ts` の `adsEnabled` が Expo Go / Web では自動的に `false` になり、
+`src/components/ui/AdBanner.tsx` は何も表示しない（import 自体も遅延読み込みで回避）。
+広告表示の実機確認には development build（EAS Build）が必要（`automation.md` 3.2.1参照）。
