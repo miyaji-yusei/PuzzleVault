@@ -1,38 +1,33 @@
 import { Difficulty } from '../../types/engine'
+export { Difficulty }
 
-export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs'
-export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13
+export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs' | 'joker'
 
 export interface Card {
   suit: Suit
-  rank: Rank
+  rank: number // A=1 〜 K=13、ジョーカーは0
 }
 
-export interface SevenPuzzle {
-  id: string
-  seed: number
-  playerCount: 2 | 3 | 4
-  passLimit: number
-  difficulty: Difficulty
-}
-
-export interface FieldRange {
-  min: Rank
-  max: Rank
-  started: boolean
-}
+export type DrawSource = 'deck' | 'discard'
+export type GamePhase = 'playing' | 'finished'
 
 export interface SevenState {
-  hands: Card[][]
-  field: Record<Suit, FieldRange>
-  currentPlayer: number
-  passCount: number[]
-  finished: number[]
-  startedAt: number
-  elapsedSeconds: number
+  deck: Card[]
+  hands: [Card[], Card[]] // [プレイヤー, AI]
+  discard: Card[]
+  // 現在の手番プレイヤーが捨てる前に捨て札の一番上だったカード(引く対象として選べる)
+  previousTop: Card | null
+  currentPlayer: 0 | 1
+  phase: GamePhase
+  winner: 0 | 1 | null
+  seed: number
 }
 
 export interface SevenMove {
-  type: 'play' | 'pass'
-  card?: Card
+  indices: number[]
+  source: DrawSource
 }
+
+export const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs']
+export const HAND_SIZE = 7
+export const WIN_THRESHOLD = 7

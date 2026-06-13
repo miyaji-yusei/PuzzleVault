@@ -24,6 +24,7 @@ const GAMES: GameInfo[] = [
   { id: 'sums', name: 'Sums', icon: 'sums', implemented: true },
   { id: 'gechoout', name: 'Snake Escape', icon: 'gechoout', implemented: true },
   { id: 'goita', name: 'ごいた', icon: 'goita', implemented: true },
+  { id: 'seven', name: 'Seven', icon: 'seven', implemented: true },
 ]
 
 function GameTile({ game, onPress }: { game: GameInfo; onPress: () => void }) {

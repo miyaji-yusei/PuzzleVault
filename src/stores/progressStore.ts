@@ -14,16 +14,24 @@ export interface SolitaireStats {
   totalCleared: number
 }
 
+export interface SevenStats {
+  totalPlayed: number
+  totalWon: number
+}
+
 interface ProgressState {
   records: GameRecord[]
   consecutiveDays: number
   lastPlayedDate: string | null
   solitaireStats: SolitaireStats
+  sevenStats: SevenStats
   recordClear: (record: GameRecord) => void
   getStatsByGame: (gameId: string) => GameRecord[]
   getStatsByDifficulty: (gameId: string, difficulty: Difficulty) => GameRecord[]
   recordSolitairePlay: () => void
   recordSolitaireClear: () => void
+  recordSevenPlay: () => void
+  recordSevenWin: () => void
 }
 
 export const useProgressStore = create<ProgressState>((set, get) => ({
@@ -31,6 +39,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   consecutiveDays: 0,
   lastPlayedDate: null,
   solitaireStats: { totalPlayed: 0, totalCleared: 0 },
+  sevenStats: { totalPlayed: 0, totalWon: 0 },
   recordClear: (record) => {
     const today = new Date().toISOString().substring(0, 10)
     const yesterday = new Date(Date.now() - 86400000).toISOString().substring(0, 10)
@@ -65,6 +74,20 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       solitaireStats: {
         ...state.solitaireStats,
         totalCleared: state.solitaireStats.totalCleared + 1,
+      },
+    })),
+  recordSevenPlay: () =>
+    set((state) => ({
+      sevenStats: {
+        ...state.sevenStats,
+        totalPlayed: state.sevenStats.totalPlayed + 1,
+      },
+    })),
+  recordSevenWin: () =>
+    set((state) => ({
+      sevenStats: {
+        ...state.sevenStats,
+        totalWon: state.sevenStats.totalWon + 1,
       },
     })),
 }))
