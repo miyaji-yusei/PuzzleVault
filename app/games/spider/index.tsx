@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import * as ScreenOrientation from 'expo-screen-orientation'
 import { SpiderBoard } from '../../../src/components/games/spider/Board'
 import { useSpiderGame } from '../../../src/hooks/useSpiderGame'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { Difficulty } from '../../../src/types/engine'
 import { isDifficulty } from '../../../src/utils/difficulty'
 import { GameHeader, AppDialog } from '../../../src/components/ui'
+import { lockPortrait, unlockOrientation } from '../../../src/utils/orientation'
 import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
 type DifficultyOption = {
@@ -70,12 +70,12 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
   // 横画面表示が許可されている間だけ画面回転を許可し、画面を離れるときは縦画面に戻す
   useEffect(() => {
     if (landscapeEnabled) {
-      ScreenOrientation.unlockAsync()
+      unlockOrientation()
     } else {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+      lockPortrait()
     }
     return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+      lockPortrait()
     }
   }, [landscapeEnabled])
 
@@ -121,15 +121,17 @@ function SpiderGame({ difficulty }: { difficulty: Difficulty }) {
         title="設定"
         actions={[{ label: '閉じる', onPress: () => setShowSettingsDialog(false) }]}
       >
-        <View style={styles.dialogSettingsRow}>
-          <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
-          <Switch
-            value={landscapeEnabled}
-            onValueChange={setLandscapeEnabled}
-            trackColor={{ false: vault.borderLight, true: gold.deep }}
-            thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
-          />
-        </View>
+        {Platform.OS !== 'web' && (
+          <View style={styles.dialogSettingsRow}>
+            <Text style={styles.dialogSettingsLabel}>横画面表示を許可</Text>
+            <Switch
+              value={landscapeEnabled}
+              onValueChange={setLandscapeEnabled}
+              trackColor={{ false: vault.borderLight, true: gold.deep }}
+              thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
+            />
+          </View>
+        )}
         <View style={styles.dialogSettingsRow}>
           <Text style={styles.dialogSettingsLabel}>空列があっても山札を配る</Text>
           <Switch
