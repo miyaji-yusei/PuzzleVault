@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-na
 import { useRouter } from 'expo-router'
 import { SevenBoard } from '../../../src/components/games/seven/Board'
 import { HowToPlayDialog } from '../../../src/components/games/seven/HowToPlayDialog'
+import { SevenTutorialOverlay } from '../../../src/components/games/seven/TutorialOverlay'
 import { useSevenGame } from '../../../src/hooks/useSevenGame'
 import { handValue } from '../../../src/engines/seven'
 import { Difficulty } from '../../../src/types/engine'
@@ -47,12 +48,19 @@ function SevenGame({ difficulty, onBack }: { difficulty: Difficulty; onBack: () 
   const sevenHowToPlayShown = useSettingsStore((s) => s.sevenHowToPlayShown)
   const setSevenHowToPlayShown = useSettingsStore((s) => s.setSevenHowToPlayShown)
 
+  const [tutorialVisible, setTutorialVisible] = useState(false)
+  const sevenTutorialShown = useSettingsStore((s) => s.sevenTutorialShown)
+  const setSevenTutorialShown = useSettingsStore((s) => s.setSevenTutorialShown)
+
   useEffect(() => {
-    if (!sevenHowToPlayShown) {
+    if (!sevenTutorialShown) {
+      setTutorialVisible(true)
+      setSevenTutorialShown(true)
+    } else if (!sevenHowToPlayShown) {
       setHowToPlayVisible(true)
       setSevenHowToPlayShown(true)
     }
-  }, [sevenHowToPlayShown, setSevenHowToPlayShown])
+  }, [sevenTutorialShown, setSevenTutorialShown, sevenHowToPlayShown, setSevenHowToPlayShown])
 
   useEffect(() => {
     recordSevenPlay()
@@ -88,13 +96,22 @@ function SevenGame({ difficulty, onBack }: { difficulty: Difficulty; onBack: () 
         title="Seven"
         onRestart={restart}
         right={
-          <TouchableOpacity
-            onPress={() => setHowToPlayVisible(true)}
-            style={styles.helpButton}
-            accessibilityLabel="遊び方を見る"
-          >
-            <Text style={styles.helpButtonText}>？</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              onPress={() => setTutorialVisible(true)}
+              style={styles.helpButton}
+              accessibilityLabel="チュートリアルを見る"
+            >
+              <Text style={styles.helpButtonText}>🎓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setHowToPlayVisible(true)}
+              style={styles.helpButton}
+              accessibilityLabel="遊び方を見る"
+            >
+              <Text style={styles.helpButtonText}>？</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
       <InfoBanner text={infoText} />
@@ -125,6 +142,7 @@ function SevenGame({ difficulty, onBack }: { difficulty: Difficulty; onBack: () 
       </AppDialog>
 
       <HowToPlayDialog visible={howToPlayVisible} onClose={() => setHowToPlayVisible(false)} />
+      <SevenTutorialOverlay visible={tutorialVisible} onClose={() => setTutorialVisible(false)} />
     </SafeAreaView>
   )
 }
@@ -150,6 +168,10 @@ const styles = StyleSheet.create({
   startButton: {
     marginTop: 16,
     paddingHorizontal: 48,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
   helpButton: {
     width: 34,

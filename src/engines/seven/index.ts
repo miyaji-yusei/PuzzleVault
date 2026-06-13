@@ -1,5 +1,7 @@
 export { chooseMove } from './ai'
 export { createDeck, createInitialState } from './dealer'
 export { applyDiscardAndDraw, canDiscard, cardValue, handValue } from './rules'
+export { TUTORIAL_STEPS, TUTORIAL_STEP_COUNT } from './tutorial'
+export type { TutorialAction, TutorialHighlight, TutorialStep } from './tutorial'
 export { HAND_SIZE, SUITS, WIN_THRESHOLD } from './types'
 export type { Card, Difficulty, DrawSource, GamePhase, SevenMove, SevenState, Suit } from './types'
