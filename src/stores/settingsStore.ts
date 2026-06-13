@@ -10,6 +10,7 @@ interface SettingsState {
   spiderLandscapeEnabled: boolean
   goitaHowToPlayShown: boolean
   sevenHowToPlayShown: boolean
+  sevenTutorialShown: boolean
   setSoundEnabled: (enabled: boolean) => void
   setVibrationEnabled: (enabled: boolean) => void
   setTheme: (theme: 'light' | 'dark') => void
@@ -19,6 +20,7 @@ interface SettingsState {
   setSpiderLandscapeEnabled: (enabled: boolean) => void
   setGoitaHowToPlayShown: (shown: boolean) => void
   setSevenHowToPlayShown: (shown: boolean) => void
+  setSevenTutorialShown: (shown: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -31,6 +33,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   spiderLandscapeEnabled: false,
   goitaHowToPlayShown: false,
   sevenHowToPlayShown: false,
+  sevenTutorialShown: false,
   setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
   setVibrationEnabled: (enabled) => set({ vibrationEnabled: enabled }),
   setTheme: (theme) => set({ theme }),
@@ -40,4 +43,5 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setSpiderLandscapeEnabled: (enabled) => set({ spiderLandscapeEnabled: enabled }),
   setGoitaHowToPlayShown: (shown) => set({ goitaHowToPlayShown: shown }),
   setSevenHowToPlayShown: (shown) => set({ sevenHowToPlayShown: shown }),
+  setSevenTutorialShown: (shown) => set({ sevenTutorialShown: shown }),
 }))

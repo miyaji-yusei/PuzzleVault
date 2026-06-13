@@ -48,9 +48,24 @@ type Props = {
   isHumanTurn: boolean
   onSelectCard: (index: number) => void
   onDrawFrom: (source: DrawSource) => void
+  /** チュートリアル用: 注目させたい手札のインデックスを金枠で強調する */
+  highlightIndices?: number[]
+  /** チュートリアル用: 注目させたい山札/捨て札を金枠で強調する */
+  highlightPile?: DrawSource | null
+  /** チュートリアル用: 手札を選択していなくても山札/捨て札をタップ可能にする */
+  forceCanDraw?: boolean
 }
 
-export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, onDrawFrom }: Props) {
+export function SevenBoard({
+  state,
+  selectedIndices,
+  isHumanTurn,
+  onSelectCard,
+  onDrawFrom,
+  highlightIndices = [],
+  highlightPile = null,
+  forceCanDraw = false,
+}: Props) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const portraitWidth = Math.min(windowWidth, windowHeight)
   const cardWidth = Math.min(56, Math.floor((portraitWidth - 32) / 7))
@@ -58,7 +73,7 @@ export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, 
 
   const opponentHand = state.hands[1]
   const discardTop = state.discard[state.discard.length - 1] ?? null
-  const canDraw = isHumanTurn && selectedIndices.length > 0
+  const canDraw = (isHumanTurn && selectedIndices.length > 0) || forceCanDraw
 
   const sortedHand = state.hands[0]
     .map((card, index) => ({ card, index }))
@@ -77,7 +92,7 @@ export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, 
 
       <View style={styles.middleRow}>
         <TouchableOpacity
-          style={styles.pile}
+          style={[styles.pile, highlightPile === 'deck' && styles.pileHighlight]}
           onPress={() => onDrawFrom('deck')}
           disabled={!canDraw}
           activeOpacity={0.7}
@@ -92,7 +107,7 @@ export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, 
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.pile}
+          style={[styles.pile, highlightPile === 'discard' && styles.pileHighlight]}
           onPress={() => onDrawFrom('discard')}
           disabled={!canDraw}
           activeOpacity={0.7}
@@ -109,12 +124,13 @@ export function SevenBoard({ state, selectedIndices, isHumanTurn, onSelectCard, 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.handRow}>
           {sortedHand.map(({ card, index }) => {
             const isSelected = selectedIndices.includes(index)
+            const isHighlighted = highlightIndices.includes(index)
             return (
               <TouchableOpacity
                 key={index}
                 onPress={() => onSelectCard(index)}
                 disabled={!isHumanTurn}
-                style={[styles.handCard, isSelected && styles.selectedCard]}
+                style={[styles.handCard, isSelected && styles.selectedCard, isHighlighted && styles.highlightCard]}
                 activeOpacity={0.7}
               >
                 <CardFace card={card} size={size} />
@@ -152,6 +168,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  pileHighlight: {
+    borderRadius: radii.sm,
+    borderWidth: 2,
+    borderColor: gold.accent,
+  },
   badge: {
     position: 'absolute',
     top: -8,
@@ -186,6 +207,11 @@ const styles = StyleSheet.create({
   },
   selectedCard: {
     marginTop: 0,
+  },
+  highlightCard: {
+    borderRadius: radii.sm,
+    borderWidth: 2,
+    borderColor: gold.accent,
   },
   sectionLabel: {
     fontSize: fontSize.xs,
