@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface SettingsState {
   soundEnabled: boolean
@@ -23,25 +25,33 @@ interface SettingsState {
   setSevenTutorialShown: (shown: boolean) => void
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
-  soundEnabled: true,
-  vibrationEnabled: true,
-  theme: 'light',
-  isPurchased: false,
-  solitaireAllowDealWithEmptyColumn: false,
-  solitaireLandscapeEnabled: false,
-  spiderLandscapeEnabled: false,
-  goitaHowToPlayShown: false,
-  sevenHowToPlayShown: false,
-  sevenTutorialShown: false,
-  setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
-  setVibrationEnabled: (enabled) => set({ vibrationEnabled: enabled }),
-  setTheme: (theme) => set({ theme }),
-  setPurchased: (purchased) => set({ isPurchased: purchased }),
-  setSolitaireAllowDealWithEmptyColumn: (allow) => set({ solitaireAllowDealWithEmptyColumn: allow }),
-  setSolitaireLandscapeEnabled: (enabled) => set({ solitaireLandscapeEnabled: enabled }),
-  setSpiderLandscapeEnabled: (enabled) => set({ spiderLandscapeEnabled: enabled }),
-  setGoitaHowToPlayShown: (shown) => set({ goitaHowToPlayShown: shown }),
-  setSevenHowToPlayShown: (shown) => set({ sevenHowToPlayShown: shown }),
-  setSevenTutorialShown: (shown) => set({ sevenTutorialShown: shown }),
-}))
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set) => ({
+      soundEnabled: true,
+      vibrationEnabled: true,
+      theme: 'light',
+      isPurchased: false,
+      solitaireAllowDealWithEmptyColumn: false,
+      solitaireLandscapeEnabled: false,
+      spiderLandscapeEnabled: false,
+      goitaHowToPlayShown: false,
+      sevenHowToPlayShown: false,
+      sevenTutorialShown: false,
+      setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
+      setVibrationEnabled: (enabled) => set({ vibrationEnabled: enabled }),
+      setTheme: (theme) => set({ theme }),
+      setPurchased: (purchased) => set({ isPurchased: purchased }),
+      setSolitaireAllowDealWithEmptyColumn: (allow) => set({ solitaireAllowDealWithEmptyColumn: allow }),
+      setSolitaireLandscapeEnabled: (enabled) => set({ solitaireLandscapeEnabled: enabled }),
+      setSpiderLandscapeEnabled: (enabled) => set({ spiderLandscapeEnabled: enabled }),
+      setGoitaHowToPlayShown: (shown) => set({ goitaHowToPlayShown: shown }),
+      setSevenHowToPlayShown: (shown) => set({ sevenHowToPlayShown: shown }),
+      setSevenTutorialShown: (shown) => set({ sevenTutorialShown: shown }),
+    }),
+    {
+      name: 'puzzlevault-settings',
+      storage: createJSONStorage(() => AsyncStorage),
+    },
+  ),
+)
