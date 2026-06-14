@@ -65,6 +65,13 @@ const HINT_COLOR: Record<HintColor, string> = {
   red: '#d93025',
 }
 
+const COLOR_EMPTY = '#232428'
+const COLOR_FILLED = '#F5F4EF'
+const COLOR_PREVIEW_FILL = 'rgba(245, 244, 239, 0.45)'
+const COLOR_PREVIEW_CROSS = 'rgba(245, 244, 239, 0.12)'
+const COLOR_PREVIEW_TOGGLE_FILLED = 'rgba(245, 244, 239, 0.25)'
+const COLOR_PREVIEW_TOGGLE_EMPTY = '#2E3036'
+
 function touchDist(t1: { pageX: number; pageY: number }, t2: { pageX: number; pageY: number }) {
   return Math.sqrt((t1.pageX - t2.pageX) ** 2 + (t1.pageY - t2.pageY) ** 2)
 }
@@ -415,10 +422,10 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
                   const inPreview = isCellInPreview(row, col, preview)
                   const isAutoX = autoCrossed[row]?.[col] ?? false
                   const bg = inPreview
-                    ? (preview!.target === 'filled' ? '#888'
-                      : preview!.target === 'crossed' ? '#eee'
-                      : cell === 'filled' ? '#bbb' : '#f5f5f5')
-                    : (cell === 'filled' ? '#333' : '#fff')
+                    ? (preview!.target === 'filled' ? COLOR_PREVIEW_FILL
+                      : preview!.target === 'crossed' ? COLOR_PREVIEW_CROSS
+                      : cell === 'filled' ? COLOR_PREVIEW_TOGGLE_FILLED : COLOR_PREVIEW_TOGGLE_EMPTY)
+                    : (cell === 'filled' ? COLOR_FILLED : COLOR_EMPTY)
                   return (
                     <View
                       key={col}
@@ -458,7 +465,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     borderLeftWidth: 0.5,
-    borderColor: '#ccc',
+    borderColor: '#2E3036',
     paddingBottom: 2,
   },
   rowClueCell: {
@@ -468,7 +475,7 @@ const styles = StyleSheet.create({
     paddingRight: 2,
     gap: 1,
     borderBottomWidth: 0.5,
-    borderColor: '#ccc',
+    borderColor: '#2E3036',
   },
   clueText: {
     fontWeight: '500',
@@ -481,26 +488,26 @@ const styles = StyleSheet.create({
   },
   cell: {
     borderWidth: 0.5,
-    borderColor: '#ccc',
+    borderColor: '#2E3036',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cellBorderRightThick: {
     borderRightWidth: 2,
-    borderRightColor: '#666',
+    borderRightColor: '#3A3C42',
   },
   cellBorderBottomThick: {
     borderBottomWidth: 2,
-    borderBottomColor: '#666',
+    borderBottomColor: '#3A3C42',
   },
   crossText: {
-    color: '#999',
+    color: '#C9C7BD',
     fontWeight: 'bold',
   },
   crossTextAuto: {
-    color: 'rgba(100, 160, 220, 0.6)',
+    color: 'rgba(120, 180, 240, 0.7)',
   },
   crossTextPreview: {
-    color: 'rgba(153, 153, 153, 0.5)',
+    color: 'rgba(201, 199, 189, 0.5)',
   },
 })
