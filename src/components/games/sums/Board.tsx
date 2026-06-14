@@ -4,7 +4,7 @@ import { SumsState, CellMark, ColorGroup } from '../../../engines/sums/types'
 
 const SW = Dimensions.get('window').width
 const GROUP_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFB347', '#A29BFE', '#6C5CE7', '#FD79A8', '#00B894']
-const GROUP_COLORS_LIGHT = ['#FFE5E5', '#E0F8F5', '#E0F4FF', '#FFF4E0', '#EEE8FF', '#E8E4FF', '#FFE5F2', '#E0FFF5']
+const GROUP_COLORS_LIGHT = ['#3A2426', '#1F3A38', '#1F333D', '#3A2E1C', '#2C2A3D', '#28233D', '#3A2530', '#1A3530']
 
 function getGroupForCell(colorGroups: ColorGroup[], r: number, c: number): ColorGroup | undefined {
   return colorGroups.find(g => g.cells.some(([gr, gc]) => gr === r && gc === c))
@@ -135,7 +135,7 @@ export function SumsBoard({ state, flashCells, onTapCell }: Props) {
                 style={[
                   styles.cell,
                   { width: cellSize, height: cellSize },
-                  { backgroundColor: gDone ? '#fff' : GROUP_COLORS_LIGHT[gIdx % GROUP_COLORS_LIGHT.length] },
+                  { backgroundColor: gDone ? '#232428' : GROUP_COLORS_LIGHT[gIdx % GROUP_COLORS_LIGHT.length] },
                   { borderColor: GROUP_COLORS[gIdx % GROUP_COLORS.length] },
                   isFlash && styles.cellFlash,
                 ]}
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   sumDone: {
-    color: '#bbb',
+    color: '#5E5D57',
   },
   liveSumText: {
     fontSize: 12,
@@ -213,31 +213,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cellFlash: {
-    backgroundColor: '#FFCDD2',
+    backgroundColor: 'rgba(201, 72, 59, 0.45)',
   },
   cellNum: {
     fontWeight: '600',
-    color: '#333',
+    color: '#F5F4EF',
   },
   cellNumDone: {
-    color: '#bbb',
+    color: '#5E5D57',
   },
   markOverlay: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(200,0,0,0.08)',
+    backgroundColor: 'rgba(201, 72, 59, 0.18)',
   },
   markOverlayCircle: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,120,0,0.08)',
+    backgroundColor: 'rgba(47, 168, 118, 0.18)',
   },
   markText: {
-    color: '#c62828',
+    color: '#E06D60',
     fontWeight: 'bold',
   },
   markTextCircle: {
-    color: '#2e7d32',
+    color: '#2FA876',
     fontWeight: 'bold',
   },
   groupSumLabel: {
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     left: 2,
     fontSize: 9,
     fontWeight: '700',
-    color: '#555',
+    color: '#C9C7BD',
     zIndex: 1,
   },
 })

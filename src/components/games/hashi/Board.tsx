@@ -370,15 +370,15 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
     <View
       ref={gridRef}
       onLayout={measureGrid}
-      style={{ width: gridWidth, height: gridHeight, backgroundColor: '#f8f8f8' }}
+      style={{ width: gridWidth, height: gridHeight, backgroundColor: '#17181B' }}
       {...panResponder.panHandlers}
     >
       {/* Grid lines */}
       {Array.from({ length: gridSize + 1 }, (_, i) => (
-        <View key={`hl-${i}`} style={{ position: 'absolute', left: 0, top: i * cellSize, width: gridWidth, height: StyleSheet.hairlineWidth, backgroundColor: '#ccc' }} />
+        <View key={`hl-${i}`} style={{ position: 'absolute', left: 0, top: i * cellSize, width: gridWidth, height: StyleSheet.hairlineWidth, backgroundColor: '#2E3036' }} />
       ))}
       {Array.from({ length: gridSize + 1 }, (_, i) => (
-        <View key={`vl-${i}`} style={{ position: 'absolute', top: 0, left: i * cellSize, height: gridHeight, width: StyleSheet.hairlineWidth, backgroundColor: '#ccc' }} />
+        <View key={`vl-${i}`} style={{ position: 'absolute', top: 0, left: i * cellSize, height: gridHeight, width: StyleSheet.hairlineWidth, backgroundColor: '#2E3036' }} />
       ))}
       {/* Confirmed bridges */}
       {current.map(bridge => {
@@ -448,8 +448,8 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
               width: diameter,
               height: diameter,
               borderRadius: islandRadius,
-              backgroundColor: isSatisfied ? '#c8e6c9' : '#fff',
-              borderColor: isSatisfied ? '#4caf50' : '#444',
+              backgroundColor: isSatisfied ? 'rgba(47, 168, 118, 0.22)' : '#232428',
+              borderColor: isSatisfied ? '#2FA876' : '#C9C7BD',
             }]}
           >
             <Text style={[styles.islandText, { fontSize: Math.max(10, Math.floor(islandRadius * 0.85)) }]}>
@@ -465,11 +465,11 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 const styles = StyleSheet.create({
   bridge: {
     position: 'absolute',
-    backgroundColor: '#555',
+    backgroundColor: '#FFD230',
   },
   previewLine: {
     position: 'absolute',
-    backgroundColor: '#aaa',
+    backgroundColor: 'rgba(255, 210, 48, 0.6)',
     opacity: 0.8,
   },
   island: {
@@ -480,6 +480,6 @@ const styles = StyleSheet.create({
   },
   islandText: {
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5F4EF',
   },
 })
