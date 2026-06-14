@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, useWindowDimensions } from 'react-native'
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
 import { SelectedCard, AutoCompleteAnim } from '../../../hooks/useSolitaireGame'
+import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
 
 const AUTO_COMPLETE_ANIM_MS = 220
 
@@ -85,7 +86,9 @@ export function SolitaireBoard({
   // Use the shorter window dimension as the basis for card sizing so cards stay a
   // consistent, sensible size whether the device is in portrait or landscape.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
-  const portraitWidth = Math.min(windowWidth, windowHeight)
+  // 広告バナー表示時はバナー分の高さを利用可能領域から控除し、場札がバナーと重ならないようにする
+  const availableHeight = adsEnabled ? windowHeight - AD_BANNER_HEIGHT_ESTIMATE : windowHeight
+  const portraitWidth = Math.min(windowWidth, availableHeight)
   const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.45)
   const TOP_ROW_H = 8 + CARD_H + 8

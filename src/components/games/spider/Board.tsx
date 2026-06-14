@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, PanResp
 import { SpiderState, Card, Suit } from '../../../engines/spider/types'
 import { isValidMoveUnit } from '../../../engines/spider'
 import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
+import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
 
 const PAD = 4
 const GAP = 2
@@ -65,7 +66,9 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   // Use the shorter window dimension as the basis for card sizing so cards stay a
   // consistent, sensible size whether the device is in portrait or landscape.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
-  const portraitWidth = Math.min(windowWidth, windowHeight)
+  // 広告バナー表示時はバナー分の高さを利用可能領域から控除し、場札がバナーと重ならないようにする
+  const availableHeight = adsEnabled ? windowHeight - AD_BANNER_HEIGHT_ESTIMATE : windowHeight
+  const portraitWidth = Math.min(windowWidth, availableHeight)
   const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.5)
 
