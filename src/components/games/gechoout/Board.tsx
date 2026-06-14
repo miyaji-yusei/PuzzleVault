@@ -291,8 +291,8 @@ export function GechoOutBoard({ state, onMove }: Props) {
 const styles = StyleSheet.create({
   board: {
     borderWidth: 2,
-    borderColor: '#333',
-    backgroundColor: '#fafafa',
+    borderColor: '#3A3C42',
+    backgroundColor: '#17181B',
     overflow: 'hidden',
   },
   row: {
@@ -300,12 +300,12 @@ const styles = StyleSheet.create({
   },
   cell: {
     borderWidth: 0.5,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: 'rgba(245, 244, 239, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   obstacle: {
-    backgroundColor: '#333',
+    backgroundColor: '#0E0E10',
   },
   hole: {
     borderWidth: 3,
