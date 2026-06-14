@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, useWi
 import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/solitaire/types'
 import { SelectedCard, AutoCompleteAnim } from '../../../hooks/useSolitaireGame'
 import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
+import { vault, gold } from '../../../theme'
 
 const AUTO_COMPLETE_ANIM_MS = 220
 
@@ -607,12 +608,13 @@ const cStyles = StyleSheet.create({
     paddingTop: 1,
   },
   back: {
-    backgroundColor: '#1a237e',
+    backgroundColor: vault.card,
+    borderColor: gold.deep,
     justifyContent: 'center',
     alignItems: 'center',
   },
   backText: {
-    color: '#90caf9',
+    color: gold.accent,
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -638,17 +640,17 @@ const cStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.15)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255, 210, 48, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyLabel: {
     fontSize: 18,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255, 210, 48, 0.5)',
     fontWeight: 'bold',
   },
   highlight: {
-    borderColor: '#FFD700',
+    borderColor: gold.accent,
     borderWidth: 2,
   },
   dimmed: {

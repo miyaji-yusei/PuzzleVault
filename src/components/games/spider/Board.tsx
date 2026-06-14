@@ -4,6 +4,7 @@ import { SpiderState, Card, Suit } from '../../../engines/spider/types'
 import { isValidMoveUnit } from '../../../engines/spider'
 import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
 import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
+import { vault, gold, ink, felt } from '../../../theme'
 
 const PAD = 4
 const GAP = 2
@@ -481,16 +482,17 @@ const cs = StyleSheet.create({
     paddingTop: 1,
   },
   back: {
-    backgroundColor: '#1a237e',
+    backgroundColor: vault.card,
+    borderColor: gold.deep,
   },
   rankText: {
     fontWeight: 'bold',
   },
   suitText: {},
   highlight: {
-    borderColor: '#FFD700',
+    borderColor: gold.accent,
     borderWidth: 2,
-    backgroundColor: '#fffde7',
+    backgroundColor: 'rgba(255, 210, 48, 0.15)',
   },
   dimmed: {
     opacity: 0.4,
@@ -499,7 +501,7 @@ const cs = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.12)',
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255, 210, 48, 0.2)',
   },
 })
 
@@ -507,16 +509,16 @@ const ss = StyleSheet.create({
   stockCard: {
     width: STOCK_W,
     height: STOCK_H,
-    backgroundColor: '#1a237e',
+    backgroundColor: vault.card,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#3949ab',
+    borderColor: gold.deep,
   },
   stockBadge: {
     position: 'absolute',
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffd54f',
+    backgroundColor: gold.accent,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -527,7 +529,7 @@ const ss = StyleSheet.create({
   stockBadgeText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#1b5e20',
+    color: ink.onGold,
   },
 })
 
@@ -541,7 +543,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#1b5e20',
+    backgroundColor: felt.base,
   },
   foundationArea: {
     flexDirection: 'row',
@@ -552,26 +554,26 @@ const styles = StyleSheet.create({
     width: 14,
     height: 18,
     borderRadius: 2,
-    backgroundColor: '#2e7d32',
+    backgroundColor: vault.card,
     borderWidth: 1,
-    borderColor: '#4caf50',
+    borderColor: vault.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   foundationPipFilled: {
-    backgroundColor: '#ffd54f',
-    borderColor: '#ffb300',
+    backgroundColor: gold.deep,
+    borderColor: gold.accent,
   },
   foundationSuitText: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#212121',
+    color: ink.strong,
   },
   foundationSuitRed: {
-    color: '#c62828',
+    color: '#E06D60',
   },
   statusText: {
-    color: '#c8e6c9',
+    color: ink.body,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -586,13 +588,13 @@ const styles = StyleSheet.create({
     height: STOCK_H,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255, 210, 48, 0.2)',
     backgroundColor: 'rgba(0,0,0,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stockEmptyText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255, 210, 48, 0.5)',
     fontSize: 18,
   },
   tableau: {
