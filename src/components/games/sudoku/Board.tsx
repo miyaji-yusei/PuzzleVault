@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     width: BOARD_SIZE,
     height: BOARD_SIZE,
     borderWidth: 2,
-    borderColor: '#333',
-    backgroundColor: '#fff',
+    borderColor: '#3A3C42',
+    backgroundColor: '#17181B',
   },
   row: {
     flexDirection: 'row',
@@ -116,17 +116,18 @@ const styles = StyleSheet.create({
     height: CELL_SIZE,
     borderRightWidth: 0.5,
     borderBottomWidth: 0.5,
-    borderColor: '#bbb',
+    borderColor: '#2E3036',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#232428',
   },
   cellBorderRight: {
     borderRightWidth: 2,
-    borderRightColor: '#333',
+    borderRightColor: '#3A3C42',
   },
   cellBorderBottom: {
     borderBottomWidth: 2,
-    borderBottomColor: '#333',
+    borderBottomColor: '#3A3C42',
   },
   cellNoBorderRight: {
     borderRightWidth: 0,
@@ -135,27 +136,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   cellSelected: {
-    backgroundColor: '#b8d4f8',
+    backgroundColor: 'rgba(255, 210, 48, 0.30)',
   },
   cellHighlight: {
-    backgroundColor: '#e8f1fb',
+    backgroundColor: 'rgba(255, 210, 48, 0.08)',
   },
   cellSameNumber: {
-    backgroundColor: '#c5ddf7',
+    backgroundColor: 'rgba(255, 210, 48, 0.18)',
   },
   cellText: {
     fontSize: CELL_SIZE * 0.55,
     fontWeight: '500',
   },
   textPreFilled: {
-    color: '#333',
+    color: '#F5F4EF',
     fontWeight: 'bold',
   },
   textUserFilled: {
-    color: '#1a6db5',
+    color: '#4A90D9',
   },
   textWrong: {
-    color: '#e53935',
+    color: '#C9483B',
   },
   textSameNumber: {
     fontWeight: 'bold',
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     fontSize: NOTE_SIZE * 0.65,
     textAlign: 'center',
     lineHeight: NOTE_SIZE,
-    color: '#5c6bc0',
+    color: '#C9C7BD',
     fontWeight: '500',
   },
   noteNumHidden: {

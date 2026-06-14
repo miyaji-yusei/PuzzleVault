@@ -7,9 +7,9 @@ const SCREEN_WIDTH = Dimensions.get('window').width
 const BOARD_PADDING = 32
 
 const REGION_COLORS = [
-  '#C97B7B', '#C9A86A', '#7FA882', '#7B93B8', '#9C84B0',
-  '#C98A66', '#6FA3A8', '#94A878', '#B87B95', '#8C7B6E',
-  '#7E8C99', '#A88670',
+  '#6B3A3A', '#6B5A2E', '#3D6B47', '#3D5570', '#5C4470',
+  '#6B4A2E', '#2E6B68', '#4F6B3A', '#6B3A56', '#4A4038',
+  '#3A4550', '#705A3D',
 ]
 
 const DRAG_THRESHOLD = 8
@@ -149,7 +149,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
         <View key={row} style={styles.row}>
           {Array.from({ length: size }, (_, col) => {
             const regionId = regions[row]?.[col] ?? 0
-            const bgColor = REGION_COLORS[regionId % REGION_COLORS.length] ?? '#ccc'
+            const bgColor = REGION_COLORS[regionId % REGION_COLORS.length] ?? '#232428'
             const cellState = current[row]?.[col] ?? 'empty'
             const isFlashing = flashWrongCell?.row === row && flashWrongCell?.col === col
             const isNewCorrect = lastCorrectCell?.row === row && lastCorrectCell?.col === col
@@ -169,7 +169,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
                       <GameIcon name="crown" size={cellSize * 0.55} color="#FFFFFF" />
                     </Animated.View>
                   ) : (
-                    <GameIcon name="crown" size={cellSize * 0.55} color={isFlashing ? '#f44336' : '#FFFFFF'} />
+                    <GameIcon name="crown" size={cellSize * 0.55} color={isFlashing ? '#C9483B' : '#FFFFFF'} />
                   )
                 )}
                 {cellState === 'crossed' && (
@@ -187,7 +187,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
 const styles = StyleSheet.create({
   board: {
     borderWidth: 2,
-    borderColor: '#333',
+    borderColor: '#3A3C42',
     overflow: 'hidden',
   },
   row: {
@@ -195,15 +195,15 @@ const styles = StyleSheet.create({
   },
   cell: {
     borderWidth: 0.5,
-    borderColor: 'rgba(0,0,0,0.2)',
+    borderColor: 'rgba(245, 244, 239, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cellFlash: {
-    backgroundColor: 'rgba(244, 67, 54, 0.4)',
+    backgroundColor: 'rgba(201, 72, 59, 0.45)',
   },
   cross: {
-    color: 'rgba(0,0,0,0.5)',
+    color: 'rgba(245, 244, 239, 0.6)',
     fontWeight: 'bold',
   },
 })
