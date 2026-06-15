@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, SafeAreaView, Animated, Dimensions, Switch, Platform } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView, Switch, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
+import { ScatterAnimation, ScatterAnimationRef } from '../../../src/components/games/solitaire/ScatterAnimation'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
 import { Difficulty } from '../../../src/types/engine'
 import { useProgressStore } from '../../../src/stores/progressStore'
@@ -11,21 +12,7 @@ import { GameHeader, AppDialog, Button, DifficultySelect } from '../../../src/co
 import { lockPortrait, unlockOrientation } from '../../../src/utils/orientation'
 import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
-const SUITS = ['♠', '♥', '♦', '♣']
-const CARD_COLORS = ['#1A1A1A', '#C9483B', '#C9483B', '#1A1A1A']
-
-const SCATTER_COUNT = 8
-
-function makeScatterCards() {
-  return Array.from({ length: SCATTER_COUNT }, (_, i) => ({
-    suit: SUITS[i % 4] as string,
-    color: CARD_COLORS[i % 4] as string,
-    tx: (Math.random() - 0.5) * SCREEN_W * 1.6,
-    ty: (Math.random() - 0.5) * SCREEN_H * 1.6,
-    rotate: (Math.random() - 0.5) * 720,
-  }))
-}
+const WIN_DIALOG_DELAY_MS = 1500
 
 export default function SolitaireScreen() {
   const router = useRouter()
@@ -43,17 +30,7 @@ export default function SolitaireScreen() {
     undo, restart, newGame, autoComplete,
   } = useSolitaireGame(difficulty)
 
-  // カード散布アニメーション用
-  const scatterAnims = useRef(
-    Array.from({ length: SCATTER_COUNT }, () => ({
-      x: new Animated.Value(0),
-      y: new Animated.Value(0),
-      opacity: new Animated.Value(0),
-      rotate: new Animated.Value(0),
-    }))
-  ).current
-  const scatterCards = useRef(makeScatterCards()).current
-  const [showScatter, setShowScatter] = useState(false)
+  const scatterRef = useRef<ScatterAnimationRef>(null)
   const [showWinDialog, setShowWinDialog] = useState(false)
   const prevComplete = useRef(false)
 
@@ -67,33 +44,14 @@ export default function SolitaireScreen() {
     if (isComplete && !prevComplete.current) {
       prevComplete.current = true
       recordSolitaireClear()
-      setShowScatter(true)
-      scatterAnims.forEach((anim, i) => {
-        anim.x.setValue(0)
-        anim.y.setValue(0)
-        anim.opacity.setValue(0)
-        anim.rotate.setValue(0)
-        Animated.parallel([
-          Animated.timing(anim.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-          Animated.timing(anim.x, { toValue: scatterCards[i]!.tx, duration: 1200, useNativeDriver: true }),
-          Animated.timing(anim.y, { toValue: scatterCards[i]!.ty, duration: 1200, useNativeDriver: true }),
-          Animated.timing(anim.rotate, { toValue: scatterCards[i]!.rotate, duration: 1200, useNativeDriver: true }),
-          Animated.sequence([
-            Animated.delay(900),
-            Animated.timing(anim.opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-          ]),
-        ]).start()
-      })
-      setTimeout(() => {
-        setShowScatter(false)
-        setShowWinDialog(true)
-      }, 1500)
+      scatterRef.current?.play()
+      setTimeout(() => setShowWinDialog(true), WIN_DIALOG_DELAY_MS)
     }
     if (!isComplete) {
       prevComplete.current = false
       setShowWinDialog(false)
     }
-  }, [isComplete, scatterAnims, scatterCards, recordSolitaireClear])
+  }, [isComplete, recordSolitaireClear])
 
   const winRate = solitaireStats.totalPlayed > 0
     ? Math.round((solitaireStats.totalCleared / solitaireStats.totalPlayed) * 100)
@@ -227,30 +185,7 @@ export default function SolitaireScreen() {
       />
 
       {/* カード散布アニメーション */}
-      {showScatter && (
-        <View style={styles.scatterOverlay} pointerEvents="none">
-          {scatterAnims.map((anim, i) => (
-            <Animated.View
-              key={i}
-              style={[
-                styles.scatterCard,
-                {
-                  opacity: anim.opacity,
-                  transform: [
-                    { translateX: anim.x },
-                    { translateY: anim.y },
-                    { rotate: anim.rotate.interpolate({ inputRange: [-720, 720], outputRange: ['-720deg', '720deg'] }) },
-                  ],
-                },
-              ]}
-            >
-              <Text style={[styles.scatterSuit, { color: scatterCards[i]!.color }]}>
-                {scatterCards[i]!.suit}
-              </Text>
-            </Animated.View>
-          ))}
-        </View>
-      )}
+      <ScatterAnimation ref={scatterRef} />
 
       <AppDialog
         visible={showWinDialog}
@@ -322,36 +257,6 @@ const styles = StyleSheet.create({
   settingsLabel: {
     fontSize: fontSize.sm,
     color: ink.strong,
-  },
-  scatterOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999,
-  },
-  scatterCard: {
-    position: 'absolute',
-    width: 44,
-    height: 60,
-    backgroundColor: '#fff',
-    borderRadius: radii.sm,
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  scatterSuit: {
-    fontSize: 28,
-    fontWeight: 'bold',
   },
   statsBox: {
     backgroundColor: vault.surface,
