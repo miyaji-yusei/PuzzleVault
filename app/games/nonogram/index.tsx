@@ -5,7 +5,7 @@ import { NonogramBoard } from '../../../src/components/games/nonogram/Board'
 import { useNonogramGame } from '../../../src/hooks/useNonogramGame'
 import { Difficulty } from '../../../src/types/engine'
 import { isDifficulty, VALID_DIFFICULTIES, DIFFICULTY_LABELS } from '../../../src/utils/difficulty'
-import { GameHeader, AppDialog } from '../../../src/components/ui'
+import { GameHeader, AppDialog, Button, DifficultySelect } from '../../../src/components/ui'
 import { vault, gold, ink, fontSize, radii } from '../../../src/theme'
 
 const SIZE_LABEL: Record<Difficulty, string> = {
@@ -25,24 +25,7 @@ export default function NonogramScreen() {
   const { state, setCell, setCellTo, mode, setMode, isComplete, restart, autoCrossed, rowClueColors, colClueColors } = useNonogramGame(difficulty)
 
   if (!selectedDifficulty) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <GameHeader title="イラストロジック" />
-        <View style={styles.selectScreen}>
-          <Text style={styles.selectTitle}>難易度を選択</Text>
-          {VALID_DIFFICULTIES.map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={styles.selectButton}
-              onPress={() => setSelectedDifficulty(d)}
-            >
-              <Text style={styles.selectButtonTitle}>{SIZE_LABEL[d]}</Text>
-              <Text style={styles.selectButtonDesc}>{DIFFICULTY_LABELS[d]}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </SafeAreaView>
-    )
+    return <NonogramDifficultySelect onSelect={setSelectedDifficulty} />
   }
 
   return (
@@ -83,6 +66,22 @@ export default function NonogramScreen() {
           { label: 'タイトルに戻る', onPress: () => router.back(), variant: 'secondary' },
         ]}
       />
+    </SafeAreaView>
+  )
+}
+
+function NonogramDifficultySelect({ onSelect }: { onSelect: (d: Difficulty) => void }) {
+  const [selected, setSelected] = useState<Difficulty>('easy')
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <GameHeader title="イラストロジック" />
+      <View style={styles.selectScreen}>
+        <Text style={styles.selectTitle}>難易度を選択</Text>
+        <DifficultySelect options={VALID_DIFFICULTIES} selected={selected} onSelect={setSelected} />
+        <Text style={styles.selectSizeLabel}>{SIZE_LABEL[selected]} ・ {DIFFICULTY_LABELS[selected]}</Text>
+        <Button label="はじめる" onPress={() => onSelect(selected)} style={styles.startButton} />
+      </View>
     </SafeAreaView>
   )
 }
@@ -160,24 +159,12 @@ const styles = StyleSheet.create({
     color: ink.strong,
     marginBottom: 12,
   },
-  selectButton: {
-    backgroundColor: vault.card,
-    borderWidth: 1,
-    borderColor: gold.deep,
-    borderRadius: radii.lg,
-    padding: 16,
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  selectButtonTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: 'bold',
-    color: gold.accent,
-    marginBottom: 2,
-  },
-  selectButtonDesc: {
-    fontSize: fontSize.sm,
+  selectSizeLabel: {
+    fontSize: fontSize.base,
     color: ink.body,
+  },
+  startButton: {
+    marginTop: 16,
+    paddingHorizontal: 48,
   },
 })

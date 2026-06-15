@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, Switch, Platform } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView, Animated, Dimensions, Switch, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
@@ -7,7 +7,7 @@ import { Difficulty } from '../../../src/types/engine'
 import { useProgressStore } from '../../../src/stores/progressStore'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { isDifficulty } from '../../../src/utils/difficulty'
-import { GameHeader, AppDialog } from '../../../src/components/ui'
+import { GameHeader, AppDialog, Button, DifficultySelect } from '../../../src/components/ui'
 import { lockPortrait, unlockOrientation } from '../../../src/utils/orientation'
 import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
@@ -142,28 +142,7 @@ export default function SolitaireScreen() {
   }, [isDeadlocked, deadlockHandled])
 
   if (!selectedDifficulty) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <GameHeader title="ソリティア" />
-        <View style={styles.selectScreen}>
-          <Text style={styles.selectTitle}>難易度を選択</Text>
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={() => setSelectedDifficulty('easy')}
-          >
-            <Text style={styles.selectButtonTitle}>初級</Text>
-            <Text style={styles.selectButtonDesc}>山札を1枚ずつめくる</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={() => setSelectedDifficulty('hard')}
-          >
-            <Text style={styles.selectButtonTitle}>上級</Text>
-            <Text style={styles.selectButtonDesc}>山札を3枚ずつめくる</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    )
+    return <SolitaireDifficultySelect onSelect={setSelectedDifficulty} />
   }
 
   return (
@@ -293,6 +272,30 @@ export default function SolitaireScreen() {
   )
 }
 
+const SOLITAIRE_DIFFICULTIES: Difficulty[] = ['easy', 'hard']
+const SOLITAIRE_DIFFICULTY_DESC: Record<Difficulty, string> = {
+  easy: '山札を1枚ずつめくる',
+  normal: '',
+  hard: '山札を3枚ずつめくる',
+  expert: '',
+}
+
+function SolitaireDifficultySelect({ onSelect }: { onSelect: (d: Difficulty) => void }) {
+  const [selected, setSelected] = useState<Difficulty>('easy')
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <GameHeader title="ソリティア" />
+      <View style={styles.selectScreen}>
+        <Text style={styles.selectTitle}>難易度を選択</Text>
+        <DifficultySelect options={SOLITAIRE_DIFFICULTIES} selected={selected} onSelect={setSelected} />
+        <Text style={styles.selectDesc}>{SOLITAIRE_DIFFICULTY_DESC[selected]}</Text>
+        <Button label="はじめる" onPress={() => onSelect(selected)} style={styles.startButton} />
+      </View>
+    </SafeAreaView>
+  )
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -382,24 +385,12 @@ const styles = StyleSheet.create({
     color: ink.strong,
     marginBottom: 16,
   },
-  selectButton: {
-    backgroundColor: vault.card,
-    borderWidth: 1,
-    borderColor: gold.deep,
-    borderRadius: radii.lg,
-    padding: 20,
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  selectButtonTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: 'bold',
-    color: gold.accent,
-    marginBottom: 4,
-  },
-  selectButtonDesc: {
+  selectDesc: {
     fontSize: fontSize.sm,
     color: ink.body,
+  },
+  startButton: {
+    marginTop: 16,
+    paddingHorizontal: 48,
   },
 })

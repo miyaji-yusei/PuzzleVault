@@ -4,7 +4,7 @@ import { getTeamScore, teamOf } from '../../../engines/goita'
 import { GoitaState, Piece, PieceType } from '../../../engines/goita/types'
 import { HUMAN_PLAYER, LeadInfo } from '../../../hooks/useGoitaGame'
 import { PieceIcon } from './PieceIcon'
-import { gold as goldColor } from '../../../theme'
+import { vault, gold, ink } from '../../../theme'
 
 // 駒の表示名（ひらがなの動物名）。動物アイコンと併記する。
 export const PIECE_LABELS: Record<PieceType, string> = {
@@ -137,10 +137,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     aspectRatio: 0.95,
-    backgroundColor: '#2e7d32',
+    backgroundColor: vault.surface,
     borderRadius: 16,
     borderWidth: 4,
-    borderColor: '#1b5e20',
+    borderColor: vault.borderLight,
     padding: 12,
     justifyContent: 'space-between',
   },
@@ -168,10 +168,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeArea: {
-    backgroundColor: 'rgba(255, 235, 59, 0.35)',
+    backgroundColor: 'rgba(255, 210, 48, 0.25)',
   },
   opponentName: {
-    color: '#fff',
+    color: ink.strong,
     fontSize: 12,
     marginBottom: 4,
     fontWeight: '600',
@@ -182,12 +182,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   opponentCount: {
-    color: '#fff',
+    color: ink.strong,
     fontSize: 13,
     fontWeight: 'bold',
   },
   scoreText: {
-    color: '#fff',
+    color: ink.strong,
     fontSize: 12,
     marginBottom: 8,
     textAlign: 'center',
@@ -197,13 +197,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   lastPlayText: {
-    color: '#fff',
+    color: ink.body,
     fontSize: 11,
     textAlign: 'center',
     marginTop: 4,
   },
   centerMessage: {
-    color: '#fffde7',
+    color: gold.soft,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -214,26 +214,26 @@ const styles = StyleSheet.create({
     margin: 2,
   },
   tileFace: {
-    backgroundColor: '#fff8e1',
+    backgroundColor: gold.paper,
     borderWidth: 1,
-    borderColor: '#8d6e63',
+    borderColor: gold.dark,
   },
   tileHighValue: {
     borderWidth: 2,
-    borderColor: goldColor.deep,
+    borderColor: gold.deep,
   },
   tileHighlight: {
-    borderColor: '#fbc02d',
+    borderColor: gold.accent,
     borderWidth: 3,
-    backgroundColor: '#fff3c4',
+    backgroundColor: gold.soft,
   },
   tileBack: {
-    backgroundColor: '#5d4037',
+    backgroundColor: vault.card,
     borderWidth: 1,
-    borderColor: '#3e2723',
+    borderColor: vault.borderLight,
   },
   tileText: {
-    color: '#3e2723',
+    color: ink.onGold,
     fontWeight: 'bold',
     marginTop: 1,
   },
