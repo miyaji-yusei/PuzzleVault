@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, Switch, Platform } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView, Animated, Dimensions, Switch, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
