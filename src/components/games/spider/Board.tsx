@@ -171,7 +171,6 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
     } else {
       runAnims(0, 0)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completingSet])
 
   const overlayStyle = {

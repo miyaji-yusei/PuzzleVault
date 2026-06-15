@@ -98,34 +98,6 @@ function buildRegions(n: number, queenCols: number[], rng: () => number): number
   return regions
 }
 
-// ビットマスク + O(1)隣接チェック高速解カウント
-function countSolutionsFast(
-  n: number,
-  regions: number[],
-  row: number,
-  colMask: number,
-  colorMask: number,
-  prevCol: number,
-  count: { value: number },
-  maxCount: number
-): void {
-  if (count.value >= maxCount) return
-  if (row === n) { count.value++; return }
-  for (let col = 0; col < n; col++) {
-    if (colMask & (1 << col)) continue
-    if (Math.abs(prevCol - col) <= 1) continue
-    const color = regions[row * n + col]
-    if (colorMask & (1 << color)) continue
-    countSolutionsFast(n, regions, row + 1, colMask | (1 << col), colorMask | (1 << color), col, count, maxCount)
-  }
-}
-
-function hasUniqueSolution(n: number, regions: number[]): boolean {
-  const count = { value: 0 }
-  countSolutionsFast(n, regions, 0, 0, 0, -100, count, 2)
-  return count.value === 1
-}
-
 // 代替解（primary 以外の解）を1つ探す。limit を超えたら打ち切り exhausted=true を返す。
 function findAltSolution(
   n: number,

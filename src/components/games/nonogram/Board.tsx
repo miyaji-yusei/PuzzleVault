@@ -348,7 +348,7 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
       setPreview(null)
       dragAxisRef.current = null
     },
-  }), [cellSize, getCellFromTouch, clampPan, initTwoFinger])
+  }), [getCellFromTouch, clampPan, initTwoFinger, panXAnim, panYAnim, scaleAnim])
 
   return (
     <View

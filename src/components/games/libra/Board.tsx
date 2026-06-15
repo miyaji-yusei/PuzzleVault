@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
-import { LibraState, CellValue, Constraint } from '../../../engines/libra/types'
+import { LibraState } from '../../../engines/libra/types'
 import { GameIcon } from '../../ui/GameIcon'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -11,14 +11,6 @@ type Props = {
   state: LibraState
   onPressCell: (row: number, col: number) => void
   flashWrongCell?: { row: number; col: number } | null
-}
-
-function getConstraintBetween(
-  constraints: Constraint[],
-  r1: number, c1: number,
-  r2: number, c2: number
-): Constraint | undefined {
-  return constraints.find(c => c.r1 === r1 && c.c1 === c1 && c.r2 === r2 && c.c2 === c2)
 }
 
 export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {

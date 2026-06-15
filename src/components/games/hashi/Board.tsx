@@ -305,7 +305,6 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
       const cs = cellSizeRef.current
       const tapCol = relX / cs
       const tapRow = relY / cs
-      const radiusCells = Math.max(10, Math.floor(cs * 0.38)) / cs
       const isDrag = Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8
 
       const startIslandId = dragStartIslandIdRef.current
