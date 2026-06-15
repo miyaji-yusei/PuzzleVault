@@ -62,7 +62,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
         useNativeDriver: true,
       }).start()
     }
-  }, [lastCorrectCell?.row, lastCorrectCell?.col, queenScale])
+  }, [lastCorrectCell, queenScale])
 
   const getCellAt = useCallback((pageX: number, pageY: number) => {
     const col = Math.floor((pageX - boardPosRef.current.x) / cellSize)

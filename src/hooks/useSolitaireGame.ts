@@ -187,14 +187,12 @@ export function useSolitaireGame(difficulty: Difficulty, seed?: number) {
 
   const isDeadlocked = useMemo(
     () => !isComplete && !canAutoComplete && !hasValidMoves(state),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, isComplete, canAutoComplete]
   )
 
   const commitState = useCallback((newState: SolitaireState) => {
     setHistory(prev => [...prev.slice(-30), state])
     setState(newState)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
   const tapStock = useCallback(() => {

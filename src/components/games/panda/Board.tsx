@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
-import { PandaState, CellContent } from '../../../engines/panda/types'
+import { PandaState } from '../../../engines/panda/types'
 import { GameIcon } from '../../ui/GameIcon'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -118,7 +118,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
     }
     if (cell === 'B') {
       return (
-        <View style={isError && styles.cellTextError}>
+        <View style={[isError && styles.cellTextError, isConfirmed && styles.cellTextConfirmed]}>
           <GameIcon
             name="panda"
             size={Math.floor(cellSize * 0.66)}

@@ -40,7 +40,7 @@ async function generateForGame(gameName: string): Promise<void> {
       fs.writeFileSync(outputPath, JSON.stringify(puzzles, null, 2))
       console.warn(`[generate] ${gameName}/${difficulty}: ${puzzles.length}問 → ${outputPath}`)
     }
-  } catch (err) {
+  } catch {
     console.error(`[generate] ${gameName} のエンジンが見つかりません。スキップします。`)
   }
 }

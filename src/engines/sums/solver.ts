@@ -52,16 +52,6 @@ export function countSolutions(puzzle: SumsPuzzle, maxOps = 1000000): number {
   let found = 0
   let ops = 0
 
-  function canSatisfy(target: number, partial: number, remaining: number, vals: number[]): boolean {
-    // min achievable = partial + sum of 0s (all cross)
-    // max achievable = partial + sum of all remaining values
-    const maxAdd = vals.reduce((s, v) => s + v, 0)
-    return partial <= target && partial + maxAdd >= target
-  }
-
-  // Precompute remaining values for each row/col/group at each step - too complex
-  // Use simpler bound: just check partial <= target and remaining > 0 for possibility
-
   function bt(idx: number): void {
     if (found >= 2 || ops++ >= maxOps) return
     if (idx === cells.length) {

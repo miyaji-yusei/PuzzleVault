@@ -20,6 +20,7 @@ export function AdBanner() {
   // adsEnabled === true（development build 等）のときだけ読み込む。
   // Expo Go ではネイティブモジュールが存在しないため、トップレベルの
   // import にするとアプリ起動時にエラーになる。
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { BannerAd, BannerAdSize, TestIds } = require('react-native-google-mobile-ads') as {
     BannerAd: typeof BannerAdComponent
     BannerAdSize: typeof BannerAdSizeEnum
