@@ -28,9 +28,9 @@ https://claude.ai/design/p/ee89c0eb-007d-41d0-9b7d-ddfb6ae831a3
   - ハードコード色の残りを一掃（`grep -rn "#4A90E2\|#4285f4\|#f5f5f5\|#1b5e20" app src`）
   - solitaire/index.tsx のscatterアニメーション部を別コンポーネントに抽出（可読性）
 - [ ] **アプリアイコン差し替え**: assets/icon.png 等を「黒×黄の財宝+雷」デザインに。Claude Designで画像生成→差し替え（コードでは対応不可）
-- [ ] **既知の問題（このブランチ起因ではない）**
-  - `npm run lint` はESLint v10とeslintrc形式の不整合で動作しない（developでも同様）
-  - `npm test` は「No tests found」（jest projects設定とテスト配置の不整合、developでも同様）
+- [x] **既知の問題（解決済み）**
+  - `npm run lint` → PR #323（ESLint v10対応）で修正済み
+  - `npm test` → jest projects設定は現行テスト配置と一致しており、15スイート・282テストが正常にパス済み
 
 ## 検証手順
 1. `npx expo start` でExpo Go起動
