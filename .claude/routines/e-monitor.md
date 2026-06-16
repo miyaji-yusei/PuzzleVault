@@ -42,6 +42,15 @@
    gh pr list --base develop --state open --json number,title,headRefName,labels
    ```
    ブランチ名が `claude/{番号}` パターンで `do-not-merge` ラベルが付いているPRについて、対応するIssueが `in-progress` の場合:
+
+   **【重要】再キュー前に後継PRの存在を確認する**:
+   同じIssue番号に対して、`do-not-merge` PR以外のオープンPRが存在しないか確認する:
+   ```bash
+   gh pr list --base develop --state open --json number,headRefName,body \
+     --jq '[.[] | select(.body | contains("Closes #{Issue番号}"))] | length'
+   ```
+   - 2件以上のPRが当該Issueに紐づく場合（`do-not-merge` PR + 後継PR）→ **スキップ**（後継PRで実装中のため再キュー不要）
+   - 1件のみ（`do-not-merge` PRのみ）→ 以下の通り再キュー:
    ```bash
    gh issue edit {Issue番号} --remove-label in-progress --add-label claude
    gh issue comment {Issue番号} --body "[Monitor] PRに do-not-merge ラベルが付いており実装が承認されていません。Workerキューに再投入しました。既存PR #{PR番号}を参考に新しいアプローチで再実装してください。"
