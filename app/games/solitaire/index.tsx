@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, SafeAreaView, Switch, Platform } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SolitaireBoard } from '../../../src/components/games/solitaire/Board'
 import { ScatterAnimation, ScatterAnimationRef } from '../../../src/components/games/solitaire/ScatterAnimation'
@@ -9,7 +9,7 @@ import { useProgressStore } from '../../../src/stores/progressStore'
 import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { isDifficulty } from '../../../src/utils/difficulty'
 import { GameHeader, AppDialog, Button, DifficultySelect } from '../../../src/components/ui'
-import { lockPortrait, unlockOrientation } from '../../../src/utils/orientation'
+import { lockPortrait } from '../../../src/utils/orientation'
 import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
 
 const WIN_DIALOG_DELAY_MS = 1500
@@ -64,20 +64,13 @@ export default function SolitaireScreen() {
   const [showRestartDialog, setShowRestartDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
-  const landscapeEnabled = useSettingsStore(s => s.solitaireLandscapeEnabled)
-  const setLandscapeEnabled = useSettingsStore(s => s.setSolitaireLandscapeEnabled)
-
-  // 横画面表示が許可されている間だけ画面回転を許可し、画面を離れるときは縦画面に戻す
+  // ソリティアは常に縦画面固定
   useEffect(() => {
-    if (landscapeEnabled) {
-      unlockOrientation()
-    } else {
-      lockPortrait()
-    }
+    lockPortrait()
     return () => {
       lockPortrait()
     }
-  }, [landscapeEnabled])
+  }, [])
 
   useEffect(() => {
     if (canAutoComplete && !autoCompleteHandled) {
@@ -147,19 +140,7 @@ export default function SolitaireScreen() {
         visible={showSettingsDialog}
         title="設定"
         actions={[{ label: '閉じる', onPress: () => setShowSettingsDialog(false) }]}
-      >
-        {Platform.OS !== 'web' && (
-          <View style={styles.settingsRow}>
-            <Text style={styles.settingsLabel}>横画面表示を許可</Text>
-            <Switch
-              value={landscapeEnabled}
-              onValueChange={setLandscapeEnabled}
-              trackColor={{ false: vault.borderLight, true: gold.deep }}
-              thumbColor={landscapeEnabled ? gold.accent : '#ccc'}
-            />
-          </View>
-        )}
-      </AppDialog>
+      />
 
       <AppDialog
         visible={showAutoCompleteDialog}
@@ -245,18 +226,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: ink.body,
     textAlign: 'center',
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingVertical: 8,
-    marginTop: 8,
-  },
-  settingsLabel: {
-    fontSize: fontSize.sm,
-    color: ink.strong,
   },
   statsBox: {
     backgroundColor: vault.surface,
