@@ -37,6 +37,17 @@
      ```
    - PRが存在しない + Issueが `claude` → 正常（Workerが未処理）→ そのまま
 
+1.5. **do-not-mergeラベル付きPR + in-progress Issueの再キュー**
+   ```bash
+   gh pr list --base develop --state open --json number,title,headRefName,labels
+   ```
+   ブランチ名が `claude/{番号}` パターンで `do-not-merge` ラベルが付いているPRについて、対応するIssueが `in-progress` の場合:
+   ```bash
+   gh issue edit {Issue番号} --remove-label in-progress --add-label claude
+   gh issue comment {Issue番号} --body "[Monitor] PRに do-not-merge ラベルが付いており実装が承認されていません。Workerキューに再投入しました。既存PR #{PR番号}を参考に新しいアプローチで再実装してください。"
+   ```
+   **注意**: PRはオープンのまま（参考用に保持）。Workerは既存ブランチ（`claude/{番号}`）に新しい実装をforce-pushするか、別の実装方針を検討すること。
+
 2. **キュー枯渇チェック**
    ```bash
    gh issue list --label claude --state open --json number
