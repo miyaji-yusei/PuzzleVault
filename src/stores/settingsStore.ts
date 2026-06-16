@@ -8,7 +8,6 @@ interface SettingsState {
   theme: 'light' | 'dark'
   isPurchased: boolean
   solitaireAllowDealWithEmptyColumn: boolean
-  solitaireLandscapeEnabled: boolean
   spiderLandscapeEnabled: boolean
   goitaHowToPlayShown: boolean
   sevenHowToPlayShown: boolean
@@ -18,7 +17,6 @@ interface SettingsState {
   setTheme: (theme: 'light' | 'dark') => void
   setPurchased: (purchased: boolean) => void
   setSolitaireAllowDealWithEmptyColumn: (allow: boolean) => void
-  setSolitaireLandscapeEnabled: (enabled: boolean) => void
   setSpiderLandscapeEnabled: (enabled: boolean) => void
   setGoitaHowToPlayShown: (shown: boolean) => void
   setSevenHowToPlayShown: (shown: boolean) => void
@@ -33,7 +31,6 @@ export const useSettingsStore = create<SettingsState>()(
       theme: 'light',
       isPurchased: false,
       solitaireAllowDealWithEmptyColumn: false,
-      solitaireLandscapeEnabled: false,
       spiderLandscapeEnabled: false,
       goitaHowToPlayShown: false,
       sevenHowToPlayShown: false,
@@ -43,7 +40,6 @@ export const useSettingsStore = create<SettingsState>()(
       setTheme: (theme) => set({ theme }),
       setPurchased: (purchased) => set({ isPurchased: purchased }),
       setSolitaireAllowDealWithEmptyColumn: (allow) => set({ solitaireAllowDealWithEmptyColumn: allow }),
-      setSolitaireLandscapeEnabled: (enabled) => set({ solitaireLandscapeEnabled: enabled }),
       setSpiderLandscapeEnabled: (enabled) => set({ spiderLandscapeEnabled: enabled }),
       setGoitaHowToPlayShown: (shown) => set({ goitaHowToPlayShown: shown }),
       setSevenHowToPlayShown: (shown) => set({ sevenHowToPlayShown: shown }),
