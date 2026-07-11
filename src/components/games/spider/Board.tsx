@@ -5,6 +5,8 @@ import { isValidMoveUnit } from '../../../engines/spider'
 import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
 import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
 import { vault, gold, ink, felt } from '../../../theme'
+import { measurePageOrigin, boardNoSelectStyle } from '../../../utils/boardCoords'
+import { capGameWidth } from '../../../utils/layout'
 
 const PAD = 4
 const GAP = 2
@@ -69,7 +71,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   // 広告バナー表示時はバナー分の高さを利用可能領域から控除し、場札がバナーと重ならないようにする
   const availableHeight = adsEnabled ? windowHeight - AD_BANNER_HEIGHT_ESTIMATE : windowHeight
-  const portraitWidth = Math.min(windowWidth, availableHeight)
+  const portraitWidth = Math.min(capGameWidth(windowWidth), availableHeight)
   const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.5)
 
@@ -182,9 +184,9 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   }
 
   const measureContainer = useCallback(() => {
-    containerRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      containerLeftRef.current = pageX
-      containerTopRef.current = pageY
+    measurePageOrigin(containerRef.current, (origin) => {
+      containerLeftRef.current = origin.x
+      containerTopRef.current = origin.y
     })
   }, [])
 
@@ -223,6 +225,8 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
     onPanResponderGrant: (e) => {
+      // スクロール/リサイズ後でも原点が最新になるよう都度測定（webでは同期）
+      measureContainer()
       const gs = gestureState.current
       gs.isDragging = false
 
@@ -317,7 +321,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
       Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
       setDragInfo(null)
     },
-  }), [getColAndCard, overlayOpacity, overlayX, overlayY])
+  }), [getColAndCard, measureContainer, overlayOpacity, overlayX, overlayY])
 
   const colData = tableau.map((col) => {
     const offsets: number[] = []
@@ -396,7 +400,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
         onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
       >
         <View
-          style={[styles.tableau, { height: maxColH }]}
+          style={[styles.tableau, { height: maxColH }, boardNoSelectStyle]}
           {...panResponder.panHandlers}
         >
           {colData.map(({ col, offsets, totalH }, ci) => (

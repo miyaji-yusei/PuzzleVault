@@ -1,9 +1,11 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
+import { View, Text, StyleSheet, PanResponder, Animated } from 'react-native'
 import { QueensState } from '../../../engines/queens/types'
 import { GameIcon } from '../../ui/GameIcon'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_PADDING = 32
 
 const REGION_COLORS = [
@@ -37,8 +39,8 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => {
-        boardPosRef.current = { x, y }
+      measurePageOrigin(boardRef.current, (origin) => {
+        boardPosRef.current = origin
       })
     })
   }, [])
@@ -83,6 +85,10 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
       onMoveShouldSetPanResponder: (_, gs) =>
         Math.abs(gs.dx) > DRAG_THRESHOLD || Math.abs(gs.dy) > DRAG_THRESHOLD,
       onPanResponderGrant: (e) => {
+        // スクロール/リサイズ後でも原点が最新になるよう都度測定（webでは同期）
+        measurePageOrigin(boardRef.current, (origin) => {
+          boardPosRef.current = origin
+        })
         isDragging = false
         lastDragCell = null
         const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
@@ -142,7 +148,7 @@ export function QueensBoard({ state, onPlaceCross, onPlaceQueen, onDragCross, on
     <View
       ref={boardRef}
       onLayout={measureBoard}
-      style={[styles.board, { width: cellSize * size, height: cellSize * size }]}
+      style={[styles.board, { width: cellSize * size, height: cellSize * size }, boardTouchFixStyle]}
       {...panResponder.panHandlers}
     >
       {Array.from({ length: size }, (_, row) => (

@@ -1,8 +1,10 @@
 import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder } from 'react-native'
 import { Island, Bridge, HashiState } from '../../../engines/hashi/types'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const GRID_PADDING = 16
 const BRIDGE_TAP_THRESHOLD = 0.45
 const DRAG_CONFIRM_THRESHOLD = 0.7
@@ -236,8 +238,8 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
 
   const measureGrid = useCallback(() => {
     requestAnimationFrame(() => {
-      gridRef.current?.measureInWindow((x, y) => {
-        gridPosRef.current = { x, y }
+      measurePageOrigin(gridRef.current, (origin) => {
+        gridPosRef.current = origin
       })
     })
   }, [])
@@ -262,6 +264,10 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
+      // スクロール/リサイズ後でも原点が最新になるよう都度測定（webでは同期）
+      measurePageOrigin(gridRef.current, (origin) => {
+        gridPosRef.current = origin
+      })
       const { pageX, pageY } = e.nativeEvent
       const relX = pageX - gridPosRef.current.x
       const relY = pageY - gridPosRef.current.y
@@ -369,7 +375,7 @@ export function HashiBoard({ state, onToggleBridge }: Props) {
     <View
       ref={gridRef}
       onLayout={measureGrid}
-      style={{ width: gridWidth, height: gridHeight, backgroundColor: '#17181B' }}
+      style={[{ width: gridWidth, height: gridHeight, backgroundColor: '#17181B' }, boardTouchFixStyle]}
       {...panResponder.panHandlers}
     >
       {/* Grid lines */}

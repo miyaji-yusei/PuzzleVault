@@ -7,9 +7,17 @@ const reactHooksPlugin = require('eslint-plugin-react-hooks')
 
 module.exports = [
   {
-    ignores: ['node_modules/', '.expo/', 'dist/', 'data/', 'eslint.config.js', 'jest.config.js'],
+    ignores: ['node_modules/', '.expo/', 'dist/', 'data/', 'eslint.config.js', 'jest.config.js', 'babel.config.js'],
   },
   js.configs.recommended,
+  {
+    // Node製のビルド/生成スクリプト（CommonJS）
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node },
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {

@@ -1,8 +1,9 @@
 import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { SudokuState } from '../../../engines/sudoku/types'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_SIZE = SCREEN_WIDTH - 32
 const CELL_SIZE = Math.floor(BOARD_SIZE / 9)
 const NOTE_SIZE = Math.floor(CELL_SIZE / 3)

@@ -1,9 +1,11 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder } from 'react-native'
 import { LibraState } from '../../../engines/libra/types'
 import { GameIcon } from '../../ui/GameIcon'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_PADDING = 24
 const CONSTRAINT_BOX = 14
 
@@ -24,8 +26,8 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
   onPressCellRef.current = onPressCell
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      boardPosRef.current = { x: pageX, y: pageY }
+    measurePageOrigin(boardRef.current, (origin) => {
+      boardPosRef.current = origin
     })
   }, [])
 
@@ -42,14 +44,14 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => false,
     onPanResponderGrant: () => {
-      boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { boardPosRef.current = { x: pageX, y: pageY } })
+      measureBoard()
     },
     onPanResponderRelease: (e) => {
       const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
       if (cell) onPressCellRef.current(cell.row, cell.col)
     },
     onPanResponderTerminate: () => {},
-  }), [getCellAt])
+  }), [getCellAt, measureBoard])
 
   return (
     <View style={{ position: 'relative' }}>
@@ -57,7 +59,7 @@ export function LibraBoard({ state, onPressCell, flashWrongCell }: Props) {
       <View
         ref={boardRef}
         onLayout={measureBoard}
-        style={[styles.grid, { width: boardSize, height: boardSize }]}
+        style={[styles.grid, { width: boardSize, height: boardSize }, boardTouchFixStyle]}
         {...panResponder.panHandlers}
       >
         {Array.from({ length: size }, (_, row) => (

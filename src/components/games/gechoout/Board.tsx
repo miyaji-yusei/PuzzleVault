@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
+import { View, StyleSheet, PanResponder, Animated } from 'react-native'
 import { DIRECTION_DELTA } from '../../../engines/gechoout'
 import { Direction, GechoOutState, Position, Snake, SnakeEnd } from '../../../engines/gechoout/types'
 import { MoveResult } from '../../../hooks/useGechooutGame'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_PADDING = 32
 
 const SNAKE_COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00897b']
@@ -123,8 +125,8 @@ export function GechoOutBoard({ state, onMove }: Props) {
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => {
-        boardPosRef.current = { x, y }
+      measurePageOrigin(boardRef.current, (origin) => {
+        boardPosRef.current = origin
       })
     })
   }, [])
@@ -159,6 +161,10 @@ export function GechoOutBoard({ state, onMove }: Props) {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (e) => {
+        // スクロール/リサイズ後でも原点が最新になるよう都度測定（webでは同期）
+        measurePageOrigin(boardRef.current, (origin) => {
+          boardPosRef.current = origin
+        })
         drag = null
         const cell = getCellAt(e.nativeEvent.pageX, e.nativeEvent.pageY)
         if (!cell) return
@@ -213,7 +219,7 @@ export function GechoOutBoard({ state, onMove }: Props) {
     <View
       ref={boardRef}
       onLayout={measureBoard}
-      style={[styles.board, { width: cellSize * size, height: cellSize * size }]}
+      style={[styles.board, { width: cellSize * size, height: cellSize * size }, boardTouchFixStyle]}
       {...panResponder.panHandlers}
     >
       {Array.from({ length: size }, (_, row) => (
