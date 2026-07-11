@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
 import { PandaState } from '../../../engines/panda/types'
 import { GameIcon } from '../../ui/GameIcon'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const HINT_SIZE = 28
@@ -36,8 +37,8 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
   const lastDragCellRef = useRef<string | null>(null)
 
   const measureGrid = useCallback(() => {
-    gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      boardPosRef.current = { x: pageX, y: pageY }
+    measurePageOrigin(gridRef.current, (origin) => {
+      boardPosRef.current = origin
     })
   }, [])
 
@@ -59,7 +60,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
       onPanResponderGrant: () => {
-        gridRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => { boardPosRef.current = { x: pageX, y: pageY } })
+        measureGrid()
         isDragging = false
         dragMode = 'add'
         lastDragCellRef.current = null
@@ -168,7 +169,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
         <View
           ref={gridRef}
           onLayout={measureGrid}
-          style={{ width: gridSize, height: gridSize }}
+          style={[{ width: gridSize, height: gridSize }, boardTouchFixStyle]}
           {...panResponder.panHandlers}
         >
           {Array.from({ length: size }, (_, row) => (
