@@ -23,8 +23,16 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "PuzzleVault",
+      "shortName": "PuzzleVault",
+      "lang": "ja",
+      "description": "クラシックパズル コレクション",
+      "themeColor": "#0E0E10",
+      "backgroundColor": "#0E0E10",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "plugins": [
       "expo-router",
@@ -43,6 +51,9 @@
       "eas": {
         "projectId": "f68a326b-6ef1-4f4a-a027-2eb79e84372a"
       }
+    },
+    "experiments": {
+      "baseUrl": "/PuzzleVault"
     }
   }
 }

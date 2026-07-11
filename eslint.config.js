@@ -11,6 +11,14 @@ module.exports = [
   },
   js.configs.recommended,
   {
+    // Node製のビルド/生成スクリプト（CommonJS）
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
