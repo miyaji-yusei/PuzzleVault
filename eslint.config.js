@@ -7,7 +7,7 @@ const reactHooksPlugin = require('eslint-plugin-react-hooks')
 
 module.exports = [
   {
-    ignores: ['node_modules/', '.expo/', 'dist/', 'data/', 'eslint.config.js', 'jest.config.js'],
+    ignores: ['node_modules/', '.expo/', 'dist/', 'data/', 'eslint.config.js', 'jest.config.js', 'babel.config.js'],
   },
   js.configs.recommended,
   {

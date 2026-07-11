@@ -6,11 +6,10 @@ import { ScatterAnimation, ScatterAnimationRef } from '../../../src/components/g
 import { useSolitaireGame } from '../../../src/hooks/useSolitaireGame'
 import { Difficulty } from '../../../src/types/engine'
 import { useProgressStore } from '../../../src/stores/progressStore'
-import { useSettingsStore } from '../../../src/stores/settingsStore'
 import { isDifficulty } from '../../../src/utils/difficulty'
 import { GameHeader, AppDialog, Button, DifficultySelect } from '../../../src/components/ui'
 import { lockPortrait } from '../../../src/utils/orientation'
-import { vault, gold, ink, felt, fontSize, radii } from '../../../src/theme'
+import { vault, ink, felt, fontSize, radii } from '../../../src/theme'
 
 const WIN_DIALOG_DELAY_MS = 1500
 
