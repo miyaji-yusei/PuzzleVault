@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
 import { NonogramMode, HintColor } from '../../../hooks/useNonogramGame'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const MAX_BOARD = SCREEN_WIDTH - 32
@@ -102,8 +103,8 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
   const touchAreaPosRef = useRef({ x: 0, y: 0 })
 
   const measureTouchArea = useCallback(() => {
-    touchAreaRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      touchAreaPosRef.current = { x: pageX, y: pageY }
+    measurePageOrigin(touchAreaRef.current, (origin) => {
+      touchAreaPosRef.current = origin
     })
   }, [])
 
@@ -218,9 +219,7 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
     onMoveShouldSetPanResponder: () => true,
 
     onPanResponderGrant: (e) => {
-      touchAreaRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-        touchAreaPosRef.current = { x: pageX, y: pageY }
-      })
+      measureTouchArea()
       const touches = e.nativeEvent.touches
 
       if (touches.length >= 2) {
@@ -348,13 +347,13 @@ export function NonogramBoard({ state, mode, autoCrossed, rowClueColors, colClue
       setPreview(null)
       dragAxisRef.current = null
     },
-  }), [getCellFromTouch, clampPan, initTwoFinger, panXAnim, panYAnim, scaleAnim])
+  }), [getCellFromTouch, clampPan, initTwoFinger, measureTouchArea, panXAnim, panYAnim, scaleAnim])
 
   return (
     <View
       ref={touchAreaRef}
       onLayout={measureTouchArea}
-      style={{ width: totalWidth, height: totalHeight, overflow: 'hidden' }}
+      style={[{ width: totalWidth, height: totalHeight, overflow: 'hidden' }, boardTouchFixStyle]}
       {...panResponder.panHandlers}
     >
       <Animated.View

@@ -4,6 +4,7 @@ import { SolitaireState, Card, Suit, SolitaireMove } from '../../../engines/soli
 import { SelectedCard, AutoCompleteAnim } from '../../../hooks/useSolitaireGame'
 import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
 import { vault, gold } from '../../../theme'
+import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
 
 const AUTO_COMPLETE_ANIM_MS = 220
 
@@ -108,9 +109,9 @@ export function SolitaireBoard({
   const boardLeftRef = useRef(0)
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-      boardLeftRef.current = pageX
-      boardTopRef.current = pageY
+    measurePageOrigin(boardRef.current, (origin) => {
+      boardLeftRef.current = origin.x
+      boardTopRef.current = origin.y
     })
   }, [])
 
@@ -246,6 +247,8 @@ export function SolitaireBoard({
       onMoveShouldSetPanResponder: (_, g) =>
         (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) && wasteRef.current.length > 0,
       onPanResponderGrant: () => {
+        // スクロール/リサイズ後でも原点が最新になるよう都度測定（webでは同期）
+        measureBoard()
         wasteGestureState.current.isDragging = false
       },
       onPanResponderMove: (e, g) => {
@@ -303,7 +306,7 @@ export function SolitaireBoard({
         setDragInfo(null)
       },
     })
-  }, [overlayOpacity, overlayX, overlayY])
+  }, [measureBoard, overlayOpacity, overlayX, overlayY])
 
   const foundationPanResponder = useMemo(() => {
     const gs = { isDragging: false, activeFi: null as number | null }
@@ -312,6 +315,7 @@ export function SolitaireBoard({
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
       onPanResponderGrant: (e) => {
+        measureBoard()
         gs.isDragging = false
         const relX = e.nativeEvent.pageX - boardLeftRef.current - PAD
         const fi = Math.floor(relX / (cardWRef.current + GAP))
@@ -366,7 +370,7 @@ export function SolitaireBoard({
         setDragInfo(null)
       },
     })
-  }, [overlayOpacity, overlayX, overlayY])
+  }, [measureBoard, overlayOpacity, overlayX, overlayY])
 
   const gestureState = useRef({
     isDragging: false,
@@ -380,6 +384,7 @@ export function SolitaireBoard({
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
     onPanResponderGrant: (e) => {
+      measureBoard()
       const gs = gestureState.current
       gs.isDragging = false
       const relX = e.nativeEvent.pageX - boardLeftRef.current
@@ -457,13 +462,13 @@ export function SolitaireBoard({
       Animated.timing(overlayOpacity, { toValue: 0, duration: 80, useNativeDriver: false }).start()
       setDragInfo(null)
     },
-  }), [getCardAt, handleDrop, overlayOpacity, overlayX, overlayY])
+  }), [getCardAt, handleDrop, measureBoard, overlayOpacity, overlayX, overlayY])
 
   return (
     <View style={{ flex: 1 }} ref={boardRef} onLayout={measureBoard}>
       {/* Top row: foundation + stock/waste */}
       <View style={styles.topRow}>
-        <View style={styles.foundationRow} {...foundationPanResponder.panHandlers}>
+        <View style={[styles.foundationRow, boardTouchFixStyle]} {...foundationPanResponder.panHandlers}>
           {foundation.map((pile, fi) => {
             const isFoundationSelected = selected?.pile === 'foundation' && selected.index === fi
             const isDraggedFromFoundation = dragInfo?.fromPile === 'foundation' && dragInfo.colIndex === fi
@@ -495,7 +500,7 @@ export function SolitaireBoard({
               </TouchableOpacity>
             )}
           </TouchableOpacity>
-          <View ref={wasteViewRef} {...wastePanResponder.panHandlers}>
+          <View ref={wasteViewRef} style={boardTouchFixStyle} {...wastePanResponder.panHandlers}>
             {waste.length > 0 ? (
               drawMode === 3 ? (
                 <View style={{ width: CARD_W + WASTE_FAN_STEP * (Math.min(waste.length, 3) - 1), height: CARD_H }}>
@@ -531,7 +536,7 @@ export function SolitaireBoard({
       </View>
 
       {/* Tableau */}
-      <View style={styles.tableau} {...panResponder.panHandlers}>
+      <View style={[styles.tableau, boardTouchFixStyle]} {...panResponder.panHandlers}>
         {tableau.map((col, ci) => {
           if (col.length === 0) {
             return <EmptySlot key={`col-${ci}`} width={CARD_W} height={CARD_H} />

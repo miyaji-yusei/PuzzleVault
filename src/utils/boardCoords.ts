@@ -1,4 +1,3 @@
-import { useCallback, useRef } from 'react'
 import { Platform } from 'react-native'
 import type { View, ViewStyle } from 'react-native'
 
@@ -56,25 +55,10 @@ export const boardTouchFixStyle: ViewStyle =
     : {}
 
 /**
- * 盤面原点の測定をまとめたフック。
- * - boardRef を盤面Viewの ref に、onBoardLayout を onLayout に渡す
- * - onPanResponderGrant の先頭で remeasure() を呼ぶと、スクロール/リサイズ/
- *   レイアウトシフト後でも原点が最新になる（webでは同期測定のためgrantイベント
- *   自体に反映される）
+ * ScrollView内に置かれる盤面（spider等）向けの軽量版。touchAction: 'none' を
+ * 適用するとタッチデバイスでスクロールできなくなるため、テキスト選択の抑止のみ行う
  */
-export function useBoardOrigin() {
-  const boardRef = useRef<View>(null)
-  const originRef = useRef<PageOrigin>({ x: 0, y: 0 })
-
-  const remeasure = useCallback(() => {
-    measurePageOrigin(boardRef.current, (origin) => {
-      originRef.current = origin
-    })
-  }, [])
-
-  const onBoardLayout = useCallback(() => {
-    requestAnimationFrame(remeasure)
-  }, [remeasure])
-
-  return { boardRef, originRef, remeasure, onBoardLayout }
-}
+export const boardNoSelectStyle: ViewStyle =
+  Platform.OS === 'web'
+    ? ({ userSelect: 'none' } as unknown as ViewStyle)
+    : {}
