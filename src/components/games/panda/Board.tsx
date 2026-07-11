@@ -98,7 +98,7 @@ export function PandaBoard({ state, confirmedCells, errorCell, onPressCell, onDr
         lastDragCellRef.current = null
       },
     })
-  }, [getCellAt])
+  }, [getCellAt, measureGrid])
 
   // Compute row/col panda counts for color hints
   const rowPandaCounts = Array.from({ length: size }, (_, r) =>
