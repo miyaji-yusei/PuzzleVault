@@ -1,9 +1,10 @@
 {
   "expo": {
     "name": "PuzzleVault",
+    "scheme": "puzzlevault",
     "slug": "PuzzleVault",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
@@ -21,17 +22,38 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "PuzzleVault",
+      "shortName": "PuzzleVault",
+      "lang": "ja",
+      "description": "クラシックパズル コレクション",
+      "themeColor": "#0E0E10",
+      "backgroundColor": "#0E0E10",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-screen-orientation",
+      "expo-font",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
     ],
     "extra": {
       "router": {},
       "eas": {
         "projectId": "f68a326b-6ef1-4f4a-a027-2eb79e84372a"
       }
+    },
+    "experiments": {
+      "baseUrl": "/PuzzleVault"
     }
   }
 }

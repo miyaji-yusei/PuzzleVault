@@ -140,3 +140,29 @@ export interface ValidationResult {
 | スパイダソリティア仕様 | `docs/md/games/spider.md` | |
 | Gecho Out仕様 | `docs/md/games/gechoout.md` | |
 | ごいた仕様 | `docs/md/games/goita.md` | |
+
+## Expo Go ローカル動作確認の注意事項
+
+### react-native-reanimated は使用禁止（Expo Go SDK 54 非互換）
+Expo Go SDK 54 は `react-native-reanimated 4.x` が依存する `react-native-worklets` の TurboModule を含んでいないため、アプリ起動時にクラッシュする。
+
+**代替**: アニメーションが必要な場合は React Native 標準の `Animated` API を使用すること。
+
+```tsx
+// NG
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated'
+
+// OK
+import { Animated } from 'react-native'
+const opacity = useRef(new Animated.Value(0)).current
+Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: false }).start()
+```
+
+### npm install は必ず --legacy-peer-deps を使う
+プロジェクトルートの `.npmrc` に `legacy-peer-deps=true` を設定済みのため、`npm install` のみで動作する。
+
+### react-native-google-mobile-ads は Expo Go 非対応
+`react-native-google-mobile-ads` もネイティブモジュールのため Expo Go では動作しない。
+`src/config/ads.ts` の `adsEnabled` が Expo Go / Web では自動的に `false` になり、
+`src/components/ui/AdBanner.tsx` は何も表示しない（import 自体も遅延読み込みで回避）。
+広告表示の実機確認には development build（EAS Build）が必要（`automation.md` 3.2.1参照）。

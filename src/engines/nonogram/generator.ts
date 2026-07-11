@@ -28,14 +28,15 @@ function computeClues(line: boolean[]): number[] {
 }
 
 const DIFFICULTY_CONFIG: Record<Difficulty, { minSize: number; maxSize: number; density: number }> = {
-  easy:   { minSize: 5,  maxSize: 8,  density: 0.5 },
-  normal: { minSize: 10, maxSize: 10, density: 0.55 },
-  hard:   { minSize: 15, maxSize: 15, density: 0.6 },
-  expert: { minSize: 20, maxSize: 20, density: 0.6 },
+  easy:   { minSize: 10, maxSize: 10, density: 0.5 },
+  normal: { minSize: 15, maxSize: 15, density: 0.55 },
+  hard:   { minSize: 20, maxSize: 20, density: 0.6 },
+  expert: { minSize: 25, maxSize: 25, density: 0.6 },
 }
 
 export function generate(difficulty: Difficulty, seed?: number): NonogramPuzzle {
   const actualSeed = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
+
   const rng = createRng(actualSeed)
 
   const { minSize, maxSize, density } = DIFFICULTY_CONFIG[difficulty]

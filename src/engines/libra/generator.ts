@@ -23,15 +23,16 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return result
 }
 
+const GRID_SIZE = 6
+
 const DIFFICULTY_CONFIG: Record<Difficulty, {
-  size: number
   revealRate: number
   constraintCount: number
 }> = {
-  easy:   { size: 6,  revealRate: 0.40, constraintCount: 6 },
-  normal: { size: 8,  revealRate: 0.30, constraintCount: 8 },
-  hard:   { size: 8,  revealRate: 0.20, constraintCount: 5 },
-  expert: { size: 10, revealRate: 0.15, constraintCount: 5 },
+  easy:   { revealRate: 0.55, constraintCount: 8 },
+  normal: { revealRate: 0.38, constraintCount: 5 },
+  hard:   { revealRate: 0.22, constraintCount: 3 },
+  expert: { revealRate: 0.12, constraintCount: 1 },
 }
 
 // Generate a complete valid solution grid using backtracking + constraint propagation
@@ -67,7 +68,6 @@ function generateConstraints(
   count: number,
   rng: () => number
 ): Constraint[] {
-  // Collect all adjacent pairs (horizontal and vertical)
   const pairs: Array<[number, number, number, number]> = []
 
   for (let r = 0; r < size; r++) {
@@ -135,19 +135,67 @@ function countSolutionsInternal(
   return count.value
 }
 
-export function generate(difficulty: Difficulty, seed?: number): LibraPuzzle {
-  const actualSeed = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
-  const rng = createRng(actualSeed)
+// Check if puzzle can be solved by constraint propagation alone (no guessing)
+function isLogicallySolvable(
+  initial: CellValue[][],
+  size: number,
+  constraints: Constraint[]
+): boolean {
+  const grid: CellValue[][] = initial.map(row => [...row])
 
-  const { size, revealRate, constraintCount } = DIFFICULTY_CONFIG[difficulty]
+  let changed = true
+  while (changed) {
+    changed = false
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (grid[r][c] !== null) continue
 
-  // Generate complete solution
+        const canA = isValid(grid, r, c, 'A', size, constraints)
+        const canB = isValid(grid, r, c, 'B', size, constraints)
+
+        if (!canA && !canB) return false
+        if (canA && !canB) { grid[r][c] = 'A'; changed = true }
+        else if (!canA && canB) { grid[r][c] = 'B'; changed = true }
+      }
+    }
+  }
+
+  return grid.every(row => row.every(v => v !== null))
+}
+
+// Count rows/columns where 3 of one value are already revealed (trivially solved line)
+function countMaxedLines(initial: CellValue[][], size: number): number {
+  const half = size / 2
+  let count = 0
+
+  for (let r = 0; r < size; r++) {
+    const aCount = initial[r].filter(v => v === 'A').length
+    const bCount = initial[r].filter(v => v === 'B').length
+    if (aCount >= half || bCount >= half) count++
+  }
+
+  for (let c = 0; c < size; c++) {
+    const col = Array.from({ length: size }, (_, r) => initial[r][c])
+    const aCount = col.filter(v => v === 'A').length
+    const bCount = col.filter(v => v === 'B').length
+    if (aCount >= half || bCount >= half) count++
+  }
+
+  return count
+}
+
+function tryGenerate(
+  difficulty: Difficulty,
+  seed: number,
+  requireLogical: boolean
+): LibraPuzzle | null {
+  const rng = createRng(seed)
+  const { revealRate, constraintCount } = DIFFICULTY_CONFIG[difficulty]
+  const size = GRID_SIZE
+
   const solution = generateSolution(size, rng)
-
-  // Generate adjacency constraints based on the solution
   const constraints = generateConstraints(solution, size, constraintCount, rng)
 
-  // Build list of all cells and shuffle
   const cells: [number, number][] = []
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
@@ -156,12 +204,10 @@ export function generate(difficulty: Difficulty, seed?: number): LibraPuzzle {
   }
   const shuffledCells = shuffle(cells, rng)
 
-  // Start with full solution and remove cells
   const initial: CellValue[][] = solution.map(row => [...row])
   const totalCells = size * size
   const targetRevealed = Math.round(totalCells * revealRate)
 
-  // Try to remove each cell, keeping only those where puzzle stays unique
   for (const [r, c] of shuffledCells) {
     const currentRevealed = initial.flat().filter(v => v !== null).length
     if (currentRevealed <= targetRevealed) break
@@ -169,28 +215,77 @@ export function generate(difficulty: Difficulty, seed?: number): LibraPuzzle {
     const backup = initial[r][c]
     initial[r][c] = null
 
-    // Check uniqueness
     const copy: CellValue[][] = initial.map(row => [...row])
     const cnt = countSolutionsInternal(copy, size, constraints)
 
     if (cnt !== 1) {
-      // Restore: removing this cell breaks uniqueness
       initial[r][c] = backup
     }
   }
 
-  // Ensure at least targetRevealed cells are revealed
-  // If we didn't reach the target (shouldn't happen but safety check), that's fine
-  // The puzzle is guaranteed to have unique solution
+  // Reject puzzles with many trivially-solved lines (20% chance of allowing them)
+  const maxedLines = countMaxedLines(initial, size)
+  if (maxedLines > 0 && rng() > 0.2) return null
+
+  // Require logical solvability (no guessing)
+  if (requireLogical && !isLogicallySolvable(initial, size, constraints)) return null
 
   return {
-    id: `libra-${difficulty}-${actualSeed}`,
+    id: `libra-${difficulty}-${seed}`,
     size,
     initial,
     solution,
     constraints,
     difficulty,
-    seed: actualSeed,
+    seed,
+  }
+}
+
+export function generate(difficulty: Difficulty, seed?: number): LibraPuzzle {
+  const baseSeed = seed !== undefined ? seed >>> 0 : Date.now() >>> 0
+
+  // Try to generate a logically solvable puzzle without trivial lines
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const trySeed = (baseSeed + attempt * 999983) >>> 0
+    const puzzle = tryGenerate(difficulty, trySeed, true)
+    if (puzzle) return { ...puzzle, seed: baseSeed }
+  }
+
+  // Fallback: allow guessing puzzles but still avoid trivial lines
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const trySeed = (baseSeed + (attempt + 80) * 999983) >>> 0
+    const puzzle = tryGenerate(difficulty, trySeed, false)
+    if (puzzle) return { ...puzzle, seed: baseSeed }
+  }
+
+  // Last resort: generate any unique puzzle
+  const fallbackSeed = (baseSeed + 100 * 999983) >>> 0
+  const rng = createRng(fallbackSeed)
+  const size = GRID_SIZE
+  const { revealRate, constraintCount } = DIFFICULTY_CONFIG[difficulty]
+  const solution = generateSolution(size, rng)
+  const constraints = generateConstraints(solution, size, constraintCount, rng)
+  const cells: [number, number][] = []
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) cells.push([r, c])
+  const shuffledCells = shuffle(cells, rng)
+  const initial: CellValue[][] = solution.map(row => [...row])
+  const targetRevealed = Math.round(size * size * revealRate)
+  for (const [r, c] of shuffledCells) {
+    if (initial.flat().filter(v => v !== null).length <= targetRevealed) break
+    const backup = initial[r][c]
+    initial[r][c] = null
+    const copy = initial.map(row => [...row])
+    if (countSolutionsInternal(copy, size, constraints) !== 1) initial[r][c] = backup
+  }
+
+  return {
+    id: `libra-${difficulty}-${baseSeed}`,
+    size,
+    initial,
+    solution,
+    constraints,
+    difficulty,
+    seed: baseSeed,
   }
 }
 

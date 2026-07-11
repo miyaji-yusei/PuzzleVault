@@ -30,7 +30,32 @@
      gh issue edit {番号} --remove-label in-progress --add-label claude
      gh issue comment {番号} --body "[Monitor] PR未作成のまま中断されています（トークン切れの可能性）。Workerキューに再投入しました。"
      ```
+   - PRが `open` + Issueが `claude` → Workerがラベル更新漏れ → in-progressに修正:
+     ```bash
+     gh issue edit {番号} --remove-label claude --add-label in-progress
+     gh issue comment {番号} --body "[Monitor] PR #{PR番号}がオープン中ですがclaudeラベルのままでした。in-progressに修正しました。"
+     ```
    - PRが存在しない + Issueが `claude` → 正常（Workerが未処理）→ そのまま
+
+1.5. **do-not-mergeラベル付きPR + in-progress Issueの再キュー**
+   ```bash
+   gh pr list --base develop --state open --json number,title,headRefName,labels
+   ```
+   ブランチ名が `claude/{番号}` パターンで `do-not-merge` ラベルが付いているPRについて、対応するIssueが `in-progress` の場合:
+
+   **【重要】再キュー前に後継PRの存在を確認する**:
+   同じIssue番号に対して、`do-not-merge` PR以外のオープンPRが存在しないか確認する:
+   ```bash
+   gh pr list --base develop --state open --json number,headRefName,body \
+     --jq '[.[] | select(.body | contains("Closes #{Issue番号}"))] | length'
+   ```
+   - 2件以上のPRが当該Issueに紐づく場合（`do-not-merge` PR + 後継PR）→ **スキップ**（後継PRで実装中のため再キュー不要）
+   - 1件のみ（`do-not-merge` PRのみ）→ 以下の通り再キュー:
+   ```bash
+   gh issue edit {Issue番号} --remove-label in-progress --add-label claude
+   gh issue comment {Issue番号} --body "[Monitor] PRに do-not-merge ラベルが付いており実装が承認されていません。Workerキューに再投入しました。既存PR #{PR番号}を参考に新しいアプローチで再実装してください。"
+   ```
+   **注意**: PRはオープンのまま（参考用に保持）。Workerは既存ブランチ（`claude/{番号}`）に新しい実装をforce-pushするか、別の実装方針を検討すること。
 
 2. **キュー枯渇チェック**
    ```bash
@@ -39,6 +64,16 @@
    が0件の場合:
    - `gh issue create --title "[監視] キュー枯渇: claudeラベルIssueが0件" --label monitoring-alert --body "Issue補充が必要です。このManagerセッションのPhase2で補充されます。"`
    - **注意**: このフラグは後続のPhase2（a-issue-refill）で必ず処理すること。キュー枯渇の場合Phase2はスキップせずに実行する。
+
+   1件以上の場合（キュー正常）:
+   - open の「キュー枯渇」アラートが残っていれば解決済みとしてクローズする:
+     ```bash
+     gh issue list --label monitoring-alert --state open --json number,title
+     ```
+     タイトルが `[監視] キュー枯渇` で始まるIssueを検出した場合:
+     ```bash
+     gh issue close {番号} --comment "[Monitor] キューが補充されたため解決済みとしてクローズしました。"
+     ```
 
 3. **スタック検知**（24時間以上更新なし）
    ```bash
@@ -55,6 +90,45 @@
    - 72時間以上経過したready PRを検知:
      `gh pr comment {番号} --body "[Monitor] 72時間以上マージされていません。Workerが次回レビューします。"`
 
+4.5. **CI環境障害チェック**（インフラ問題による即時失敗の検知）
+
+   ready状態（isDraft=false）のPRを対象に、最新CIランを確認して「30秒未満の即時失敗」が複数PRで発生していないかチェックする:
+   ```bash
+   gh pr list --base develop --state open --json number,headRefName,isDraft \
+     --jq '.[] | select(.isDraft == false) | [.number, .headRefName] | @tsv'
+   ```
+   各PRの最新CIランを確認:
+   ```bash
+   gh run list --workflow=ci.yml --branch {headブランチ名} --limit 1 \
+     --json status,conclusion,createdAt,updatedAt,databaseId \
+     --jq '.[0] | {conclusion, duration: ((.updatedAt | fromdate) - (.createdAt | fromdate))}'
+   ```
+
+   **即時失敗と判定する条件**（以下のいずれか）:
+   - `conclusion=failure` かつ 実行時間が **30秒未満**
+   - `databaseId` が取得できない（ランナー未割り当て）
+   - ログ取得を試みると404エラーが返る
+
+   該当PRが **2件以上** → CI環境障害と判定して Issueを作成する:
+   ```bash
+   EXISTING=$(gh issue list --label monitoring-alert --state open --json title \
+     --jq '[.[] | select(.title | contains("CI環境障害"))] | length')
+   if [ "$EXISTING" -eq 0 ]; then
+     gh issue create \
+       --title "[監視] CI環境障害: 全PRで即時失敗を検知（インフラ問題）" \
+       --label monitoring-alert \
+       --body "対象PR: {番号リスト}\n\n複数のPRで30秒未満のCI即時失敗を検知しました。GitHub Actionsのランナーが割り当てられていない（runner_id=0）インフラ側の問題の可能性があります。\n\n**Workerへの指示**: このIssueが未クローズの間、CIが30秒未満で失敗しているPRはコード修正を試みずスキップしてください。"
+   fi
+   ```
+
+   CI環境障害Issueが既に存在する場合:
+   - 最新CI実行が30秒以上で完了していれば → 「環境回復」としてIssueをクローズする:
+     ```bash
+     gh issue close {監視Issue番号} --comment "[Monitor] CIランが正常に完了したため、環境障害は解消されたと判断します。"
+     ```
+
+   → CI環境障害と判定した場合でも他のチェック（ステップ5・6）は続行する。
+
 5. **CI連続失敗チェック**
    ```bash
    gh pr list --base develop --state open --json number,title
@@ -70,6 +144,23 @@
    ```
    - isDraft=falseのPRで「🎮 このPRで遊べるようになるゲーム」がなければ追記:
      `gh pr edit {番号} --body "{更新した本文}"`
+
+---
+
+### フェーズ1.5: 古いmonitoring-alertのクリーンアップ
+
+7. 解決済み・古いアラートIssueをクローズする:
+   ```bash
+   gh issue list --label monitoring-alert --state open --json number,title,createdAt
+   ```
+   以下の条件に該当するIssueをクローズする:
+   - タイトルが `[リリース判断] 基準未達` → 同じタイトルが複数あれば古い方をクローズ
+   - タイトルが `[改善]` → 対応する `.claude/routines/*.md` が既に改善済みであればクローズ
+   - タイトルが `[監視]` → 該当する異常状態が既に解消されていればクローズ
+   - 作成から7日以上経過したIssue → 内容に関わらずクローズ（陳腐化）
+   ```bash
+   gh issue close {番号} --comment "[Monitor] 解決済み/陳腐化のためクローズしました。"
+   ```
 
 ---
 

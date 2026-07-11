@@ -41,15 +41,14 @@ describe('Nonogram Engine', () => {
       expect(p1.solution).not.toEqual(p2.solution)
     })
 
-    it('easy puzzle has size between 5 and 8', () => {
+    it('easy puzzle has size 10', () => {
       const puzzle = generate('easy', 7)
-      expect(puzzle.size).toBeGreaterThanOrEqual(5)
-      expect(puzzle.size).toBeLessThanOrEqual(8)
+      expect(puzzle.size).toBe(10)
     })
 
-    it('normal puzzle has size 10', () => {
+    it('normal puzzle has size 15', () => {
       const puzzle = generate('normal', 7)
-      expect(puzzle.size).toBe(10)
+      expect(puzzle.size).toBe(15)
     })
 
     it('generates within 500ms for easy', () => {

@@ -10,12 +10,45 @@
 
 1. `.claude/paused` ファイルが存在する場合は「一時停止中」と出力して終了する
 
-2. claudeラベルIssueを全件取得する:
-   `gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number)'`
+2. claudeラベルIssueを取得する（priorityラベル付きを優先、次に番号が小さい順）:
+   ```bash
+   # priorityラベル付きを先頭に
+   gh issue list --label claude,priority --state open --json number,title,body
+   # 残りは番号順
+   gh issue list --label claude --state open --json number,title,body --jq 'sort_by(.number)'
+   # 両方をマージして重複除外、priorityを先頭に並べる
+   ```
 
 3. Issueが0件なら「実装待ちIssueなし」と出力して終了する
 
-4. **実装ループ**（最大3件。トークン残量が少ない場合は途中で終了してよい）:
+4. **実装上限ルール**（Issue種別 × 経過時間で判断）:
+
+   | Issue種別 | 1セッション上限 | 1件完了後の継続条件 |
+   |---|---|---|
+   | エンジン実装（「ゲームエンジン実装」を含む） | 1件 | 継続しない（必ず終了） |
+   | UI実装（「UI」「基盤」「foundation」を含む） | 2件 | 経過70分未満なら継続 |
+
+   1件目完了後に必ず経過時間を確認する:
+   ```bash
+   ELAPSED_MIN=$(( ( $(date +%s) - SESSION_START ) / 60 ))
+   echo "1件目完了。経過時間: ${ELAPSED_MIN}分"
+   ```
+
+   **30分経過チェックポイント**（実装ループ内で定期確認）:
+   各ファイルの実装が一段落したタイミング（例: generator.ts完成時、solver.ts完成時）で経過時間を確認する:
+   ```bash
+   ELAPSED_MIN=$(( ( $(date +%s) - SESSION_START ) / 60 ))
+   if [ $ELAPSED_MIN -ge 30 ]; then
+     # 未コミットの変更があれば中間コミット
+     git add -A
+     git diff --cached --quiet || git commit -m "[WIP] #{番号} {ゲーム名} 実装中 (${ELAPSED_MIN}分経過)"
+     git push origin claude/{Issue番号}
+     echo "中間コミット完了（${ELAPSED_MIN}分経過）"
+   fi
+   ```
+   → Draft PRが作成済みであればpush後にGitHub上で自動反映される。トークン切れになっても作業途中のコードが保存される。
+
+5. **実装ループ**（上記ルールに従う）:
 
    各Issueについて以下を実行:
 
@@ -30,18 +63,26 @@
       - `src/engines/{name}/validator.ts` - ValidationResult を返す
       - `src/engines/{name}/index.ts` - 全関数をエクスポート
       - `src/engines/{name}/__tests__/{name}.test.ts` - Jestテスト
-   f. テストは以下をカバーする:
+   f. テストファイルは作成するが**ローカル実行はしない**（CIに任せる）。テストは以下をカバーする:
       - 各Difficultyで10問生成して全問解けることを確認
       - 同一seedで同一問題が生成されることを確認
       - countSolutions()の一意解チェックが正しいことを確認
       - 生成時間が500ms以内（Normal）
       - validateが正誤を正しく判定することを確認
-   g. `npm run typecheck` を実行してエラーがないことを確認する
-   h. `npm test -- --testPathPattern={name}` を実行して全件パスすることを確認する
-   i. エラーがある場合は修正する（最大3回）
-   j. `git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"`
-   k. `git push origin claude/{Issue番号}`
-   k2. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
+   g. **PR作成前チェック**（コミット前に必ず実行する）:
+      - Issue本文に記載された全てのチェックボックス（`- [ ]`）に対応する実装が完了しているか確認する
+      - 実装中に**Issueの範囲外で未解消の問題**を発見した場合:
+        1. その問題を別Issueとして切り出す: `gh issue create --label claude --title "[ClaudeCode] {内容}" --body "{詳細}"`
+        2. 現在のIssue/PRはオリジナルの範囲のみで完了とする（無理に同じPRに詰め込まない）
+      - Issueの要件のうち**対応できなかったもの**がある場合:
+        - PR本文に「**未対応：{内容}（別Issue #{番号}で対応）**」の形式で明記する
+      - 全チェックボックスへの対応または上記の切り出し・明記が完了してから次へ進む
+   j. **typecheck通過後すぐにコミット＋push**（テストはCIに任せる）:
+      ```bash
+      git add -A && git commit -m "[WIP] #{番号} {ゲーム名}エンジン実装中"
+      git push origin claude/{Issue番号}
+      ```
+   k. **Draft PRを即座に作成する**（トークン切れ時のコード消失防止）:
        ```bash
        DRAFT_PR_URL=$(gh pr create --base develop --draft \
          --title "[WIP] #{番号} {ゲーム名} ゲームエンジン実装" \
@@ -58,8 +99,8 @@
        fi
        echo "PR #$VERIFY_PR の作成を確認しました"
        ```
-       → PR作成確認後、実装を継続する。以降のpushは自動的にこのPRに反映される。
-   l. テスト・typecheck通過後、Draft PRをReadyに変換して本文を更新する:
+       → Draft PR作成後、CIが自動実行される。次回WorkerがCI結果を確認してReadyに変換・マージする。
+   l. Draft PRをReadyに変換して本文を更新する（typecheckが通っていればCIを待たずにReady化してよい）:
       ```bash
       gh pr ready {PR番号}
       # Draft解除確認（失敗時はキューに再投入してスキップ）
@@ -74,9 +115,16 @@
           --body "{完成したPR本文（下記テンプレート）}"
       fi
       ```
-      PR本文（Readyに変換時に設定）:
 
-      PR本文:
+      > ### ⛔ PR本文作成前に必ず確認
+      > 全PR（バグ修正・改善・UX改善・新機能を問わず）のPR本文は **必ず** 下記のいずれかのテンプレートをそのまま使うこと。
+      > - ヘッダは **`## 🎮 このPRで遊べるようになるゲーム`** に固定。**絶対に変更しない。**
+      > - `## 🎮 このPRで改善されること` `## 🎮 このPRで改善されるゲーム` `## このPRの変更点` など一切の別名禁止。
+      > - テンプレートをそのまま使えば問題ない。ヘッダを「改善」の方が自然だからと変えてはいけない。
+
+      ---
+
+      **エンジン実装Issueの場合**、PR本文:
       ```
       ## 🎮 このPRで遊べるようになるゲーム
 
@@ -130,8 +178,94 @@
       Closes #{番号}
       ```
 
-   m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
+      ---
 
-5. 実装した件数とPR番号を記録する:
+      **バグ修正・変更・削除系Issueの場合（エンジン実装・UI実装以外）**、PR本文:
+      ```
+      ## 🎮 このPRで遊べるようになるゲーム
+
+      なし（バグ修正・変更のみ）
+
+      ---
+
+      ## ✅ 実装内容
+
+      {変更内容のチェックリスト}
+
+      ---
+
+      ## 🖥️ ローカルで動作確認する手順
+
+      ```bash
+      # 1. このブランチをチェックアウト
+      git fetch origin
+      git checkout claude/{Issue番号}
+
+      # 2. 依存パッケージをインストール
+      npm install --legacy-peer-deps
+
+      # 3. 型チェックを実行
+      npm run typecheck
+
+      # 4. アプリを起動して変更を確認
+      npx expo start
+      ```
+
+      ---
+
+      Closes #{番号}
+      ```
+
+      ---
+
+      **改善・品質改善・UX改善系Issueの場合（ゲームプレイ改善・難易度調整・操作改善等）**、PR本文:
+      ```
+      ## 🎮 このPRで遊べるようになるゲーム
+
+      | ゲーム名 | 概要 |
+      |---|---|
+      | {ゲーム名} | {改善内容の一言説明} |
+
+      ---
+
+      ## ✅ 実装内容
+
+      {変更内容のチェックリスト}
+
+      ---
+
+      ## 🖥️ ローカルで動作確認する手順
+
+      ```bash
+      # 1. このブランチをチェックアウト
+      git fetch origin
+      git checkout claude/{Issue番号}
+
+      # 2. 依存パッケージをインストール
+      npm install --legacy-peer-deps
+
+      # 3. 型チェックを実行
+      npm run typecheck
+
+      # 4. アプリを起動して改善を確認
+      npx expo start
+      ```
+
+      ---
+
+      Closes #{番号}
+      ```
+
+   m. `gh issue edit {番号} --add-label in-progress --remove-label claude`
+   n. **UI実装の場合（`app/games/{name}/` を作成・更新するPRの場合）**:
+      `app/(tabs)/index.tsx` の GAMES リストで対象ゲームの `implemented: false` を `implemented: true` に変更する:
+      ```bash
+      # app/(tabs)/index.tsx を開いて対象ゲームの implemented: false を true に変更
+      git add "app/(tabs)/index.tsx"
+      git commit -m "feat: {name}をゲーム一覧で選択可能にする（implemented: true）"
+      git push origin claude/{Issue番号}
+      ```
+
+6. 実装した件数とPR番号を記録する:
    `gh issue comment {最後のIssue番号} --body "Worker実行完了: {N}件実装しました\n作成PR: #{PR番号1}, #{PR番号2}..."`
    （PR番号が不明な場合は `gh pr list --head claude/{番号} --json number --jq '.[0].number'` で確認してから記録する）

@@ -4,90 +4,84 @@
 - GitHub操作のみ（ブランチ操作不要）
 - ファイル確認は develop ブランチの状態を参照
 
-## 実装フェーズの優先順位
+## 補充ルール（エンジンとUIを並行）
 
-現在は **UIフェーズ** を優先する。以下の順でIssueを補充する:
+キューに空きがある場合、以下の優先順位でIssueを補充する:
 
-### UIフェーズ（現在優先）
-1. `app-foundation` — アプリ基盤（_layout.tsx, タブ, ホーム画面, 設定画面）
-2. `sudoku-ui` — ナンプレ画面UI
-3. `nonogram-ui` — イラストロジック画面UI
-4. `queens-ui` — クイーンズマスター画面UI
-5. `libra-ui` — Libra画面UI
-6. `panda-ui` — Panda画面UI
+### 優先順位 (2026-06-14更新)
+1. **app-foundation** / **完成エンジンのUI** / **未実装エンジン**
+   - 2026-06-14時点で全て完了済み（対象なし）。Phase 1の8ゲーム（sudoku/nonogram/queens/libra/panda/solitaire/hashi/seven）に加え spider/sums/gechoout(Snake Escape)/goita も実装済みで、PR #42（v1.0.0リリース）の対象になっている。
+2. **デザイン一新フェーズ（現在優先）**
+   - `docs/design-overhaul-TODO.md`（developブランチ）の「残作業」セクションを参照する
+   - 2026-06-14時点で対応中/作成済みのIssue: #310（sudoku/nonogram/queens盤面）, #311（sums/hashi/gechoout盤面）, #312（goita盤面+DifficultySelect統一）, #315（solitaire/spider盤面）, #316（Phase5仕上げ: ハードコード色一掃+solitaireアニメーション分割）
+   - 上記が全てclosed/completedになり、`docs/design-overhaul-TODO.md`の「残作業」に新たな項目が無ければ、このフェーズは完了とみなし優先順位3へ進む
+3. **次フェーズ: 既知の問題対応**（デザイン一新フェーズ完了後）
+   - `docs/design-overhaul-TODO.md`「既知の問題（このブランチ起因ではない）」に記載の以下を解消するIssueを作成する:
+     - `npm run lint` がESLint v10とeslintrc形式の不整合で動作しない
+     - `npm test` が「No tests found」になる（jest projects設定とテスト配置の不整合）
+4. **フォールバック: 改善・バグ修正Issueからの補充**（上記1〜3が全て完了済み、かつキューが3件未満の場合）
+   - `gh issue list --state open --label bug,enhancement --json number,title,labels` で取得したIssueのうち、
+     `claude` / `in-progress` / `completed` のいずれのラベルも付いていないものを番号の古い順に選ぶ
+   - 選んだIssueに `gh issue edit {番号} --add-label claude` でラベルを付与してキューに追加する（3件になるまで）
+   - 該当Issueも無い場合は新規Issueを作成せず「補充対象なし: {既存件数}件のまま」と出力して終了する
 
-### エンジンフェーズ（UIが揃い次第再開）
-- solitaire → hashi → seven → spider → sums
+※ 複数フェーズのIssueを混在させてよい（例: デザイン一新2件 + 次フェーズ1件）
 
 ## 手順
 
 1. `gh issue list --label claude --state open --json number` でキューを確認する
 2. claudeラベルIssueが3件以上あれば「補充不要: {N}件キューあり」と出力して終了する
 
-3. **実装済みタスクを特定する**（以下を全て確認する）:
+3. **現状を把握する**:
    ```bash
    gh issue list --state all --json number,title,labels,state
    git checkout develop && git pull origin develop
-   ls src/engines/ 2>/dev/null
-   ls app/ src/components/ 2>/dev/null
+   cat docs/design-overhaul-TODO.md
    ```
-   以下のいずれかに該当するタスクは「実装済み」とみなす:
-   - `completed` ラベルまたは `closed` 状態のIssue
-   - `in-progress` / `claude` ラベルのIssue（進行中・待機中）
-   - 対応ディレクトリが develop に存在する（`app/(tabs)/`等）
+   - 既存Issue（claude/in-progress/completed/closed）のタイトルから「着手済みタスク」を抽出する
+   - `docs/design-overhaul-TODO.md`の「残作業」セクションの各項目について、対応するIssueが
+     `completed`ラベル/`closed`状態/`in-progress`・`claude`ラベルのいずれかに該当するか確認し、
+     該当しない項目を「未着手」とみなす
 
-4. 未着手タスクを上記の優先順位で選んでIssueを作成する（3件になるまで）
+4. 未着手タスクを上記の優先順位2〜3で選んでIssueを作成する（3件になるまで）。
+   優先順位2〜3に未着手タスクが無い場合は、優先順位4のフォールバック手順で既存Issueにラベルを付与する。
 
-5. **UIフェーズのIssue本文テンプレート**:
+5. **デザイン一新フェーズのIssue本文テンプレート**（優先順位2でIssueを新規作成する場合に使用。#310, #311, #312, #315, #316 を参考に対象ファイル・配色方針を具体化する）:
 
-   ### app-foundation（アプリ基盤）
    ```
+   ## 背景
+   デザイン一新（黒×黄色「財宝の中の雷」テーマ、`src/theme/colors.ts`）はホーム画面・タブ・各ゲームの共有UI（GameHeader/AppDialog等）には適用済みですが、以下の対応が残っています。
+   `docs/design-overhaul-TODO.md` の「残作業」を参照してください。
+
    ## 実装対象
-   アプリの基盤となる画面・ナビゲーション・共通UIを実装してください。
-   仕様は `docs/md/architecture.md` を参照してください。
+   - [ ] {対象ファイルパス（例: src/components/games/{name}/Board.tsx）}
 
-   ## 実装ファイル
-   - [ ] `app/_layout.tsx` — Expo Routerルートレイアウト（Stack/Tabs設定）
-   - [ ] `app/(tabs)/_layout.tsx` — タブナビゲーション（ホーム・設定）
-   - [ ] `app/(tabs)/index.tsx` — ゲーム選択ホーム画面（ゲーム一覧グリッド）
-   - [ ] `app/(tabs)/settings.tsx` — 設定画面（サウンド・振動ON/OFF等）
-   - [ ] `src/stores/settingsStore.ts` — 設定Zustand store
-   - [ ] `src/stores/progressStore.ts` — ゲーム進行状況Zustand store
-
-   ## UI要件
-   - ホーム画面: 実装済みゲームをカード形式で一覧表示
-   - 各カードはゲーム名・アイコン・難易度選択を含む
-   - Expo Router v3 のfile-basedルーティングを使用
-   - TypeScript strict mode 必須
+   ## 実装方針
+   - `src/theme/colors.ts` のパレット（`vault`/`gold`/`ink`/`jewels`等）を用いて、ハードコードされた旧配色をダークテーマに置き換える
+   - 既にダークテーマ対応済みの `src/components/games/libra/Board.tsx`, `src/components/games/panda/Board.tsx` を配色の参考にする
+   - 「色による識別」が機能の一部になっている箇所は、識別性を保ったまま暗い配色に置き換える
+   - ロジック・状態管理・アニメーションは変更しない（スタイルのみの変更）
 
    ## 完了条件
    - `npm run typecheck` エラーなし
-   - `npx expo start` で画面が表示されること
+   - `npm test` 全件パス（UIのみの変更でロジックへの影響がないこと）
+   - `npx expo start` で対象画面を開き、黒×金のダークテーマで他画面と統一されていることを確認
    ```
 
-   ### {game}-ui（各ゲーム画面）
+   **次フェーズ（既知の問題対応）のIssue本文テンプレート**（優先順位3でIssueを新規作成する場合に使用）:
+
    ```
+   ## 背景
+   `docs/design-overhaul-TODO.md`「既知の問題」に記載の設定不整合を解消してください。
+
    ## 実装対象
-   {ゲーム名}のゲームプレイ画面UIを実装してください。
-   エンジン（`src/engines/{name}/`）は実装済みです。
-
-   ## 実装ファイル
-   - [ ] `app/games/{name}/index.tsx` — ゲーム画面（メインコンポーネント）
-   - [ ] `src/components/games/{name}/Board.tsx` — ゲームボード
-   - [ ] `src/hooks/use{Name}Game.ts` — ゲーム状態管理フック
-
-   ## UI要件
-   - エンジンの `generate(difficulty, seed)` で問題を生成して表示
-   - ユーザー入力を受け取り `validate(state, move)` で正誤判定
-   - ライフ（残機）表示（上部）
-   - 難易度選択から戻れるナビゲーション
-   - TypeScript strict mode 必須
+   - [ ] {対象（例: ESLint設定をv10形式に移行 / jest projects設定を修正）}
 
    ## 完了条件
-   - `npm run typecheck` エラーなし
-   - 実機/シミュレータでゲームが遊べること
+   - {対象コマンド（npm run lint / npm test）が正常に実行できること}
    ```
 
-6. `gh issue create --title "[ClaudeCode] {タスク名}" --label claude --body {本文}` でIssueを作成する
+6. 優先順位2〜3の場合: `gh issue create --title "[ClaudeCode] {タスク名}" --label claude --body {本文}` でIssueを作成する。
+   優先順位4の場合: `gh issue edit {番号} --add-label claude` で既存Issueをキューに追加する。
 
-7. 作成したIssue番号を出力して終了する
+7. 作成・更新したIssue番号を出力して終了する

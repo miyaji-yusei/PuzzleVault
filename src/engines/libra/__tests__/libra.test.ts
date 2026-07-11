@@ -54,18 +54,18 @@ describe('Libra Engine', () => {
       puzzle.solution.forEach(row => expect(row.length).toBe(6))
     })
 
-    it('solution has correct grid size for normal (8x8)', () => {
+    it('solution has correct grid size for normal (6x6)', () => {
       const puzzle = generate('normal', 7)
-      expect(puzzle.size).toBe(8)
-      expect(puzzle.solution.length).toBe(8)
-      puzzle.solution.forEach(row => expect(row.length).toBe(8))
+      expect(puzzle.size).toBe(6)
+      expect(puzzle.solution.length).toBe(6)
+      puzzle.solution.forEach(row => expect(row.length).toBe(6))
     })
 
-    it('solution has correct grid size for expert (10x10)', () => {
+    it('solution has correct grid size for expert (6x6)', () => {
       const puzzle = generate('expert', 7)
-      expect(puzzle.size).toBe(10)
-      expect(puzzle.solution.length).toBe(10)
-      puzzle.solution.forEach(row => expect(row.length).toBe(10))
+      expect(puzzle.size).toBe(6)
+      expect(puzzle.solution.length).toBe(6)
+      puzzle.solution.forEach(row => expect(row.length).toBe(6))
     })
 
     it('solution rows are balanced (equal A and B)', () => {

@@ -1,0 +1,5 @@
+export { generate } from './generator'
+export { dealState, removeCompleteSets } from './state'
+export { solve, countSolutions, autoSolve } from './solver'
+export { validate, isValidMoveUnit } from './validator'
+export type { Suit, Rank, Card, SpiderPuzzle, SpiderState, SpiderMove } from './types'
