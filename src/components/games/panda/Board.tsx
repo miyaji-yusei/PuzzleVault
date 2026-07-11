@@ -1,10 +1,11 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder } from 'react-native'
 import { PandaState } from '../../../engines/panda/types'
 import { GameIcon } from '../../ui/GameIcon'
 import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const HINT_SIZE = 28
 const BOARD_PADDING = 32
 const DRAG_THRESHOLD = 5

@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
+import { View, StyleSheet, PanResponder, Animated } from 'react-native'
 import { DIRECTION_DELTA } from '../../../engines/gechoout'
 import { Direction, GechoOutState, Position, Snake, SnakeEnd } from '../../../engines/gechoout/types'
 import { MoveResult } from '../../../hooks/useGechooutGame'
 import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_PADDING = 32
 
 const SNAKE_COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00897b']

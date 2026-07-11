@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions, Animated } from 'react-native'
+import { View, Text, StyleSheet, PanResponder, Animated } from 'react-native'
 import { NonogramState, CellState } from '../../../engines/nonogram/types'
 import { NonogramMode, HintColor } from '../../../hooks/useNonogramGame'
 import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const MAX_BOARD = SCREEN_WIDTH - 32
 const AXIS_THRESHOLD = 6
 const MIN_SCALE = 1

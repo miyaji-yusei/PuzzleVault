@@ -1,10 +1,11 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder } from 'react-native'
 import { LibraState } from '../../../engines/libra/types'
 import { GameIcon } from '../../ui/GameIcon'
 import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const BOARD_PADDING = 24
 const CONSTRAINT_BOX = 14
 

@@ -6,6 +6,7 @@ import { SpiderSelection, CompletingSet } from '../../../hooks/useSpiderGame'
 import { adsEnabled, AD_BANNER_HEIGHT_ESTIMATE } from '../../../config/ads'
 import { vault, gold, ink, felt } from '../../../theme'
 import { measurePageOrigin, boardNoSelectStyle } from '../../../utils/boardCoords'
+import { capGameWidth } from '../../../utils/layout'
 
 const PAD = 4
 const GAP = 2
@@ -70,7 +71,7 @@ export function SpiderBoard({ state, selected, onTapTableau, onDoubleTapCard, on
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   // 広告バナー表示時はバナー分の高さを利用可能領域から控除し、場札がバナーと重ならないようにする
   const availableHeight = adsEnabled ? windowHeight - AD_BANNER_HEIGHT_ESTIMATE : windowHeight
-  const portraitWidth = Math.min(windowWidth, availableHeight)
+  const portraitWidth = Math.min(capGameWidth(windowWidth), availableHeight)
   const CARD_W = Math.floor((portraitWidth - PAD * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS)
   const CARD_H = Math.floor(CARD_W * 1.5)
 

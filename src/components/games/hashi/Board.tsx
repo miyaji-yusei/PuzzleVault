@@ -1,9 +1,10 @@
 import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react'
-import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, PanResponder } from 'react-native'
 import { Island, Bridge, HashiState } from '../../../engines/hashi/types'
 import { measurePageOrigin, boardTouchFixStyle } from '../../../utils/boardCoords'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_WIDTH = gameWindowWidth()
 const GRID_PADDING = 16
 const BRIDGE_TAP_THRESHOLD = 0.45
 const DRAG_CONFIRM_THRESHOLD = 0.7

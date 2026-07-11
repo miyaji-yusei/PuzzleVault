@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { SumsState, CellMark, ColorGroup } from '../../../engines/sums/types'
+import { gameWindowWidth } from '../../../utils/layout'
 
-const SW = Dimensions.get('window').width
+const SW = gameWindowWidth()
 const GROUP_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFB347', '#A29BFE', '#6C5CE7', '#FD79A8', '#00B894']
 const GROUP_COLORS_LIGHT = ['#3A2426', '#1F3A38', '#1F333D', '#3A2E1C', '#2C2A3D', '#28233D', '#3A2530', '#1A3530']
 
